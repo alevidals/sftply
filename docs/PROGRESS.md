@@ -3,8 +3,8 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-06  
-**Current phase:** Phase 1 complete pending visual QA; Phase 2 (local filesystem) is next  
-**Overall status:** Foundation, design system, app shell, settings and typed IPC are implemented and verified by automated gates. Runtime visual QA of the desktop window is still pending.
+**Current phase:** Phase 2 implemented and verified by automated gates; Phase 3 (connections and remote browsing) is next  
+**Overall status:** Phase 1 shell and Phase 2 local browser are implemented. Automated gates are green; real-window visual QA and rendered component interaction tests are still pending.
 
 ---
 
@@ -49,10 +49,12 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Progress log created
 - [x] Phase 0: git initialization, Rust toolchain pin, Bun scripts, frontend foundations, shadcn/Tailwind v4, tauri-specta spike
 - [x] Phase 1: design tokens, shell, resizable persisted layout, themes, command palette skeleton, settings, Rust foundation, typed IPC, strict CSP, tests
+- [x] Phase 2: local filesystem service, path validation, virtualized table, navigation, selection/keyboard model, mutations, dialogs, empty/error states, 10k performance check
 
 ### In progress
 
-- [ ] Phase 1 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity)
+- [ ] Phase 1 + 2 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity, local browser interactions)
+- [ ] Rendered component tests for keyboard table navigation and rename/delete dialog flows
 - [ ] Phase 0 CI skeleton (frontend + Rust + audit)
 
 ### Known issues / blockers
@@ -61,6 +63,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - Runtime FTPS/SFTP/keyring spikes still need local test servers (Docker or local daemons). Compile-time validation proceeds without them; protocol crates and their features are not yet added to `Cargo.toml`.
 - The `suppaftp`/implicit-FTPS and `russh` + `russh-sftp` version pairings remain unproven at runtime; if they fail, the dependency ADRs must be updated before Phase 3.
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
+- The production JS bundle is a single chunk slightly above Vite's 500 kB warning threshold (≈781 kB raw / 238 kB gzip). Code splitting belongs in the Phase 5 performance pass unless it starts blocking work.
+- Biome's `useSemanticElements` / `useFocusableInteractive` are disabled for the virtualized file table and column header only. They are an ARIA grid with a single roving tab stop, not semantic `<table>` markup; keyboard access is handled on the grid container.
 
 ---
 
@@ -119,23 +123,27 @@ These were recommended in the architecture package. Implementation proceeds with
 
 ## Phase 2 — Local filesystem and file browser
 
-- [ ] Local filesystem Rust service (list/stat/mkdir/rename/delete/chmod/open/reveal)
-- [ ] Path validation + sanitization + property tests
-- [ ] Virtualized file table (name, size, modified, permissions, kind)
-- [ ] Breadcrumbs + history + keyboard path entry
-- [ ] Selection model (click, mod-click, shift-range, select all, type-ahead)
-- [ ] New folder, inline rename, delete confirmation, permissions dialog
-- [ ] Context menu + keyboard access
-- [ ] Hidden files toggle, filter, sort, column config
-- [ ] Loading/empty/error/permission-denied states
-- [ ] 10k-entry performance check
-- [ ] Tests: selection/sort reducers, path invariants, keyboard table, rename/delete flows
+- [x] Local filesystem Rust service (list/stat/mkdir/rename/delete/chmod/open/reveal)
+- [x] Path validation + sanitization + tests (absolute paths, NUL, traversal names, separators, reserved names, mode bits)
+- [x] Virtualized file table (name, size, modified, permissions, kind)
+- [x] Breadcrumbs + history + keyboard path entry (`⌘L`)
+- [x] Selection model (click, mod-click, shift-range, select all, type-ahead)
+- [x] New folder, inline rename, delete confirmation, permissions dialog
+- [x] Context menu + keyboard access (`↩`, `F2`, `Delete`, `⌘⌫`, arrows, Home/End, `Esc`)
+- [x] Hidden files toggle, filter, sort, column config
+- [x] Loading/empty/error/permission-denied states
+- [x] 10k-entry performance check (Rust listing + frontend sort/filter smoke test)
+- [x] Tests: selection/sort/path/name models and backend list/stat/mutations/traversal/symlink/chmod/error mapping
+- [ ] Rendered component tests for the keyboard table and rename/delete dialogs
+- [ ] Visual runtime QA of the local browser in the Tauri window
 
 ### Phase 2 exit criteria
 
-- Fully usable local file manager by keyboard.
-- 10k entries meet performance budget.
-- No mock listings in production paths.
+- Fully usable local file manager by keyboard — implemented; manual runtime pass pending.
+- 10k entries meet performance budget — listing took **71.9 ms** locally (5 s test ceiling).
+- No mock listings in production paths — local commands call the real filesystem; remote scopes return `UNSUPPORTED`.
+
+**Status:** Backend and frontend implementation complete, automated gates green. Runtime visual QA and rendered interaction tests remain.
 
 ---
 
@@ -243,16 +251,18 @@ cargo test
 
 **Last verification run:** 2026-11-06 — all gates green.
 
-| Gate                 | Result                                                  |
-| -------------------- | ------------------------------------------------------- |
-| `bun run typecheck`  | pass                                                    |
-| `bunx biome check .` | pass                                                    |
-| `bun run test`       | 19 tests pass in 4 files                                |
-| `bun run build`      | pass                                                    |
-| `cargo fmt --check`  | pass                                                    |
-| `cargo clippy`       | pass with `-D warnings`                                 |
-| `cargo test`         | 11 tests pass                                           |
-| `bun run bindings`   | regenerates `src/lib/ipc/bindings.ts` deterministically |
+| Gate                 | Result                                                         |
+| -------------------- | -------------------------------------------------------------- |
+| `bun run typecheck`  | pass                                                           |
+| `bunx biome check .` | pass                                                           |
+| `bun run test`       | 49 tests pass in 8 files (includes 10k sort/filter smoke test) |
+| `bun run build`      | pass (single JS chunk warning, see known issues)               |
+| `cargo fmt --check`  | pass                                                           |
+| `cargo clippy`       | pass with `-D warnings`                                        |
+| `cargo test`         | 29 tests pass (includes 10k listing budget test)               |
+| `bun run bindings`   | regenerates `src/lib/ipc/bindings.ts` deterministically        |
+
+**Performance:** listing 10,000 local entries took **71.9 ms**; the automated test fails above 5 s to tolerate slow CI hardware.
 
 ---
 
@@ -307,3 +317,33 @@ cargo test
 - Run `bun run tauri dev` and complete the Phase 1 visual QA checklist.
 - Add the CI skeleton and commit the Phase 1 checkpoint.
 - Start Phase 2: local filesystem service, path validation, virtualized table, selection/keyboard model, mutations, tests and the 10k-entry performance check.
+
+### 2026-11-06 — Session 3: Phase 2 local filesystem and browser
+
+**Done**
+
+- Added the Rust local filesystem service: `fs_list`, `fs_stat`, `fs_mkdir`, `fs_rename`, `fs_delete`, `fs_chmod`, `local_open` and `local_reveal`.
+- Added `FsScope` (`local` / `remote`) so remote requests return an honest `UNSUPPORTED` error instead of a mock listing.
+- Added lexical absolute-path normalization and name validation (NUL, separators, `.`/`..`, 255-byte limit, Windows reserved names) plus chmod mode validation.
+- Listing uses `buffer_unordered(64)` for metadata, reports unreadable entries as warnings instead of failing, detects symlinks with targets, and reports Unix permissions and hidden state.
+- Built the Phase 2 frontend: typed local API, TanStack Query listing hook, per-pane navigation history, path bar with breadcrumbs and `⌘L` editing, virtualized ARIA file grid, column sorting, filter, hidden-file toggle and column config.
+- Added the selection model (replace/toggle/shift-range/select-all/type-ahead/prune) and keyboard handling: arrows, Home/End, Space, Enter, Backspace, Delete, `⌘⌫`, `F2`, `Esc`.
+- Added new-folder, inline rename, delete confirmation and permissions dialogs wired to real commands, with optimistic-free refetching and activity entries.
+- Added loading skeleton, empty, filtered-empty, error, permission-denied and listing-warning states; status bar now reports the local path, item count and selection.
+- Replaced the Phase 1 local placeholder pane with `LocalBrowser`; the remote pane still states that remote sessions are unavailable.
+- Added 10k-entry performance checks: Rust listing (measured 71.9 ms) and a frontend sort/filter smoke test.
+- Added targeted Biome overrides and explanatory suppressions for the virtualized grid and intentional navigation-reset effects; all lint diagnostics resolved.
+- Regenerated typed bindings with `size`/`readAt`/`modifiedAt` as `number`/`number | null` via Specta `Number` annotations.
+
+**Verified**
+
+- `bun run typecheck`, `bunx biome check .`, `bun run test` (49 tests in 8 files), `bun run build`.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (29 tests).
+- `bun run bindings` produces an identical `src/lib/ipc/bindings.ts`.
+- Git tree reviewed; `dist/` and `src-tauri/target/` remain ignored.
+
+**Next**
+
+- Run the Phase 1 + 2 visual QA checklist in `bun run tauri dev`.
+- Add rendered component tests for keyboard table navigation and rename/delete dialogs.
+- Start Phase 3: connection repository, connection form, keychain storage, protocol adapters, known-hosts flow, session actors and the remote browser.

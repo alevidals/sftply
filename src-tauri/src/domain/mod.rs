@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod fs;
 pub mod settings;
 
 use serde::{Deserialize, Serialize};

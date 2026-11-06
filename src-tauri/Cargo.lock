@@ -3126,6 +3126,7 @@ dependencies = [
 name = "sftply"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "serde",
  "serde_json",
  "specta",

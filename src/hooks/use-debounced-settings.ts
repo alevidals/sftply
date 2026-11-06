@@ -4,9 +4,9 @@ import { useSettings } from "@/features/settings/settings-context"
 import { errorMessage } from "@/lib/errors"
 import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
 
-/** Persist layout changes after the user stops dragging. Patches made within
- * the debounce window are merged so no field is lost. */
-export function usePersistedLayout() {
+/** Persist settings changes after a short pause. Patches made within the
+ * debounce window are merged so no field is lost. */
+export function useDebouncedSettingsPatch() {
   const { updateSettings } = useSettings()
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pending = useRef<Partial<AppSettings_Serialize>>({})
@@ -27,7 +27,7 @@ export function usePersistedLayout() {
         pending.current = {}
         timer.current = null
         updateSettings(merged).catch((error) => {
-          toast.error("Could not save the layout", {
+          toast.error("Could not save your settings", {
             description: errorMessage(error),
           })
         })

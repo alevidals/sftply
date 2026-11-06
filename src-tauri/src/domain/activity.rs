@@ -16,8 +16,8 @@ pub struct ActivityEntry {
     pub id: String,
     pub level: ActivityLevel,
     pub message: String,
-    /// Unix epoch milliseconds. `f64` keeps the value exactly representable in
-    /// JavaScript, which Specta requires for 64-bit numeric types.
+    /// Unix epoch milliseconds.
+    #[specta(type = specta_typescript::Number)]
     pub timestamp: f64,
 }
 

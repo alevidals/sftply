@@ -12,6 +12,14 @@ export const commands = {
 	startupReport: () => __TAURI_INVOKE<StartupReport>("startup_report"),
 	settingsGet: () => __TAURI_INVOKE<AppSettings_Serialize>("settings_get"),
 	settingsUpdate: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
+	fsList: (scope: FsScope, path: string, showHidden: boolean) => typedError<Listing_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_list", { scope, path, showHidden })),
+	fsStat: (scope: FsScope, path: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_stat", { scope, path })),
+	fsMkdir: (scope: FsScope, parent: string, name: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_mkdir", { scope, parent, name })),
+	fsRename: (scope: FsScope, path: string, newName: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_rename", { scope, path, newName })),
+	fsDelete: (scope: FsScope, path: string, recursive: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_delete", { scope, path, recursive })),
+	fsChmod: (scope: FsScope, path: string, mode: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_chmod", { scope, path, mode })),
+	localOpen: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_open", { path })),
+	localReveal: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_reveal", { path })),
 };
 
 /** Events */
@@ -24,11 +32,8 @@ export type ActivityEntry = {
 	id: string,
 	level: ActivityLevel,
 	message: string,
-	/**
-	 *  Unix epoch milliseconds. `f64` keeps the value exactly representable in
-	 *  JavaScript, which Specta requires for 64-bit numeric types.
-	 */
-	timestamp: number | null,
+	/**  Unix epoch milliseconds. */
+	timestamp: number,
 };
 
 export type ActivityLevel = "info" | "success" | "warning" | "error";
@@ -112,8 +117,109 @@ export type AppSettings_Serialize = {
 
 export type Density = "compact" | "comfortable";
 
+/**
+ *  The kind of a filesystem entry as reported by the backend. Symlinks are
+ *  reported as links even when their target is a directory; callers decide
+ *  whether to follow them.
+ */
+export type EntryKind = "file" | "directory" | "symlink" | "other";
+
 /**  Stable, user-safe error codes shared with the frontend. */
 export type ErrorCode = "NETWORK" | "TIMEOUT" | "AUTH_FAILED" | "HOST_KEY_UNKNOWN" | "HOST_KEY_MISMATCH" | "TLS_CERTIFICATE" | "PERMISSION_DENIED" | "NOT_FOUND" | "ALREADY_EXISTS" | "CONFLICT" | "UNSUPPORTED" | "SESSION_NOT_READY" | "PROTOCOL" | "CANCELLED" | "KEYCHAIN_UNAVAILABLE" | "CONFIG_CORRUPT" | "CONFIG_WRITE_FAILED" | "INVALID_INPUT" | "INTERNAL";
+
+/**
+ *  Operations the active backend can perform honestly. The UI disables
+ *  actions that are not supported instead of emulating them.
+ */
+export type FsCapabilities = {
+	list: boolean,
+	mkdir: boolean,
+	remove: boolean,
+	rename: boolean,
+	chmod: boolean,
+	chown: boolean,
+	symlinks: boolean,
+	unixPermissions: boolean,
+	detailedListing: boolean,
+	resumeDownload: ResumeSupport,
+	resumeUpload: ResumeSupport,
+	serverSideMove: boolean,
+	serverSideCopy: boolean,
+	textRead: boolean,
+	textWrite: boolean,
+};
+
+export type FsEntry = FsEntry_Serialize | FsEntry_Deserialize;
+
+export type FsEntry_Deserialize = {
+	name: string,
+	/**  Absolute local path or POSIX remote path. */
+	path: string,
+	kind: EntryKind,
+	/**  Bytes. Directories report 0 unless the platform supplies a size. */
+	size: number,
+	/**  Unix epoch milliseconds, UTC. */
+	modifiedAt?: number | null,
+	/**  Unix mode bits, e.g. `0o644`. `None` when unavailable. */
+	permissions?: number | null,
+	owner?: string | null,
+	group?: string | null,
+	linkTarget?: string | null,
+	hidden: boolean,
+	/**  False when some metadata could not be read or a name was lossy. */
+	metadataComplete: boolean,
+};
+
+export type FsEntry_Serialize = {
+	name: string,
+	/**  Absolute local path or POSIX remote path. */
+	path: string,
+	kind: EntryKind,
+	/**  Bytes. Directories report 0 unless the platform supplies a size. */
+	size: number,
+	/**  Unix epoch milliseconds, UTC. */
+	modifiedAt: number | null,
+	/**  Unix mode bits, e.g. `0o644`. `None` when unavailable. */
+	permissions: number | null,
+	owner: string | null,
+	group: string | null,
+	linkTarget: string | null,
+	hidden: boolean,
+	/**  False when some metadata could not be read or a name was lossy. */
+	metadataComplete: boolean,
+};
+
+/**
+ *  Identifies the filesystem used by a command. The backend resolves the
+ *  scope and never accepts caller-supplied protocol or credential data.
+ */
+export type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string };
+
+export type Listing = Listing_Serialize | Listing_Deserialize;
+
+export type Listing_Deserialize = {
+	path: string,
+	parent?: string | null,
+	entries: FsEntry_Deserialize[],
+	capabilities: FsCapabilities,
+	/**  Unix epoch milliseconds, UTC. */
+	readAt: number,
+	/**  Non-fatal problems such as entries that could not be read. */
+	warnings: string[],
+};
+
+export type Listing_Serialize = {
+	path: string,
+	parent: string | null,
+	entries: FsEntry_Serialize[],
+	capabilities: FsCapabilities,
+	/**  Unix epoch milliseconds, UTC. */
+	readAt: number,
+	/**  Non-fatal problems such as entries that could not be read. */
+	warnings: string[],
+};
+
+export type ResumeSupport = "supported" | "conditional" | "unsupported";
 
 /**
  *  One-shot diagnostics produced while the app starts. Fetched by the frontend

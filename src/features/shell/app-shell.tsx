@@ -10,14 +10,14 @@ import { TitleBar } from "@/features/shell/title-bar"
 import { Workspace } from "@/features/shell/workspace"
 import { useActivityBridge } from "@/hooks/use-activity-bridge"
 import { useAppInfo } from "@/hooks/use-app-info"
+import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
-import { usePersistedLayout } from "@/hooks/use-persisted-layout"
 import { useStartupReport } from "@/hooks/use-startup-report"
 import { recordActivity } from "@/stores/activity-store"
 
 export function AppShell() {
   const { settings } = useSettings()
-  const persistLayout = usePersistedLayout()
+  const persistLayout = useDebouncedSettingsPatch()
   const appInfo = useAppInfo()
   const startupReport = useStartupReport()
   const readyLogged = useRef(false)

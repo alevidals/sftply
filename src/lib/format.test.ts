@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { formatBytes, formatClock, formatCount, formatPercent } from "@/lib/format"
+import {
+  formatBytes,
+  formatClock,
+  formatCount,
+  formatMode,
+  formatModeSymbolic,
+  formatModified,
+  formatPercent,
+} from "@/lib/format"
 
 describe("formatBytes", () => {
   it("formats raw bytes without a decimal", () => {
@@ -39,5 +47,30 @@ describe("formatPercent", () => {
   it("rounds and clamps display formatting", () => {
     expect(formatPercent(49.6)).toBe("50%")
     expect(formatPercent(Number.NaN)).toBe("—")
+  })
+})
+
+describe("formatMode", () => {
+  it("renders four-digit octal permissions", () => {
+    expect(formatMode(0o644)).toBe("0644")
+    expect(formatMode(0o7777)).toBe("7777")
+    expect(formatMode(null)).toBe("—")
+  })
+
+  it("renders symbolic permissions including special bits", () => {
+    expect(formatModeSymbolic(0o644)).toBe("-rw-r--r--")
+    expect(formatModeSymbolic(0o755, true)).toBe("drwxr-xr-x")
+    expect(formatModeSymbolic(0o4755)).toBe("-rwsr-xr-x")
+    expect(formatModeSymbolic(0o4644)).toBe("-rwSr--r--")
+    expect(formatModeSymbolic(0o1777, true)).toBe("drwxrwxrwt")
+    expect(formatModeSymbolic(null)).toBe("—")
+  })
+})
+
+describe("formatModified", () => {
+  it("formats timestamps and hides missing values", () => {
+    expect(formatModified(1_700_000_000_000)).toMatch(/\d/)
+    expect(formatModified(null)).toBe("—")
+    expect(formatModified(Number.NaN)).toBe("—")
   })
 })

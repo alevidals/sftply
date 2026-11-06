@@ -2,9 +2,11 @@ import { ActivityIcon, ArrowDownUpIcon, HardDriveIcon, PanelBottomIcon } from "l
 import { toast } from "sonner"
 import { Kbd } from "@/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { pathLeaf } from "@/features/files/model/path"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
+import { formatCount } from "@/lib/format"
 import { useActivityStore } from "@/stores/activity-store"
 import { useUiStore } from "@/stores/ui-store"
 
@@ -12,6 +14,7 @@ export function StatusBar() {
   const { settings, updateSettings } = useSettings()
   const appInfo = useAppInfo()
   const activityCount = useActivityStore((state) => state.entries.length)
+  const localSummary = useUiStore((state) => state.localSummary)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
 
   const openPanel = (tab: "transfers" | "activity") => {
@@ -31,10 +34,19 @@ export function StatusBar() {
 
   return (
     <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-border/70 bg-chrome px-3 text-2xs text-muted-foreground select-none">
-      <span className="flex items-center gap-1.5">
-        <HardDriveIcon className="size-3" />
-        <span>Local</span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <HardDriveIcon className="size-3 shrink-0" />
+        <span className="max-w-[180px] truncate">
+          {localSummary.path ? pathLeaf(localSummary.path) : "Local"}
+        </span>
       </span>
+
+      {localSummary.path ? (
+        <span className="shrink-0 tabular">
+          {formatCount(localSummary.items)} items
+          {localSummary.selected > 0 ? ` · ${formatCount(localSummary.selected)} selected` : ""}
+        </span>
+      ) : null}
 
       <span className="h-3 w-px bg-border/80" />
 

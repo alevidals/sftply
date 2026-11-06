@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod domain;
 mod error;
+mod fs;
 mod logging;
 
 use app_state::AppState;
@@ -22,6 +23,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::app::startup_report,
             commands::settings::settings_get,
             commands::settings::settings_update,
+            commands::fs::fs_list,
+            commands::fs::fs_stat,
+            commands::fs::fs_mkdir,
+            commands::fs::fs_rename,
+            commands::fs::fs_delete,
+            commands::fs::fs_chmod,
+            commands::fs::local_open,
+            commands::fs::local_reveal,
         ])
         .events(tauri_specta::collect_events![ActivityEntry])
 }

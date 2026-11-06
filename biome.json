@@ -81,6 +81,20 @@
       }
     },
     {
+      "includes": [
+        "src/features/files/components/file-table.tsx",
+        "src/features/files/components/column-header.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useSemanticElements": "off",
+            "useFocusableInteractive": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/styles/globals.css"],
       "linter": {
         "rules": {

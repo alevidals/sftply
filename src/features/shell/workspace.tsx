@@ -1,14 +1,13 @@
-import { FolderOpenIcon, HardDriveIcon, ServerOffIcon } from "lucide-react"
+import { ServerOffIcon } from "lucide-react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { FilePane } from "@/features/files/file-pane"
+import { LocalBrowser } from "@/features/files/local-browser"
 import { useSettings } from "@/features/settings/settings-context"
-import { useHomeDirectory } from "@/hooks/use-home-directory"
-import { usePersistedLayout } from "@/hooks/use-persisted-layout"
+import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 
 export function Workspace() {
   const { settings } = useSettings()
-  const persistLayout = usePersistedLayout()
-  const home = useHomeDirectory()
+  const persistLayout = useDebouncedSettingsPatch()
 
   return (
     <ResizablePanelGroup orientation="horizontal" className="min-h-0">
@@ -22,16 +21,7 @@ export function Workspace() {
           persistLayout({ paneSplit: Math.round(size.asPercentage) })
         }}
       >
-        <FilePane
-          kind="local"
-          title="Local"
-          icon={HardDriveIcon}
-          path={home.data ?? "Home"}
-          status="local"
-          emptyTitle="No folder loaded"
-          emptyDescription="Local file browsing is not available in this build. It is the next milestone."
-          emptyIcon={FolderOpenIcon}
-        />
+        <LocalBrowser />
       </ResizablePanel>
 
       <ResizableHandle />
