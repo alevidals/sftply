@@ -11,18 +11,19 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 **Goal:** Retire protocol and toolchain uncertainty. Produce evidence, not assumptions.
 
-| Deliverable | Details |
-| --- | --- |
-| Git repository | Initialize, commit template, add `.gitattributes`, confirm secrets/build artifacts ignored |
-| Toolchain baseline | `rust-toolchain.toml`, Bun version pin, scripts for dev/build/typecheck/lint/test/check |
-| CI skeleton | Frontend typecheck + build + tests; Rust fmt + clippy + tests; `cargo-deny`; `cargo-audit`; `bun audit` |
-| FTPS spike | Explicit + implicit FTPS, custom CA, pin, hostname rejection, MLSD/LIST, resume, abort |
-| SFTP spike | russh 0.65 + russh-sftp 3.0.1, password/key/passphrase, host-key callback, chmod, concurrency, >4 GiB |
-| Typed IPC spike | `tauri-specta` command + event generation, TypeScript compile, CI diff check |
-| Keychain spike | macOS Keychain store/read/delete; failure behavior |
-| Shell spike | Strict CSP, custom title bar, native drag-drop, window-state restore |
+| Deliverable        | Details                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| Git repository     | Initialize, commit template, add `.gitattributes`, confirm secrets/build artifacts ignored              |
+| Toolchain baseline | `rust-toolchain.toml`, Bun version pin, scripts for dev/build/typecheck/lint/test/check                 |
+| CI skeleton        | Frontend typecheck + build + tests; Rust fmt + clippy + tests; `cargo-deny`; `cargo-audit`; `bun audit` |
+| FTPS spike         | Explicit + implicit FTPS, custom CA, pin, hostname rejection, MLSD/LIST, resume, abort                  |
+| SFTP spike         | russh 0.65 + russh-sftp 3.0.1, password/key/passphrase, host-key callback, chmod, concurrency, >4 GiB   |
+| Typed IPC spike    | `tauri-specta` command + event generation, TypeScript compile, CI diff check                            |
+| Keychain spike     | macOS Keychain store/read/delete; failure behavior                                                      |
+| Shell spike        | Strict CSP, custom title bar, native drag-drop, window-state restore                                    |
 
 **Exit criteria**
+
 - Each spike has a reproducible test or a documented failure with a chosen alternative.
 - ADR-0002 (protocol stack) and ADR-0003 (credentials) are updated with measured findings.
 - CI is green on the template.
@@ -36,21 +37,22 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 **Goal:** A polished, empty application that already behaves like a serious desktop tool.
 
-| Area | Deliverable |
-| --- | --- |
-| Design system | Tailwind v4 tokens, dark/light themes, typography, focus rings, scrollbars, density modes |
-| UI primitives | shadcn base components installed and reviewed: button, input, dialog, dropdown, context menu, tooltip, tabs, checkbox, switch, select, command, toast, progress, separator, scroll area |
-| App shell | Custom title bar (macOS overlay traffic lights; Windows/Linux controls), sidebar, dual panes, bottom panel, status bar, resizable splits, collapse behavior |
-| Theming | System/dark/light persistence; no flash of wrong theme |
-| Navigation skeleton | Sidebar sections (Quick Connect, Saved, Favorites, Recent), tabs, empty workspace state |
-| Command palette skeleton | Registry, Cmd/Ctrl+K, grouped commands, disabled-command reasons |
-| Backend foundation | `AppState`, error model, logging + redaction, config paths + atomic store, event bus, settings commands |
-| Typed IPC | Generated `bindings.ts`, typed invoke wrapper, event bridge, error normalization |
-| Window | 1440×900 default, min 960×600, state persistence, macOS overlay styling |
-| Tests | Token/theme smoke, command registry, IPC wrapper, settings store; Rust config atomic-write tests |
-| Security config | Strict CSP, minimal capabilities, no fs/shell plugins, devtools disabled in release |
+| Area                     | Deliverable                                                                                                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design system            | Tailwind v4 tokens, dark/light themes, typography, focus rings, scrollbars, density modes                                                                                               |
+| UI primitives            | shadcn base components installed and reviewed: button, input, dialog, dropdown, context menu, tooltip, tabs, checkbox, switch, select, command, toast, progress, separator, scroll area |
+| App shell                | Custom title bar (macOS overlay traffic lights; Windows/Linux controls), sidebar, dual panes, bottom panel, status bar, resizable splits, collapse behavior                             |
+| Theming                  | System/dark/light persistence; no flash of wrong theme                                                                                                                                  |
+| Navigation skeleton      | Sidebar sections (Quick Connect, Saved, Favorites, Recent), tabs, empty workspace state                                                                                                 |
+| Command palette skeleton | Registry, Cmd/Ctrl+K, grouped commands, disabled-command reasons                                                                                                                        |
+| Backend foundation       | `AppState`, error model, logging + redaction, config paths + atomic store, event bus, settings commands                                                                                 |
+| Typed IPC                | Generated `bindings.ts`, typed invoke wrapper, event bridge, error normalization                                                                                                        |
+| Window                   | 1440×900 default, min 960×600, state persistence, macOS overlay styling                                                                                                                 |
+| Tests                    | Token/theme smoke, command registry, IPC wrapper, settings store; Rust config atomic-write tests                                                                                        |
+| Security config          | Strict CSP, minimal capabilities, no fs/shell plugins, devtools disabled in release                                                                                                     |
 
 **Exit criteria**
+
 - `bun run tauri dev` opens a polished shell with working dark/light themes.
 - Layout is keyboard navigable; focus states are visible; reduced motion respected.
 - Settings persist atomically and survive restart; invalid/corrupt config produces a clear recovery path.
@@ -63,21 +65,22 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 **Goal:** A genuinely usable local file manager before any network is involved.
 
-| Area | Deliverable |
-| --- | --- |
-| Local FS backend | `FileSystem` implementation over `tokio::fs`; list, stat, mkdir, rename, delete, chmod (Unix), open/reveal |
-| Path safety | `LocalPath` canonicalization, traversal checks, filename sanitization, symlink policy, tests/property tests |
-| File table | Virtualized, sortable columns (name, size, modified, permissions, kind), column config, directory-first toggle |
-| Navigation | Breadcrumb with overflow, back/forward/up, keyboard path entry, per-pane history |
-| Selection | Click, Cmd/Ctrl-click, Shift-range, select all, cursor/anchor, type-ahead, ARIA grid semantics |
-| Actions | New folder, rename inline, delete with confirmation, copy path, refresh, open/reveal, permissions dialog (Unix) |
-| Filtering | Hidden files toggle, substring filter, filtered-state indicator, empty/loading/error states |
-| Interactions | Context menu (Shift+F10), inline rename, drag-and-drop within local, multi-select drag |
-| Performance | 10k-entry directory budget; measured render/scroll; no sync I/O on the UI thread |
-| Tests | Path invariants, sort/selection reducer, keyboard table behavior, rename/delete flows, component tests with mocked IPC |
-| Light/remote placeholders | Right pane demonstrates disconnected/empty states and capability gating without fake data |
+| Area                      | Deliverable                                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Local FS backend          | `FileSystem` implementation over `tokio::fs`; list, stat, mkdir, rename, delete, chmod (Unix), open/reveal             |
+| Path safety               | `LocalPath` canonicalization, traversal checks, filename sanitization, symlink policy, tests/property tests            |
+| File table                | Virtualized, sortable columns (name, size, modified, permissions, kind), column config, directory-first toggle         |
+| Navigation                | Breadcrumb with overflow, back/forward/up, keyboard path entry, per-pane history                                       |
+| Selection                 | Click, Cmd/Ctrl-click, Shift-range, select all, cursor/anchor, type-ahead, ARIA grid semantics                         |
+| Actions                   | New folder, rename inline, delete with confirmation, copy path, refresh, open/reveal, permissions dialog (Unix)        |
+| Filtering                 | Hidden files toggle, substring filter, filtered-state indicator, empty/loading/error states                            |
+| Interactions              | Context menu (Shift+F10), inline rename, drag-and-drop within local, multi-select drag                                 |
+| Performance               | 10k-entry directory budget; measured render/scroll; no sync I/O on the UI thread                                       |
+| Tests                     | Path invariants, sort/selection reducer, keyboard table behavior, rename/delete flows, component tests with mocked IPC |
+| Light/remote placeholders | Right pane demonstrates disconnected/empty states and capability gating without fake data                              |
 
 **Exit criteria**
+
 - A user can browse, sort, filter, select, create, rename, delete, chmod (Unix), and navigate local files entirely by keyboard.
 - 10,000 entries render and scroll within budget.
 - Corrupt names, symlinks, permission errors, and disappearing files are handled with clear errors.
@@ -89,24 +92,25 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 **Goal:** Real remote browsing over all three protocol families with strict security.
 
-| Area | Deliverable |
-| --- | --- |
-| Connection repository | Versioned `connections.json`, folders, favorites, recent list, duplicate, delete, reorder, search |
-| Connection form | RHF + Zod; General / Authentication / Advanced / TLS tabs; test-before-save; inline validation |
-| Credentials | keyring-backed password/passphrase; "stored" status; delete on profile delete; no read command; no plaintext |
-| Quick Connect | Transient credentials, optional save, recent update |
-| Protocol: FTP | suppaftp adapter, FEAT, MLSD + LIST fallback, passive/active policy, UTF-8, timeouts, error mapping |
-| Protocol: FTPS | Explicit and implicit, custom rustls verifier, CA file, pin, verify toggle with warning |
-| Protocol: SFTP | russh/russh-sftp adapter, password/key/passphrase auth, keepalive, realpath, v3 ops, extensions |
-| Host keys | App-managed known_hosts, trust dialog with SHA-256 fingerprint, changed-key hard block, security settings |
-| Session lifecycle | Actor state machine, events, connect/disconnect/reconnect, cancellation, timeouts |
-| Remote browser | Same file table against remote scope; capability-driven actions; remote path validation |
-| Tabs | Multiple simultaneous connections, per-tab local/remote paths, close confirmation, tab switching |
-| Connection UX | Sidebar status indicators, latency, protocol/cipher badges, reconnect, error details |
-| Security review | Threat-model checklist, redaction tests, no secrets in logs/export, path traversal tests |
-| Tests | Parser fixtures, known_hosts, path validation, form tests, host-key dialog, session state tests; Docker integration suite |
+| Area                  | Deliverable                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Connection repository | Versioned `connections.json`, folders, favorites, recent list, duplicate, delete, reorder, search                         |
+| Connection form       | RHF + Zod; General / Authentication / Advanced / TLS tabs; test-before-save; inline validation                            |
+| Credentials           | keyring-backed password/passphrase; "stored" status; delete on profile delete; no read command; no plaintext              |
+| Quick Connect         | Transient credentials, optional save, recent update                                                                       |
+| Protocol: FTP         | suppaftp adapter, FEAT, MLSD + LIST fallback, passive/active policy, UTF-8, timeouts, error mapping                       |
+| Protocol: FTPS        | Explicit and implicit, custom rustls verifier, CA file, pin, verify toggle with warning                                   |
+| Protocol: SFTP        | russh/russh-sftp adapter, password/key/passphrase auth, keepalive, realpath, v3 ops, extensions                           |
+| Host keys             | App-managed known_hosts, trust dialog with SHA-256 fingerprint, changed-key hard block, security settings                 |
+| Session lifecycle     | Actor state machine, events, connect/disconnect/reconnect, cancellation, timeouts                                         |
+| Remote browser        | Same file table against remote scope; capability-driven actions; remote path validation                                   |
+| Tabs                  | Multiple simultaneous connections, per-tab local/remote paths, close confirmation, tab switching                          |
+| Connection UX         | Sidebar status indicators, latency, protocol/cipher badges, reconnect, error details                                      |
+| Security review       | Threat-model checklist, redaction tests, no secrets in logs/export, path traversal tests                                  |
+| Tests                 | Parser fixtures, known_hosts, path validation, form tests, host-key dialog, session state tests; Docker integration suite |
 
 **Exit criteria**
+
 - Connect to OpenSSH SFTP, vsftpd/Pure-FTPd FTP, explicit FTPS and implicit FTPS test servers.
 - Browse, navigate, create/rename/delete remote files with capability-accurate controls.
 - Unknown SSH hosts require explicit trust; a changed key blocks the connection.
@@ -152,6 +156,7 @@ Split into three reviewable increments.
 - Retry semantics proven not to duplicate data; failed transfers never marked complete.
 
 **Exit criteria**
+
 - Upload/download single files and folders on FTP, FTPS and SFTP with correct progress and finalization.
 - Cancel leaves no misleading success and cleans up partial downloads.
 - Pause is shown only when truly supported; resume verifies size/offset.
@@ -165,22 +170,23 @@ Split into three reviewable increments.
 
 **Goal:** Make the product feel like Linear/VS Code rather than a utility window.
 
-| Area | Deliverable |
-| --- | --- |
-| Command palette | Full registry, context-aware commands, fuzzy search, shortcut hints, recent commands |
-| Keyboard | Complete shortcut map, shortcut sheet, scope stack, platform labels, discoverability |
-| Context menus | Pane, row, tab, sidebar, transfer; capability-aware disabled reasons |
-| Tabs | Tab overflow, drag reorder, close behavior, session restore prompts |
-| States | First-run onboarding, disconnected, empty, loading, error, filtered-empty, permission-denied |
-| Density | Compact/comfortable rows, column visibility, date/size formats, persisted per user |
-| Feedback | Toasts with actions, inline errors, progress in title bar (optional), status bar aggregation |
-| Performance | Virtualization tuning, memoization, bundle analysis, startup profiling, memory pass |
-| Accessibility | Keyboard-only walkthrough, screen-reader labels, contrast audit, focus restoration, reduced motion |
-| Visual QA | Both themes, 100%/125%/150% scaling, macOS/Windows/Linux window chrome |
-| Reliability | Reconnect UX, session drop notifications, operation guards, unsaved-state confirmations |
-| Packaging | App icon, product metadata, macOS signing/notarization, Windows installer, Linux packages |
+| Area            | Deliverable                                                                                        |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| Command palette | Full registry, context-aware commands, fuzzy search, shortcut hints, recent commands               |
+| Keyboard        | Complete shortcut map, shortcut sheet, scope stack, platform labels, discoverability               |
+| Context menus   | Pane, row, tab, sidebar, transfer; capability-aware disabled reasons                               |
+| Tabs            | Tab overflow, drag reorder, close behavior, session restore prompts                                |
+| States          | First-run onboarding, disconnected, empty, loading, error, filtered-empty, permission-denied       |
+| Density         | Compact/comfortable rows, column visibility, date/size formats, persisted per user                 |
+| Feedback        | Toasts with actions, inline errors, progress in title bar (optional), status bar aggregation       |
+| Performance     | Virtualization tuning, memoization, bundle analysis, startup profiling, memory pass                |
+| Accessibility   | Keyboard-only walkthrough, screen-reader labels, contrast audit, focus restoration, reduced motion |
+| Visual QA       | Both themes, 100%/125%/150% scaling, macOS/Windows/Linux window chrome                             |
+| Reliability     | Reconnect UX, session drop notifications, operation guards, unsaved-state confirmations            |
+| Packaging       | App icon, product metadata, macOS signing/notarization, Windows installer, Linux packages          |
 
 **Exit criteria**
+
 - Entire app operable with keyboard; command palette covers all major actions.
 - Visual QA passes both themes and all supported platforms.
 - Startup, list scrolling, and selection meet budgets.
@@ -203,6 +209,7 @@ Split into three reviewable increments.
 8. **Queue management extras:** priorities, per-connection limits, transfer scheduling, clearer history filtering.
 
 **Exit criteria**
+
 - Every advanced feature declares its protocol capability and degrades honestly.
 - Editor/sync operations are never destructive without explicit confirmation and a dry-run where applicable.
 - Tests cover permission edge cases, encoding/binary detection, diff classification, and sync planning.
@@ -211,14 +218,14 @@ Split into three reviewable increments.
 
 ## Phase 7 — Release hardening
 
-| Area | Deliverable |
-| --- | --- |
-| Security | Final threat-model review, dependency audit, fuzz listing parsers, secret-leak audit, CSP/capability review |
-| Reliability | Soak tests (long transfers, reconnects, thousands of files), fault injection, crash recovery |
-| Test matrix | OpenSSH, vsftpd, ProFTPD, FileZilla Server, Synology; IPv6, non-ASCII, >4 GiB, LIST-only |
-| Docs | User guide, connection setup, key/host-key explanations, troubleshooting, architecture links |
-| Release | Versioning, changelog, signed installers, checksums, release notes |
-| Post-1.0 backlog | Auto-update, SSH agent auth, shared sessions, bandwidth schedules, custom themes |
+| Area             | Deliverable                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Security         | Final threat-model review, dependency audit, fuzz listing parsers, secret-leak audit, CSP/capability review |
+| Reliability      | Soak tests (long transfers, reconnects, thousands of files), fault injection, crash recovery                |
+| Test matrix      | OpenSSH, vsftpd, ProFTPD, FileZilla Server, Synology; IPv6, non-ASCII, >4 GiB, LIST-only                    |
+| Docs             | User guide, connection setup, key/host-key explanations, troubleshooting, architecture links                |
+| Release          | Versioning, changelog, signed installers, checksums, release notes                                          |
+| Post-1.0 backlog | Auto-update, SSH agent auth, shared sessions, bandwidth schedules, custom themes                            |
 
 ---
 

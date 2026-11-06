@@ -21,12 +21,14 @@ The product must support FTP, explicit FTPS, implicit FTPS and SFTP through one 
 ## Consequences
 
 **Positive**
+
 - UI is protocol-agnostic and driven by real capabilities.
 - Unsupported operations can be disabled honestly.
 - Protocol-specific quirks stay in isolated, testable modules.
 - No C/OpenSSL dependency for SSH; smaller and more portable builds.
 
 **Negative / accepted**
+
 - We own the abstraction, capability matrix, and finalization semantics.
 - russh is 0.x and has API churn; versions must be pinned and upgrades tested against OpenSSH.
 - suppaftp's implicit FTPS API is behind a `deprecated` feature (protocol deprecation); enabled deliberately.

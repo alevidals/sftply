@@ -22,12 +22,14 @@ Use:
 ## Consequences
 
 **Positive**
+
 - Small runtime and memory footprint compared with Electron; native Rust protocols without sidecar processes.
 - Strong separation: no network or filesystem credentials in the webview.
 - One language for the backend domain and a mature React ecosystem for a polished UI.
 - Typed IPC removes an entire class of contract drift.
 
 **Negative / accepted**
+
 - WebView differences across platforms (drag-and-drop, CSS, IME) require real-device testing.
 - Rust compile times add friction; mitigated with incremental builds and CI caching.
 - Tauri capability/CSP configuration is security-critical and must be reviewed.
@@ -35,12 +37,12 @@ Use:
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-| --- | --- |
-| Electron + Node | Larger footprint; networking/credentials in JS; weaker native isolation |
-| Flutter desktop | Strong UI, but less mature Linux desktop story and a weaker fit with the Rust protocol layer |
-| Native Swift/WinUI | Not cross-platform; disproportionate effort for one product |
-| Browser-only/PWA | Cannot safely implement FTP/SFTP or OS keychain access |
+| Alternative        | Why rejected                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| Electron + Node    | Larger footprint; networking/credentials in JS; weaker native isolation                      |
+| Flutter desktop    | Strong UI, but less mature Linux desktop story and a weaker fit with the Rust protocol layer |
+| Native Swift/WinUI | Not cross-platform; disproportionate effort for one product                                  |
+| Browser-only/PWA   | Cannot safely implement FTP/SFTP or OS keychain access                                       |
 
 ## Notes
 

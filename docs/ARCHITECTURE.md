@@ -10,16 +10,16 @@
 
 The repository is an unmodified Tauri 2 starter template:
 
-| Area | Current state |
-| --- | --- |
-| Frontend | React 19.1 template, one `App.tsx` with a `greet` demo, `App.css` |
-| Build | Vite 8.0.16, TypeScript 6.0.3, Bun 1.4.4 + `bun.lock` |
-| Desktop | Tauri 2.12.5, Rust 1.99.1, edition 2024 |
-| Backend | One `greet` command in `src-tauri/src/lib.rs` |
-| Security | `csp: null`, default capability (`core:default`, `opener:default`) |
-| Window | 800×600, native decorations, no state persistence |
-| Project | No git repository initialized; `src-tauri/target` build artifacts present |
-| Tests / CI / lint | None |
+| Area              | Current state                                                             |
+| ----------------- | ------------------------------------------------------------------------- |
+| Frontend          | React 19.1 template, one `App.tsx` with a `greet` demo, `App.css`         |
+| Build             | Vite 8.0.16, TypeScript 6.0.3, Bun 1.4.4 + `bun.lock`                     |
+| Desktop           | Tauri 2.12.5, Rust 1.99.1, edition 2024                                   |
+| Backend           | One `greet` command in `src-tauri/src/lib.rs`                             |
+| Security          | `csp: null`, default capability (`core:default`, `opener:default`)        |
+| Window            | 800×600, native decorations, no state persistence                         |
+| Project           | No git repository initialized; `src-tauri/target` build artifacts present |
+| Tests / CI / lint | None                                                                      |
 
 There is no existing product behavior to preserve. The implementation starts from the template, but the template demo code will be removed.
 
@@ -247,6 +247,7 @@ src/
 ```
 
 **Rules**
+
 - Components never call `invoke` directly; they call feature `api.ts` modules.
 - Business rules (conflict policy, resumability, capability checks) live in Rust. The UI only renders capabilities and asks for actions.
 - TanStack Query owns server state (directory listings, connection test results). Zustand owns client state (layout, selection, tabs, transfer event projection). No duplication of listing data into Zustand.
@@ -431,48 +432,48 @@ Types are generated with `tauri-specta` from Rust, including commands and events
 
 ### Commands (initial surface)
 
-| Area | Command | Purpose |
-| --- | --- | --- |
-| App | `app_info` | Version, platform, data/log paths |
-| Settings | `settings_get`, `settings_update` | Versioned user settings |
-| Connections | `connections_list`, `connections_save`, `connections_delete` | CRUD, no secrets |
-| Connections | `connections_duplicate`, `connections_reorder` | Organization |
-| Connections | `connections_import`, `connections_export` | Credential-free JSON |
-| Credentials | `credentials_set`, `credentials_delete`, `credentials_status` | Keychain write/delete/status; never read |
-| Connection | `connection_test` | TCP + handshake + auth + initial path, transient secrets |
-| Connection | `connection_open`, `connection_close` | Spawn/stop session actor |
-| Connection | `security_trust_host_key` | Explicitly persist an unknown host key |
-| Session | `session_list` | Authoritative session snapshots |
-| FS | `fs_list`, `fs_stat` | Unified local/remote listing |
-| FS | `fs_mkdir`, `fs_rename`, `fs_delete` | Mutations, capability-checked |
-| FS | `fs_chmod` | SFTP/Unix only; unavailable otherwise |
-| FS | `fs_read_text`, `fs_write_text` | Phase 6 editor; size/encoding limits |
-| Local | `local_open`, `local_reveal` | Open with OS handler / reveal in file manager |
-| Transfers | `transfer_enqueue_upload`, `transfer_enqueue_download` | File/folder jobs |
-| Transfers | `transfer_pause`, `transfer_resume`, `transfer_cancel` | Honest capability-checked control |
-| Transfers | `transfer_retry`, `transfer_cancel_all`, `transfer_clear_completed` | Queue control |
-| Transfers | `transfer_list`, `transfer_history` | Rehydration/history |
-| Security | `known_hosts_list`, `known_hosts_remove` | Security settings |
+| Area        | Command                                                             | Purpose                                                  |
+| ----------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
+| App         | `app_info`                                                          | Version, platform, data/log paths                        |
+| Settings    | `settings_get`, `settings_update`                                   | Versioned user settings                                  |
+| Connections | `connections_list`, `connections_save`, `connections_delete`        | CRUD, no secrets                                         |
+| Connections | `connections_duplicate`, `connections_reorder`                      | Organization                                             |
+| Connections | `connections_import`, `connections_export`                          | Credential-free JSON                                     |
+| Credentials | `credentials_set`, `credentials_delete`, `credentials_status`       | Keychain write/delete/status; never read                 |
+| Connection  | `connection_test`                                                   | TCP + handshake + auth + initial path, transient secrets |
+| Connection  | `connection_open`, `connection_close`                               | Spawn/stop session actor                                 |
+| Connection  | `security_trust_host_key`                                           | Explicitly persist an unknown host key                   |
+| Session     | `session_list`                                                      | Authoritative session snapshots                          |
+| FS          | `fs_list`, `fs_stat`                                                | Unified local/remote listing                             |
+| FS          | `fs_mkdir`, `fs_rename`, `fs_delete`                                | Mutations, capability-checked                            |
+| FS          | `fs_chmod`                                                          | SFTP/Unix only; unavailable otherwise                    |
+| FS          | `fs_read_text`, `fs_write_text`                                     | Phase 6 editor; size/encoding limits                     |
+| Local       | `local_open`, `local_reveal`                                        | Open with OS handler / reveal in file manager            |
+| Transfers   | `transfer_enqueue_upload`, `transfer_enqueue_download`              | File/folder jobs                                         |
+| Transfers   | `transfer_pause`, `transfer_resume`, `transfer_cancel`              | Honest capability-checked control                        |
+| Transfers   | `transfer_retry`, `transfer_cancel_all`, `transfer_clear_completed` | Queue control                                            |
+| Transfers   | `transfer_list`, `transfer_history`                                 | Rehydration/history                                      |
+| Security    | `known_hosts_list`, `known_hosts_remove`                            | Security settings                                        |
 
 `fs_*` commands accept a scope discriminator:
 
 ```ts
-type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string };
+type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string }
 ```
 
 The backend resolves the scope, validates the session, and never accepts a caller-supplied protocol or credential.
 
 ### Events
 
-| Event | Payload | Frequency |
-| --- | --- | --- |
-| `session://state` | `SessionSnapshot` | On transition |
-| `session://host-key` | `HostKeyPrompt` | On unknown/changed key |
-| `session://closed` | `{ sessionId, reason? }` | On disconnect |
-| `transfer://delta` | `{ upserts: TransferSnapshot[], removed: string[] }` | Batched, 4–10/s |
-| `transfer://queue` | `{ concurrency, paused, totals }` | On structural change |
-| `fs://invalidate` | `{ scopes: string[], paths: string[] }` | After transfers/mutations |
-| `activity://entry` | Sanitized activity record | On notable operation |
+| Event                | Payload                                              | Frequency                 |
+| -------------------- | ---------------------------------------------------- | ------------------------- |
+| `session://state`    | `SessionSnapshot`                                    | On transition             |
+| `session://host-key` | `HostKeyPrompt`                                      | On unknown/changed key    |
+| `session://closed`   | `{ sessionId, reason? }`                             | On disconnect             |
+| `transfer://delta`   | `{ upserts: TransferSnapshot[], removed: string[] }` | Batched, 4–10/s           |
+| `transfer://queue`   | `{ concurrency, paused, totals }`                    | On structural change      |
+| `fs://invalidate`    | `{ scopes: string[], paths: string[] }`              | After transfers/mutations |
+| `activity://entry`   | Sanitized activity record                            | On notable operation      |
 
 The frontend event bridge is mounted once in `providers.tsx`, unsubscribes on unmount, and updates the relevant Zustand store or Query cache. Components do not subscribe to raw Tauri events individually.
 
@@ -481,8 +482,11 @@ The frontend event bridge is mounted once in `providers.tsx`, unsubscribes on un
 ```ts
 // lib/ipc/client.ts
 export async function call<T>(fn: () => Promise<T>): Promise<T> {
-  try { return await fn(); }
-  catch (raw) { throw normalizeAppError(raw); }
+  try {
+    return await fn()
+  } catch (raw) {
+    throw normalizeAppError(raw)
+  }
 }
 ```
 
@@ -539,15 +543,15 @@ open_read(source, offset)
 
 ### Resume and pause honesty
 
-| Capability | Local | FTP/FTPS | SFTP |
-| --- | --- | --- | --- |
-| Resume download | n/a | Only if `REST` is supported and verified; otherwise start over | Yes via seek on read handle when server supports it (v3 handle seek) |
-| Resume upload | n/a | Conditional: only when the server reliably supports `REST`/`APPE`; never assume | Yes via seek/write offset when server allows |
-| Pause | n/a | Cancel-and-keep-partial when resumable; otherwise button disabled | Pause between chunks while keeping the handle open, or cancel-and-resume |
-| Server-side move | Local rename | `RNFR`/`RNTO` | `rename` |
-| Server-side copy | No (unless filesystem copy) | No standard; disabled | No standard SFTP v3 copy; disabled |
-| chmod | Unix only | Disabled (SITE CHMOD not assumed) | Yes |
-| Owner/group | Unix metadata | Only if MLSD provides it (display only) | Yes (numeric IDs displayed) |
+| Capability       | Local                       | FTP/FTPS                                                                        | SFTP                                                                     |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Resume download  | n/a                         | Only if `REST` is supported and verified; otherwise start over                  | Yes via seek on read handle when server supports it (v3 handle seek)     |
+| Resume upload    | n/a                         | Conditional: only when the server reliably supports `REST`/`APPE`; never assume | Yes via seek/write offset when server allows                             |
+| Pause            | n/a                         | Cancel-and-keep-partial when resumable; otherwise button disabled               | Pause between chunks while keeping the handle open, or cancel-and-resume |
+| Server-side move | Local rename                | `RNFR`/`RNTO`                                                                   | `rename`                                                                 |
+| Server-side copy | No (unless filesystem copy) | No standard; disabled                                                           | No standard SFTP v3 copy; disabled                                       |
+| chmod            | Unix only                   | Disabled (SITE CHMOD not assumed)                                               | Yes                                                                      |
+| Owner/group      | Unix metadata               | Only if MLSD provides it (display only)                                         | Yes (numeric IDs displayed)                                              |
 
 The UI reads `FsCapabilities` and renders disabled controls with an explanation. It never shows a pause button that silently restarts a file.
 
@@ -613,14 +617,14 @@ Before enqueuing a file whose target exists, the backend returns a conflict desc
   --surface-1: oklch(1 0 0);
   --surface-2: oklch(0.965 0.003 260);
   --surface-3: oklch(0.94 0.004 260);
-  --border: oklch(0.90 0.004 260);
+  --border: oklch(0.9 0.004 260);
   --text: oklch(0.23 0.01 260);
   --text-muted: oklch(0.52 0.012 260);
   --accent: oklch(0.55 0.19 275);
   --accent-fg: oklch(0.99 0.002 260);
   --success: oklch(0.62 0.15 155);
   --warning: oklch(0.72 0.15 75);
-  --danger: oklch(0.60 0.20 25);
+  --danger: oklch(0.6 0.2 25);
 }
 
 .dark {
@@ -628,14 +632,14 @@ Before enqueuing a file whose target exists, the backend returns a conflict desc
   --surface-1: oklch(0.185 0.005 260);
   --surface-2: oklch(0.215 0.006 260);
   --surface-3: oklch(0.25 0.007 260);
-  --border: oklch(0.30 0.006 260 / 0.7);
+  --border: oklch(0.3 0.006 260 / 0.7);
   --text: oklch(0.94 0.003 260);
   --text-muted: oklch(0.66 0.008 260);
   --accent: oklch(0.68 0.16 275);
   --accent-fg: oklch(0.99 0 0);
   --success: oklch(0.72 0.15 155);
-  --warning: oklch(0.80 0.14 80);
-  --danger: oklch(0.70 0.19 25);
+  --warning: oklch(0.8 0.14 80);
+  --danger: oklch(0.7 0.19 25);
 }
 ```
 
@@ -659,15 +663,15 @@ Before enqueuing a file whose target exists, the backend returns a conflict desc
 
 ### State ownership
 
-| State | Owner | Reason |
-| --- | --- | --- |
-| Directory listings, stats | TanStack Query | Server-derived, cacheable, invalidatable |
-| Session snapshots | Zustand (event projection) | Real-time, not request/response |
-| Transfers | Zustand (event projection) | High-frequency batched updates |
-| Tabs, active tab, pane paths | Zustand + persisted settings | Client navigation state |
-| Selection, cursor, filter | Zustand per pane | Keyboard behavior, not server state |
-| Forms | React Hook Form | Local validation lifecycle |
-| Command palette query | Component state | Ephemeral |
+| State                        | Owner                        | Reason                                   |
+| ---------------------------- | ---------------------------- | ---------------------------------------- |
+| Directory listings, stats    | TanStack Query               | Server-derived, cacheable, invalidatable |
+| Session snapshots            | Zustand (event projection)   | Real-time, not request/response          |
+| Transfers                    | Zustand (event projection)   | High-frequency batched updates           |
+| Tabs, active tab, pane paths | Zustand + persisted settings | Client navigation state                  |
+| Selection, cursor, filter    | Zustand per pane             | Keyboard behavior, not server state      |
+| Forms                        | React Hook Form              | Local validation lifecycle               |
+| Command palette query        | Component state              | Ephemeral                                |
 
 Query key: `["fs", scopeKey, path]` where `scopeKey` is `"local"` or `"remote:<sessionId>"`. Window-focus refetch is disabled; mutations invalidate current and parent directory; transfer completion events invalidate affected directories (debounced 250ms). Optimistic updates are limited to rename (safe, reversible) and selection-independent UI; delete/create wait for backend success.
 
@@ -677,24 +681,24 @@ Query key: `["fs", scopeKey, path]` where `scopeKey` is `"local"` or `"remote:<s
 
 ### Keyboard map (initial)
 
-| Shortcut | Action |
-| --- | --- |
-| Cmd/Ctrl+N | New connection |
-| Cmd/Ctrl+K | Command palette |
-| Cmd/Ctrl+R | Refresh active pane |
-| Cmd/Ctrl+U | Upload selection |
-| Cmd/Ctrl+D | Download selection |
-| Cmd/Ctrl+T | New tab |
-| Cmd/Ctrl+W | Close tab (with confirmation if transfers active) |
-| Cmd/Ctrl+1..9 | Switch tab |
-| Cmd/Ctrl+Shift+L / R | Focus local / remote pane |
-| Enter | Open folder or file |
-| F2 | Rename |
-| Delete (macOS: Cmd+Backspace) | Delete selection |
-| Cmd/Ctrl+Shift+N | New folder |
-| Cmd/Ctrl+C / V | Copy path / paste path |
-| Escape | Close dialog, cancel inline edit, clear selection |
-| ? | Shortcut sheet (Phase 5) |
+| Shortcut                      | Action                                            |
+| ----------------------------- | ------------------------------------------------- |
+| Cmd/Ctrl+N                    | New connection                                    |
+| Cmd/Ctrl+K                    | Command palette                                   |
+| Cmd/Ctrl+R                    | Refresh active pane                               |
+| Cmd/Ctrl+U                    | Upload selection                                  |
+| Cmd/Ctrl+D                    | Download selection                                |
+| Cmd/Ctrl+T                    | New tab                                           |
+| Cmd/Ctrl+W                    | Close tab (with confirmation if transfers active) |
+| Cmd/Ctrl+1..9                 | Switch tab                                        |
+| Cmd/Ctrl+Shift+L / R          | Focus local / remote pane                         |
+| Enter                         | Open folder or file                               |
+| F2                            | Rename                                            |
+| Delete (macOS: Cmd+Backspace) | Delete selection                                  |
+| Cmd/Ctrl+Shift+N              | New folder                                        |
+| Cmd/Ctrl+C / V                | Copy path / paste path                            |
+| Escape                        | Close dialog, cancel inline edit, clear selection |
+| ?                             | Shortcut sheet (Phase 5)                          |
 
 A scope stack prevents shortcuts from firing inside text inputs or when a modal owns focus. Platform-aware labels use `⌘` vs `Ctrl`.
 
@@ -760,20 +764,20 @@ FTPS profiles carry `tls: { mode: "explicit" | "implicit", verify: true, caFile?
 
 ### Threats and controls
 
-| Threat | Control |
-| --- | --- |
-| Credential theft at rest | OS keychain only; config contains no secrets; no plaintext fallback |
-| Secrets in logs/crash output | `secrecy::SecretString`, manual `Debug` redaction, tracing filter, no protocol payload logging by default, FTP `PASS` never logged |
-| Unknown/malicious SSH host | Strict known_hosts; explicit trust dialog; changed key blocks connection |
-| FTPS interception | Certificate + hostname verification on by default; custom CA or explicit pin; insecure mode clearly flagged |
-| Path traversal / filename injection | `RemotePath`/`LocalPath` validation, name sanitization, no shell execution |
-| Malicious directory listings | Listing parser bounds, control-character rejection, no execution, no URL opening from entries |
-| FTP bounce / data connection redirection | Passive mode default; in active mode, data connections restricted to the control peer unless explicitly overridden |
-| Arbitrary local file access via frontend | No Tauri fs/shell plugin; all local I/O goes through validated commands |
-| Oversized responses / memory abuse | Listing and text preview size caps; streamed file transfer; bounded history; timeouts |
-| Tauri capability escalation | Minimal capability set, strict CSP, no remote content, no shell/fs plugins, no devtools in release |
-| Clipboard leakage | Only paths are copied; secrets are never placed on the clipboard |
-| Dependency compromise | Lockfiles, `cargo-deny`, `cargo-audit`, `bun audit`, pinned versions, review of new dependencies |
+| Threat                                   | Control                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Credential theft at rest                 | OS keychain only; config contains no secrets; no plaintext fallback                                                                |
+| Secrets in logs/crash output             | `secrecy::SecretString`, manual `Debug` redaction, tracing filter, no protocol payload logging by default, FTP `PASS` never logged |
+| Unknown/malicious SSH host               | Strict known_hosts; explicit trust dialog; changed key blocks connection                                                           |
+| FTPS interception                        | Certificate + hostname verification on by default; custom CA or explicit pin; insecure mode clearly flagged                        |
+| Path traversal / filename injection      | `RemotePath`/`LocalPath` validation, name sanitization, no shell execution                                                         |
+| Malicious directory listings             | Listing parser bounds, control-character rejection, no execution, no URL opening from entries                                      |
+| FTP bounce / data connection redirection | Passive mode default; in active mode, data connections restricted to the control peer unless explicitly overridden                 |
+| Arbitrary local file access via frontend | No Tauri fs/shell plugin; all local I/O goes through validated commands                                                            |
+| Oversized responses / memory abuse       | Listing and text preview size caps; streamed file transfer; bounded history; timeouts                                              |
+| Tauri capability escalation              | Minimal capability set, strict CSP, no remote content, no shell/fs plugins, no devtools in release                                 |
+| Clipboard leakage                        | Only paths are copied; secrets are never placed on the clipboard                                                                   |
+| Dependency compromise                    | Lockfiles, `cargo-deny`, `cargo-audit`, `bun audit`, pinned versions, review of new dependencies                                   |
 
 ### Tauri hardening
 
@@ -842,6 +846,7 @@ pub struct AppError {
 Codes include: `NETWORK`, `TIMEOUT`, `AUTH_FAILED`, `HOST_KEY_UNKNOWN`, `HOST_KEY_MISMATCH`, `TLS_CERTIFICATE`, `PERMISSION_DENIED`, `NOT_FOUND`, `ALREADY_EXISTS`, `CONFLICT`, `UNSUPPORTED`, `SESSION_NOT_READY`, `PROTOCOL`, `CANCELLED`, `KEYCHAIN_UNAVAILABLE`, `INVALID_INPUT`, `INTERNAL`.
 
 UX mapping:
+
 - **Field errors:** inline in forms (Zod + backend validation).
 - **Transient failures:** toast with action ("Retry", "Details").
 - **Pane-level failures:** inline state with cause and retry, never a blank pane.
@@ -883,18 +888,18 @@ A documented checklist per release: OpenSSH, vsftpd, ProFTPD, FileZilla Server (
 
 ## 15. Performance budgets
 
-| Metric | Budget |
-| --- | --- |
-| Cold start to interactive (warm OS cache, M-series) | < 1.2s |
-| Window visible | < 500ms |
-| Directory with 10k entries: first render | < 150ms after data arrives |
-| Scrolling file list | 60fps with virtualization |
-| Selection/keyboard response | < 16ms |
-| IPC listing payload | ≤ 2MB for 10k entries; warning above 25k |
-| Progress event rate | ≤ 10/s per transfer, batched |
-| Idle memory (2 sessions, 1k transfers) | < 250MB |
-| Initial JS bundle | < 400KB gzip |
-| Rust release binary | Track per platform; no fixed limit, but review growth |
+| Metric                                              | Budget                                                |
+| --------------------------------------------------- | ----------------------------------------------------- |
+| Cold start to interactive (warm OS cache, M-series) | < 1.2s                                                |
+| Window visible                                      | < 500ms                                               |
+| Directory with 10k entries: first render            | < 150ms after data arrives                            |
+| Scrolling file list                                 | 60fps with virtualization                             |
+| Selection/keyboard response                         | < 16ms                                                |
+| IPC listing payload                                 | ≤ 2MB for 10k entries; warning above 25k              |
+| Progress event rate                                 | ≤ 10/s per transfer, batched                          |
+| Idle memory (2 sessions, 1k transfers)              | < 250MB                                               |
+| Initial JS bundle                                   | < 400KB gzip                                          |
+| Rust release binary                                 | Track per platform; no fixed limit, but review growth |
 
 Techniques: virtualized lists, no per-row global subscriptions for hidden rows, deferred filter input, batched events, streaming transfers with fixed 64 KiB buffers, `spawn_blocking` for directory walks, no base64 in IPC, no unnecessary re-renders from the transfer store (selector-based).
 
@@ -923,18 +928,18 @@ Techniques: virtualized lists, no per-row global subscriptions for hidden rows, 
 
 ## 18. Architectural risks
 
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| suppaftp FTPS custom verification / implicit mode gaps | FTPS security or compatibility | Phase 0 spike; if the adapter cannot expose the needed TLS policy, wrap the stream or switch TLS backend; document limitations rather than weaken verification |
-| russh API churn (0.65) / russh-sftp compatibility | Rework in the SSH layer | Pin versions, isolate behind `SftpRemote`, integration tests against OpenSSH, upgrade deliberately |
-| FTP LIST parsing variance | Wrong names/sizes/dates | Prefer MLSD; fixture-driven parser; surface warnings; never crash |
-| Resume semantics differ by server | Data corruption or dishonest UI | Capability negotiation, size verification, tests; disable rather than guess |
-| Tauri IPC throughput with huge directories | UI jank | Virtualization, payload budget, pagination/incremental listing if measurement requires it |
-| WebView drag/drop differences | Broken upload UX | Internal HTML5 DnD + Tauri OS drop; test on all platforms; file picker fallback |
-| Keychain unavailable on Linux | Cannot save credentials | Clear error, setup guidance; no insecure fallback |
-| Large file u64/i64 offsets | Overflow/truncation | Use u64 for sizes/offsets, checked conversions at protocol boundaries, >4GiB tests |
-| Key material in memory | Residual secrets | `SecretString`/`Zeroizing`, minimize copies, avoid logs; document limits |
-| Scope creep in advanced features | Delays reliability work | Phase gates; advanced features only after transfer core is trustworthy |
+| Risk                                                   | Impact                          | Mitigation                                                                                                                                                     |
+| ------------------------------------------------------ | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| suppaftp FTPS custom verification / implicit mode gaps | FTPS security or compatibility  | Phase 0 spike; if the adapter cannot expose the needed TLS policy, wrap the stream or switch TLS backend; document limitations rather than weaken verification |
+| russh API churn (0.65) / russh-sftp compatibility      | Rework in the SSH layer         | Pin versions, isolate behind `SftpRemote`, integration tests against OpenSSH, upgrade deliberately                                                             |
+| FTP LIST parsing variance                              | Wrong names/sizes/dates         | Prefer MLSD; fixture-driven parser; surface warnings; never crash                                                                                              |
+| Resume semantics differ by server                      | Data corruption or dishonest UI | Capability negotiation, size verification, tests; disable rather than guess                                                                                    |
+| Tauri IPC throughput with huge directories             | UI jank                         | Virtualization, payload budget, pagination/incremental listing if measurement requires it                                                                      |
+| WebView drag/drop differences                          | Broken upload UX                | Internal HTML5 DnD + Tauri OS drop; test on all platforms; file picker fallback                                                                                |
+| Keychain unavailable on Linux                          | Cannot save credentials         | Clear error, setup guidance; no insecure fallback                                                                                                              |
+| Large file u64/i64 offsets                             | Overflow/truncation             | Use u64 for sizes/offsets, checked conversions at protocol boundaries, >4GiB tests                                                                             |
+| Key material in memory                                 | Residual secrets                | `SecretString`/`Zeroizing`, minimize copies, avoid logs; document limits                                                                                       |
+| Scope creep in advanced features                       | Delays reliability work         | Phase gates; advanced features only after transfer core is trustworthy                                                                                         |
 
 ---
 

@@ -28,12 +28,14 @@ Transfers are the highest-risk user-facing feature: they involve long-running I/
 ## Consequences
 
 **Positive**
+
 - Progress and completion reflect reality.
 - Protocol limitations are visible rather than papered over.
 - Cancellation and failure leave predictable filesystem state.
 - The same engine serves uploads, downloads, sync and drag-and-drop.
 
 **Negative / accepted**
+
 - More explicit state than a naive `copy` loop.
 - Atomic download requires same-filesystem temp file and rename semantics.
 - Some servers cannot support pause/resume; those actions remain unavailable.

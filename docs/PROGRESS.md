@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-05  
-**Current phase:** Phase 0 — validation and project setup (in progress)  
-**Overall status:** Design approved by user; implementation starting.
+**Last updated:** 2026-11-06  
+**Current phase:** Phase 1 complete pending visual QA; Phase 2 (local filesystem) is next  
+**Overall status:** Foundation, design system, app shell, settings and typed IPC are implemented and verified by automated gates. Runtime visual QA of the desktop window is still pending.
 
 ---
 
@@ -27,15 +27,16 @@ Do not mark a feature complete unless its verification command passes and its ac
 
 These were recommended in the architecture package. Implementation proceeds with these defaults unless the user changes them; changes must be recorded here and in an ADR.
 
-| Topic | Default in use | Notes |
-| --- | --- | --- |
-| Protocol stack | suppaftp 12 + russh 0.65 / russh-sftp 3.0.1 | Phase 0 spikes must validate |
-| FTPS TLS | rustls + platform verifier | Fallback: native-tls if integration proves impractical |
-| Product name | `sftply` | Rename before branding/icons if requested |
-| Platform priority | macOS-first, Windows/Linux kept buildable | CI parity added as platform work progresses |
-| Lint/format | Biome for TS; rustfmt + clippy | ESLint/Prettier swap is contained if requested |
-| Advanced features | After a reliable 1.0 core | Permissions/bookmarks/editor/compare/sync in Phase 6 |
-| Git | Initialized locally, checkpoint commits | Never commit secrets or build artifacts |
+| Topic             | Default in use                              | Notes                                                  |
+| ----------------- | ------------------------------------------- | ------------------------------------------------------ |
+| Protocol stack    | suppaftp 12 + russh 0.65 / russh-sftp 3.0.1 | Phase 0 runtime spikes still pending (no test servers) |
+| FTPS TLS          | rustls + platform verifier                  | Fallback: native-tls if integration proves impractical |
+| Product name      | `sftply`                                    | Rename before branding/icons if requested              |
+| Platform priority | macOS-first, Windows/Linux kept buildable   | CI parity added as platform work progresses            |
+| Lint/format       | Biome for TS; rustfmt + clippy              | ESLint/Prettier swap is contained if requested         |
+| Advanced features | After a reliable 1.0 core                   | Permissions/bookmarks/editor/compare/sync in Phase 6   |
+| Git               | Initialized locally, checkpoint commits     | Never commit secrets or build artifacts                |
+| Typed IPC         | tauri-specta v2 RC + specta v2 RC           | v1 is Tauri v1 only; version corrected in Phase 1      |
 
 ---
 
@@ -46,32 +47,36 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Repository analysis and architecture package (`docs/`)
 - [x] ADRs 0001–0005 (proposed)
 - [x] Progress log created
+- [x] Phase 0: git initialization, Rust toolchain pin, Bun scripts, frontend foundations, shadcn/Tailwind v4, tauri-specta spike
+- [x] Phase 1: design tokens, shell, resizable persisted layout, themes, command palette skeleton, settings, Rust foundation, typed IPC, strict CSP, tests
 
 ### In progress
 
-- [ ] Phase 0: git initialization, toolchain, CI skeleton, spike validation
-- [ ] Phase 1: foundation, design system, app shell, settings, typed IPC
+- [ ] Phase 1 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity)
+- [ ] Phase 0 CI skeleton (frontend + Rust + audit)
 
 ### Known issues / blockers
 
-- None yet.
-- FTPS/SFTP integration spikes require local test servers (Docker or local daemons). If unavailable, compile-time validation is done now and runtime integration is deferred with an explicit marker.
+- No CI workflow exists yet; all gates are currently run locally.
+- Runtime FTPS/SFTP/keyring spikes still need local test servers (Docker or local daemons). Compile-time validation proceeds without them; protocol crates and their features are not yet added to `Cargo.toml`.
+- The `suppaftp`/implicit-FTPS and `russh` + `russh-sftp` version pairings remain unproven at runtime; if they fail, the dependency ADRs must be updated before Phase 3.
+- `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
 
 ---
 
 ## Phase 0 — Validation and project hygiene
 
-- [ ] Initialize git repository and checkpoint commit
-- [ ] Pin Rust toolchain (`rust-toolchain.toml`)
-- [ ] Confirm Bun usage and add scripts (`dev`, `build`, `typecheck`, `lint`, `format`, `test`, `check`)
-- [ ] Install and configure frontend foundations
-- [ ] Initialize shadcn/ui + Tailwind v4
+- [x] Initialize git repository and checkpoint commit (`b0efcfd`)
+- [x] Pin Rust toolchain (`rust-toolchain.toml`, 1.99.1 with rustfmt + clippy)
+- [x] Confirm Bun usage and add scripts (`dev`, `build`, `typecheck`, `lint`, `format`, `test`, `check`, `bindings`, Rust gates)
+- [x] Install and configure frontend foundations (React 19, TS 6 strict, Tailwind v4, Biome 2, Vitest + Testing Library, Zustand, TanStack Query/Virtual, RHF + Zod, cmdk, sonner, dnd-kit, tinykeys)
+- [x] Initialize shadcn/ui + Tailwind v4 (Radix base, `nova` preset, 28 primitives)
 - [ ] Add CI skeleton (frontend + Rust + audit)
-- [ ] Spike: suppaftp + FTPS API compiles; custom rustls connector shape validated
-- [ ] Spike: russh 0.65 + russh-sftp 3.0.1 compile together
-- [ ] Spike: tauri-specta command/event generation
+- [ ] Spike: suppaftp + FTPS API compiles; custom rustls connector shape validated (crates not added yet)
+- [ ] Spike: russh 0.65 + russh-sftp 3.0.1 compile together (crates not added yet)
+- [x] Spike: tauri-specta command/event generation (v2 RC, command + event + types verified)
 - [ ] Spike: keyring 4 store/read/delete
-- [ ] Record spike results in `docs/DEPENDENCIES.md` or a new ADR
+- [x] Record spike results in `docs/DEPENDENCIES.md` (tauri-specta correction recorded; protocol/keyring runtime results pending)
 
 ### Phase 0 exit criteria
 
@@ -80,23 +85,26 @@ These were recommended in the architecture package. Implementation proceeds with
 - Typed IPC generation works.
 - Known limitations documented; no security fallback chosen silently.
 
+**Status:** Typed IPC works. CI, protocol crates and keyring spikes remain outstanding.
+
 ---
 
 ## Phase 1 — Foundation: shell, design system, typed boundary
 
-- [ ] Design tokens (dark default + light), typography, density, scrollbars, focus rings
-- [ ] shadcn primitives installed and reviewed
-- [ ] App shell: title bar, sidebar, workspace split, bottom panel, status bar
-- [ ] Resizable layout with persisted sizes
-- [ ] Theme switcher (system/dark/light), no flash
-- [ ] Sidebar sections and honest disconnected/empty states
-- [ ] Command palette skeleton (Cmd/Ctrl+K)
-- [ ] Rust foundation: AppState, AppError, logging + redaction, config paths, atomic JSON store
-- [ ] Settings get/update commands + persistence
-- [ ] tauri-specta typed bindings + invoke wrapper + event bridge
-- [ ] Window defaults (1440×900, min 960×600), state persistence
-- [ ] Strict CSP and minimal capabilities
-- [ ] Tests: config atomic write, error normalization, theme/settings store, command registry
+- [x] Design tokens (dark default + light), typography, density, scrollbars, focus rings
+- [x] shadcn primitives installed and reviewed
+- [x] App shell: title bar, sidebar, workspace split, bottom panel, status bar
+- [x] Resizable layout with persisted sizes
+- [x] Theme switcher (system/dark/light), no flash
+- [x] Sidebar sections and honest disconnected/empty states
+- [x] Command palette skeleton (Cmd/Ctrl+K)
+- [x] Rust foundation: AppState, AppError, logging + redaction, config paths, atomic JSON store
+- [x] Settings get/update commands + persistence
+- [x] tauri-specta typed bindings + invoke wrapper + event bridge
+- [x] Window defaults (1440×900, min 1024×640), state persistence
+- [x] Strict CSP and minimal capabilities
+- [x] Tests: config atomic write, error normalization, theme/settings store, command registry
+- [ ] Visual runtime QA in the actual Tauri window
 
 ### Phase 1 exit criteria
 
@@ -104,6 +112,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - Settings survive restart; corrupt config has a recovery path.
 - Typed IPC regenerates deterministically.
 - No fake features; panes clearly show "not connected".
+
+**Status:** Implementation and automated verification complete. A real-window visual pass is the only remaining acceptance check.
 
 ---
 
@@ -211,26 +221,38 @@ These were recommended in the architecture package. Implementation proceeds with
 
 ## Verification
 
-Commands will be enabled as phases progress. Current intended commands:
-
 ```bash
-# Frontend
+# Full frontend gate
+bun run check          # typecheck + biome + vitest + production build
+
+# Individual gates
 bun run typecheck
 bun run lint
 bun run test
 bun run build
+
+# Bindings (must produce no diff)
+bun run bindings
 
 # Rust
 cd src-tauri
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
-
-# Full gate (to be added)
-bun run check
 ```
 
-**Last verification run:** not yet (Phase 0 setup in progress).
+**Last verification run:** 2026-11-06 — all gates green.
+
+| Gate                 | Result                                                  |
+| -------------------- | ------------------------------------------------------- |
+| `bun run typecheck`  | pass                                                    |
+| `bunx biome check .` | pass                                                    |
+| `bun run test`       | 19 tests pass in 4 files                                |
+| `bun run build`      | pass                                                    |
+| `cargo fmt --check`  | pass                                                    |
+| `cargo clippy`       | pass with `-D warnings`                                 |
+| `cargo test`         | 11 tests pass                                           |
+| `bun run bindings`   | regenerates `src/lib/ipc/bindings.ts` deterministically |
 
 ---
 
@@ -239,15 +261,49 @@ bun run check
 ### 2026-11-05 — Session 1: design approval and Phase 0 start
 
 **Done**
+
 - Analyzed the repository and verified toolchain versions.
 - Produced architecture, dependency evaluation, roadmap and ADRs.
 - Created this progress log.
 - Implemented earlier planning docs only; no product code yet.
 
 **Next**
+
 - Initialize git and toolchain pins.
 - Install frontend foundations and shadcn.
 - Build Phase 1 shell.
 
 **Notes**
+
 - User approved starting implementation and requested phase-by-phase progress records.
+
+### 2026-11-06 — Session 2: Phase 0 foundation and Phase 1 shell
+
+**Done**
+
+- Initialized git and committed the template plus architecture package (`b0efcfd`).
+- Pinned Rust 1.99.1 and added npm scripts for frontend/Rust/binding gates.
+- Installed and configured Tailwind v4, shadcn (Radix base + `nova`, 28 primitives), Zustand, TanStack Query/Virtual, RHF + Zod, cmdk, sonner, dnd-kit, tinykeys, Vitest and Biome.
+- Replaced the template UI with a dark-default/light design system (Inter + JetBrains Mono, OKLCH tokens, density, scrollbars, reduced motion).
+- Built the app shell: custom draggable title bar with traffic-light inset, sidebar, dual resizable panes, resizable Transfers/Activity panel, status bar, command palette, settings dialog and theme dropdown.
+- Implemented keyboard shortcuts: `⌘K` palette, `⌘,` settings, `⌘J` bottom panel, `⌘1`/`⌘2` pane focus.
+- Built the Rust foundation: typed `AppError`/`ErrorCode`, validated settings with defaults, atomic JSON writes, corrupt-config backup/recovery, tracing with redaction helper, `AppState`, `app_info`, `settings_get`/`settings_update`.
+- Corrected the typed-IPC decision: `tauri-specta` 1.0.2 targets Tauri v1, so the project uses `tauri-specta`/`specta` 2.0.0-rc.26 with `specta-typescript` 0.0.13.
+- Generated typed bindings and added a normalized IPC facade plus an activity event bridge.
+- Added settings load/update queue with optimistic updates, rollback, theme/density application and a no-flash localStorage mirror (never secrets).
+- Replaced startup-time event emission with a `startup_report` command drained by the frontend, so config-recovery warnings cannot be lost before the listener exists.
+- Added 19 frontend tests and 11 Rust tests covering formatting, theme, error normalization, activity store, settings validation, atomic writes and corrupt-config recovery.
+- Tightened CSP (`csp` + `devCsp`) and minimized capabilities to `core:default`, `dialog:default`, `opener:default`, `window-state:default`.
+
+**Verified**
+
+- `bun run typecheck`, `bunx biome check .`, `bun run test` (19), `bun run build`.
+- `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (11).
+- `bun run bindings` regenerates the same typed command/event surface.
+- Git working tree reviewed; `dist/` and `src-tauri/target/` remain ignored.
+
+**Next**
+
+- Run `bun run tauri dev` and complete the Phase 1 visual QA checklist.
+- Add the CI skeleton and commit the Phase 1 checkpoint.
+- Start Phase 2: local filesystem service, path validation, virtualized table, selection/keyboard model, mutations, tests and the 10k-entry performance check.

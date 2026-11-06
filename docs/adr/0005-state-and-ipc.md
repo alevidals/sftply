@@ -31,12 +31,14 @@ The app mixes slow server-derived data (directory listings), real-time pushed st
 ## Consequences
 
 **Positive**
+
 - One owner per kind of state; no duplication between Query and Zustand.
 - High-frequency transfer updates do not invalidate directory queries.
 - Contract drift is caught at compile time and in CI.
 - UI remains responsive with large lists and many transfers.
 
 **Negative / accepted**
+
 - Generated bindings require a Rust-side build step and CI check.
 - Event-projected Zustand state needs careful reducer tests and rehydration after reconnect.
 - Two state libraries require documented conventions (which state goes where).

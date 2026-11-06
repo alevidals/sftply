@@ -27,11 +27,13 @@ The application stores connection profiles that may include passwords and privat
 ## Consequences
 
 **Positive**
+
 - Secrets are protected by OS-level access control and unlocked with the user's login session.
 - No custom cryptography or master password to lose.
 - The webview never receives credentials after the initial submission.
 
 **Negative / accepted**
+
 - Linux requires a Secret Service provider; headless/minimal environments may not support saving passwords.
 - Keychain access can prompt the user (macOS), especially after binary updates.
 - Rust cannot guarantee every copied secret is zeroized; we minimize copies and document best-effort clearing.
