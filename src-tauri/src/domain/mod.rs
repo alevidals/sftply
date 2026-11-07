@@ -1,5 +1,9 @@
 pub mod activity;
+pub mod connection;
+pub mod credentials;
 pub mod fs;
+pub mod host_key;
+pub mod remote_path;
 pub mod settings;
 
 use serde::{Deserialize, Serialize};

@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-06  
-**Current phase:** Phase 2 implemented and verified by automated gates; Phase 3 (connections and remote browsing) is next  
-**Overall status:** Phase 1 shell and Phase 2 local browser are implemented. Automated gates are green; real-window visual QA and rendered component interaction tests are still pending.
+**Last updated:** 2026-11-07  
+**Current phase:** Phase 3 in progress — connection repository, keychain credentials and known-hosts store are implemented; protocol adapters, sessions and the remote browser are next  
+**Overall status:** Phase 1 shell and Phase 2 local browser are implemented and verified. Phase 3 foundation (connections, credentials, host keys) is implemented with automated gates green. Real-window visual QA, rendered component tests and protocol runtime integration remain pending.
 
 ---
 
@@ -347,3 +347,30 @@ cargo test
 - Run the Phase 1 + 2 visual QA checklist in `bun run tauri dev`.
 - Add rendered component tests for keyboard table navigation and rename/delete dialogs.
 - Start Phase 3: connection repository, connection form, keychain storage, protocol adapters, known-hosts flow, session actors and the remote browser.
+
+### 2026-11-07 — Session 4: Phase 3 connection foundation
+
+**Done**
+
+- Added the connection domain model: `ConnectionProfile`, `ConnectionInput`, protocol enum (`ftp`, `ftpsExplicit`, `ftpsImplicit`, `sftp`), password/key auth with absolute key paths, and trim/validate rules (`name ≤ 100`, `host ≤ 253` without whitespace or separators, port `1–65535`, `username ≤ 128`, SFTP-only keys, normalized absolute initial path, optional group).
+- Added `ConnectionStore` (`config_dir/connections.json`, schema version 1) with atomic writes, corrupt-file backup/recovery, duplicate, delete, favorite toggle and reorder.
+- Added keychain credential storage (`keyring` v1 API, service `dev.sftply.credentials`, item `{connection-id}:{password|passphrase}`) with set/read/delete/status. No command returns secret material; status reads and discards values.
+- Added the SSH known-hosts store (`config_dir/known_hosts.json`) with `Trusted` / `Unknown` / `Changed { previous_fingerprint }` verdicts; changed keys must block.
+- Wired `AppState` with connections, known hosts and chained startup warnings; registered 12 connection/keychain/known-host commands and regenerated typed bindings.
+- Added the frontend connection layer: typed API facade, Zod schema mirroring backend validation and defaults, TanStack Query hooks, RHF create/edit dialog with protocol/port defaults, native key-file picker and keychain secret hint/removal.
+- Replaced the sidebar placeholder with a connections panel: favorites-first ordering, secure/insecure protocol badges, duplicate, favorite toggle, delete confirmation and empty/loading/error states.
+- Added connection schema tests (validation, conversion, defaults) and a normalized IPC facade for all connection and known-host commands.
+
+**Verified**
+
+- `bun run typecheck`, `bunx biome check src`, `bun run test` (58 tests in 9 files), `bun run build`.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (46 tests).
+- `bun run bindings` regenerates the same typed surface.
+- Protocol crates (`suppaftp 12.2.1`, `russh 0.65.1`, `russh-sftp 3.0.1`) compile together in one workspace; `russh-sftp` only uses russh as a dev-dependency, so the reported 0.63/0.65 conflict does not apply.
+
+**Next**
+
+- Implement `protocol/` FTP/FTPS and SFTP adapters with capability reporting.
+- Add session actors, connection state events, host-key unknown/changed flow and connect/disconnect tests.
+- Build the remote browser from the shared `FileTable`; wire tabs and sidebar status indicators.
+- Add the Docker FTP/FTPS/SFTP integration suite and security redaction/traversal tests.

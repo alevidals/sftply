@@ -20,6 +20,19 @@ export const commands = {
 	fsChmod: (scope: FsScope, path: string, mode: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_chmod", { scope, path, mode })),
 	localOpen: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_open", { path })),
 	localReveal: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_reveal", { path })),
+	connectionsList: () => __TAURI_INVOKE<ConnectionProfile_Serialize[]>("connections_list"),
+	connectionCreate: (input: ConnectionInput_Deserialize) => typedError<ConnectionProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("connection_create", { input })),
+	connectionUpdate: (id: string, input: ConnectionInput_Deserialize) => typedError<ConnectionProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("connection_update", { id, input })),
+	connectionDelete: (id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("connection_delete", { id })),
+	connectionDuplicate: (id: string) => typedError<ConnectionProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("connection_duplicate", { id })),
+	connectionSetFavorite: (id: string, favorite: boolean) => typedError<ConnectionProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("connection_set_favorite", { id, favorite })),
+	connectionReorder: (ids: string[]) => typedError<ConnectionProfile_Serialize[], AppError_Serialize>(__TAURI_INVOKE("connection_reorder", { ids })),
+	connectionSecretSet: (id: string, kind: SecretKind, secret: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("connection_secret_set", { id, kind, secret })),
+	connectionSecretDelete: (id: string, kind: SecretKind) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("connection_secret_delete", { id, kind })),
+	connectionSecretStatus: (id: string) => typedError<SecretStatus, AppError_Serialize>(__TAURI_INVOKE("connection_secret_status", { id })),
+	knownHostsList: () => __TAURI_INVOKE<KnownHost[]>("known_hosts_list"),
+	knownHostTrust: (host: string, port: number, keyType: string, fingerprint: string) => typedError<KnownHost, AppError_Serialize>(__TAURI_INVOKE("known_host_trust", { host, port, keyType, fingerprint })),
+	knownHostRemove: (host: string, port: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("known_host_remove", { host, port })),
 };
 
 /** Events */
@@ -115,6 +128,84 @@ export type AppSettings_Serialize = {
 	lastLocalPath: string | null,
 };
 
+/**
+ *  How a connection authenticates. Secrets are never part of this model; they
+ *  live in the OS keychain and are referenced by connection id.
+ */
+export type ConnectionAuth = { kind: "password" } | { kind: "key"; 
+/**  Absolute local path to an OpenSSH or PEM private key. */
+keyPath: string; 
+/**  Whether the key is expected to need a passphrase in the keychain. */
+passphraseProtected: boolean };
+
+/**  Fields the frontend may submit when creating or updating a connection. */
+export type ConnectionInput = ConnectionInput_Serialize | ConnectionInput_Deserialize;
+
+/**  Fields the frontend may submit when creating or updating a connection. */
+export type ConnectionInput_Deserialize = {
+	name: string,
+	protocol: ConnectionProtocol,
+	host: string,
+	port: number,
+	username: string,
+	auth: ConnectionAuth,
+	initialPath: string,
+	favorite: boolean,
+	group?: string | null,
+};
+
+/**  Fields the frontend may submit when creating or updating a connection. */
+export type ConnectionInput_Serialize = {
+	name: string,
+	protocol: ConnectionProtocol,
+	host: string,
+	port: number,
+	username: string,
+	auth: ConnectionAuth,
+	initialPath: string,
+	favorite: boolean,
+	group: string | null,
+};
+
+/**  Non-secret connection metadata persisted in `connections.json`. */
+export type ConnectionProfile = ConnectionProfile_Serialize | ConnectionProfile_Deserialize;
+
+/**  Non-secret connection metadata persisted in `connections.json`. */
+export type ConnectionProfile_Deserialize = {
+	id: string,
+	name: string,
+	protocol: ConnectionProtocol,
+	host: string,
+	port: number,
+	username: string,
+	auth: ConnectionAuth,
+	initialPath: string,
+	favorite: boolean,
+	group?: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	createdAt: number,
+	lastUsedAt?: number | null,
+};
+
+/**  Non-secret connection metadata persisted in `connections.json`. */
+export type ConnectionProfile_Serialize = {
+	id: string,
+	name: string,
+	protocol: ConnectionProtocol,
+	host: string,
+	port: number,
+	username: string,
+	auth: ConnectionAuth,
+	initialPath: string,
+	favorite: boolean,
+	group: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	createdAt: number,
+	lastUsedAt: number | null,
+};
+
+export type ConnectionProtocol = "ftp" | "ftpsExplicit" | "ftpsImplicit" | "sftp";
+
 export type Density = "compact" | "comfortable";
 
 /**
@@ -195,6 +286,19 @@ export type FsEntry_Serialize = {
  */
 export type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string };
 
+/**
+ *  A trusted SSH host key. `fingerprint` is the SHA-256 fingerprint in the
+ *  OpenSSH `SHA256:…` representation.
+ */
+export type KnownHost = {
+	host: string,
+	port: number,
+	keyType: string,
+	fingerprint: string,
+	/**  Unix epoch milliseconds, UTC. */
+	addedAt: number,
+};
+
 export type Listing = Listing_Serialize | Listing_Deserialize;
 
 export type Listing_Deserialize = {
@@ -220,6 +324,17 @@ export type Listing_Serialize = {
 };
 
 export type ResumeSupport = "supported" | "conditional" | "unsupported";
+
+/**
+ *  Which secret a connection stores. Secrets never cross the IPC boundary in
+ *  read direction: the frontend can set, delete and query presence only.
+ */
+export type SecretKind = "password" | "passphrase";
+
+export type SecretStatus = {
+	password: boolean,
+	passphrase: boolean,
+};
 
 /**
  *  One-shot diagnostics produced while the app starts. Fetched by the frontend

@@ -1,12 +1,15 @@
 mod app_state;
 mod commands;
 mod config;
+mod credentials;
 mod domain;
 mod error;
 mod fs;
 mod logging;
 
 use app_state::AppState;
+use config::connection_store::ConnectionStore;
+use config::known_hosts::KnownHostsStore;
 use config::paths::AppPaths;
 use config::settings_store::SettingsStore;
 use domain::activity::ActivityEntry;
@@ -31,6 +34,19 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::fs::fs_chmod,
             commands::fs::local_open,
             commands::fs::local_reveal,
+            commands::connections::connections_list,
+            commands::connections::connection_create,
+            commands::connections::connection_update,
+            commands::connections::connection_delete,
+            commands::connections::connection_duplicate,
+            commands::connections::connection_set_favorite,
+            commands::connections::connection_reorder,
+            commands::connections::connection_secret_set,
+            commands::connections::connection_secret_delete,
+            commands::connections::connection_secret_status,
+            commands::connections::known_hosts_list,
+            commands::connections::known_host_trust,
+            commands::connections::known_host_remove,
         ])
         .events(tauri_specta::collect_events![ActivityEntry])
 }
@@ -63,10 +79,25 @@ pub fn run() {
         .setup(move |app| {
             let paths = AppPaths::resolve(app.handle())?;
             let log_guard = logging::init(&paths)?;
-            let (settings, warning) = SettingsStore::load(paths.settings_file.clone());
-            let warnings = warning.into_iter().collect();
+            let (settings, settings_warning) = SettingsStore::load(paths.settings_file.clone());
+            let (connections, connections_warning) =
+                ConnectionStore::load(paths.connections_file.clone());
+            let (known_hosts, known_hosts_warning) =
+                KnownHostsStore::load(paths.known_hosts_file.clone());
+            let warnings = settings_warning
+                .into_iter()
+                .chain(connections_warning)
+                .chain(known_hosts_warning)
+                .collect();
 
-            app.manage(AppState::new(paths, settings, log_guard, warnings));
+            app.manage(AppState::new(
+                paths,
+                settings,
+                connections,
+                known_hosts,
+                log_guard,
+                warnings,
+            ));
             builder.mount_events(app);
 
             tracing::info!(version = env!("CARGO_PKG_VERSION"), "sftply starting");

@@ -63,6 +63,10 @@ impl AppError {
         Self::new(ErrorCode::InvalidInput, message)
     }
 
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::NotFound, message)
+    }
+
     pub fn internal(message: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::new(ErrorCode::Internal, message).with_detail(detail)
     }

@@ -1,6 +1,6 @@
 # sftply — Dependency Evaluation
 
-**Status:** Approved; implementation in progress — versions verified 2026-11-05/06 against crates.io / npm.  
+**Status:** Approved; implementation in progress — versions verified 2026-11-05/06 against crates.io / npm. Compile spike for the protocol stack passed 2026-11-07.  
 **Policy:** Pin exact versions in `Cargo.toml` / `package.json`, commit both lockfiles, and review upgrades deliberately. Every dependency must earn its place: it is maintained, permissively licensed, cross-platform, and does not require a system binary at runtime.
 
 ---
@@ -61,7 +61,7 @@
 | Crypto      | rustls/aws-lc-rs by default, ring available; modern KEX/ciphers                                                                                                                        |
 | Risks       | API churn between minor versions (0.x); russh-sftp 3.0.1's dev dependency is russh 0.63.2, so 0.65 compatibility must be verified in the Phase 0 spike; server-specific SFTP v3 quirks |
 
-**Decision:** Use russh + russh-sftp. Pin exact versions, isolate them behind `protocol/sftp/`, and keep a protocol integration suite against OpenSSH. If the 0.65 pairing fails, pin russh to the version tested by russh-sftp and re-evaluate upgrade cadence; do not fall back to a system `ssh`/`sftp` binary.
+**Decision:** Use russh + russh-sftp. Pin exact versions, isolate them behind `protocol/sftp/`, and keep a protocol integration suite against OpenSSH. **Compile spike 2026-11-07:** `russh 0.65.1` + `russh-sftp 3.0.1` build together with `ring`/`rsa`/`flate2`; `russh-sftp` consumes any `AsyncRead + AsyncWrite` stream, so no version coupling exists. Runtime integration against OpenSSH is still pending a local server.
 
 **Alternatives considered**
 
@@ -206,7 +206,8 @@ Trade-off: generated code must be reviewed like any other code. We will not blin
    - `resume_transfer` download and append upload behavior; verify offset semantics.
    - `abort()` mid-transfer leaves a usable control connection or cleanly reconnects.
 2. **russh / russh-sftp**
-   - 0.65.1 + 3.0.1 compile together and pass SFTP operations against OpenSSH.
+   - **Compile spike passed 2026-11-07:** 0.65.1 + 3.0.1 build together (russh-sftp's russh 0.63 is dev-only).
+   - Still to run: SFTP operations against OpenSSH.
    - Password, unencrypted key, passphrase key; wrong passphrase yields a clear error.
    - Unknown host key triggers our trust flow; changed key blocks.
    - chmod, rename, recursive listing, large file (>4 GiB sparse file) streaming.

@@ -2,10 +2,15 @@ import { normalizeError } from "@/lib/errors"
 import {
   type AppInfo,
   type AppSettings_Serialize,
+  type ConnectionInput_Deserialize,
+  type ConnectionProfile_Serialize,
   commands,
   type FsEntry,
   type FsScope,
+  type KnownHost,
   type Listing,
+  type SecretKind,
+  type SecretStatus,
   type StartupReport,
 } from "@/lib/ipc/bindings"
 
@@ -78,6 +83,76 @@ export const ipc = {
 
   localReveal(path: string): Promise<void> {
     return invoke(commands.localReveal(path)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  connectionsList(): Promise<ConnectionProfile_Serialize[]> {
+    return invoke(commands.connectionsList())
+  },
+
+  connectionCreate(input: ConnectionInput_Deserialize): Promise<ConnectionProfile_Serialize> {
+    return invoke(commands.connectionCreate(input)).then((result) => unwrap(result))
+  },
+
+  connectionUpdate(
+    id: string,
+    input: ConnectionInput_Deserialize,
+  ): Promise<ConnectionProfile_Serialize> {
+    return invoke(commands.connectionUpdate(id, input)).then((result) => unwrap(result))
+  },
+
+  connectionDelete(id: string): Promise<void> {
+    return invoke(commands.connectionDelete(id)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  connectionDuplicate(id: string): Promise<ConnectionProfile_Serialize> {
+    return invoke(commands.connectionDuplicate(id)).then((result) => unwrap(result))
+  },
+
+  connectionSetFavorite(id: string, favorite: boolean): Promise<ConnectionProfile_Serialize> {
+    return invoke(commands.connectionSetFavorite(id, favorite)).then((result) => unwrap(result))
+  },
+
+  connectionReorder(ids: string[]): Promise<ConnectionProfile_Serialize[]> {
+    return invoke(commands.connectionReorder(ids)).then((result) => unwrap(result))
+  },
+
+  connectionSecretSet(id: string, kind: SecretKind, secret: string): Promise<void> {
+    return invoke(commands.connectionSecretSet(id, kind, secret)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  connectionSecretDelete(id: string, kind: SecretKind): Promise<void> {
+    return invoke(commands.connectionSecretDelete(id, kind)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  connectionSecretStatus(id: string): Promise<SecretStatus> {
+    return invoke(commands.connectionSecretStatus(id)).then((result) => unwrap(result))
+  },
+
+  knownHostsList(): Promise<KnownHost[]> {
+    return invoke(commands.knownHostsList())
+  },
+
+  knownHostTrust(
+    host: string,
+    port: number,
+    keyType: string,
+    fingerprint: string,
+  ): Promise<KnownHost> {
+    return invoke(commands.knownHostTrust(host, port, keyType, fingerprint)).then((result) =>
+      unwrap(result),
+    )
+  },
+
+  knownHostRemove(host: string, port: number): Promise<void> {
+    return invoke(commands.knownHostRemove(host, port)).then((result) => {
       unwrap(result)
     })
   },

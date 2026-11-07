@@ -7,11 +7,13 @@ use crate::error::{AppError, ErrorCode};
 #[derive(Debug, Clone)]
 pub struct AppPaths {
     pub config_dir: PathBuf,
-    /// Reserved for Phase 3 (known hosts, connection metadata, transfer state).
+    /// Reserved for Phase 4 (transfer state).
     #[allow(dead_code)]
     pub data_dir: PathBuf,
     pub log_dir: PathBuf,
     pub settings_file: PathBuf,
+    pub connections_file: PathBuf,
+    pub known_hosts_file: PathBuf,
 }
 
 impl AppPaths {
@@ -35,6 +37,8 @@ impl AppPaths {
 
         Ok(Self {
             settings_file: config_dir.join("settings.json"),
+            connections_file: config_dir.join("connections.json"),
+            known_hosts_file: config_dir.join("known_hosts.json"),
             config_dir,
             data_dir,
             log_dir,

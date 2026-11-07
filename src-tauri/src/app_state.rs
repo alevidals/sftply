@@ -2,12 +2,16 @@ use std::sync::{Mutex, RwLock};
 
 use tracing_appender::non_blocking::WorkerGuard;
 
+use crate::config::connection_store::ConnectionStore;
+use crate::config::known_hosts::KnownHostsStore;
 use crate::config::paths::AppPaths;
 use crate::config::settings_store::SettingsStore;
 
 pub struct AppState {
     pub paths: AppPaths,
     pub settings: SettingsStore,
+    pub connections: ConnectionStore,
+    pub known_hosts: KnownHostsStore,
     /// Warnings produced before the webview existed, drained by
     /// `startup_report` once the frontend asks for them.
     startup_warnings: RwLock<Vec<String>>,
@@ -19,12 +23,16 @@ impl AppState {
     pub fn new(
         paths: AppPaths,
         settings: SettingsStore,
+        connections: ConnectionStore,
+        known_hosts: KnownHostsStore,
         log_guard: WorkerGuard,
         startup_warnings: Vec<String>,
     ) -> Self {
         Self {
             paths,
             settings,
+            connections,
+            known_hosts,
             startup_warnings: RwLock::new(startup_warnings),
             _log_guard: Mutex::new(Some(log_guard)),
         }
