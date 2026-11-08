@@ -62,3 +62,17 @@ pub enum HostKeyVerdict {
     /// the connection until the user explicitly replaces the stored key.
     Changed { previous_fingerprint: String },
 }
+
+/// Machine-readable host-key challenge attached to a failed connection so the
+/// UI can show a trust dialog without parsing free-form error text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HostKeyChallenge {
+    pub host: String,
+    pub port: u16,
+    pub key_type: String,
+    /// OpenSSH-style `SHA256:…` fingerprint of the key the server presented.
+    pub fingerprint: String,
+    /// Fingerprint already trusted for this host, when the key changed.
+    pub previous_fingerprint: Option<String>,
+}

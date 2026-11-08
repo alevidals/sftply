@@ -35,6 +35,10 @@ interface FileTableProps {
   rowHeight: number
   renamingPath: string | null
   canChmod: boolean
+  /** Whether non-directory entries can be opened. Remote panes only navigate. */
+  allowOpen: boolean
+  /** Whether items can be revealed in the OS file manager (local only). */
+  allowReveal: boolean
   onSelect: (index: number, mode: SelectionMode) => void
   onSelectAll: () => void
   onClearSelection: () => void
@@ -54,6 +58,8 @@ export function FileTable({
   rowHeight,
   renamingPath,
   canChmod,
+  allowOpen,
+  allowReveal,
   onSelect,
   onSelectAll,
   onClearSelection,
@@ -104,6 +110,7 @@ export function FileTable({
   const actionDisabled = (action: FileAction): boolean => {
     switch (action) {
       case "open":
+        return !activeEntry || (activeEntry.kind !== "directory" && !allowOpen)
       case "rename":
       case "reveal":
         return !activeEntry
@@ -319,10 +326,12 @@ export function FileTable({
           Open
           <ContextMenuShortcut>↩</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem disabled={actionDisabled("reveal")} onSelect={() => onAction("reveal")}>
-          <FolderSearchIcon />
-          Reveal in file manager
-        </ContextMenuItem>
+        {allowReveal ? (
+          <ContextMenuItem disabled={actionDisabled("reveal")} onSelect={() => onAction("reveal")}>
+            <FolderSearchIcon />
+            Reveal in file manager
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuSeparator />
         <ContextMenuItem disabled={actionDisabled("rename")} onSelect={() => onAction("rename")}>
           <PencilIcon />

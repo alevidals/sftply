@@ -11,6 +11,7 @@ import {
   type Listing,
   type SecretKind,
   type SecretStatus,
+  type SessionInfo,
   type StartupReport,
 } from "@/lib/ipc/bindings"
 
@@ -153,6 +154,20 @@ export const ipc = {
 
   knownHostRemove(host: string, port: number): Promise<void> {
     return invoke(commands.knownHostRemove(host, port)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  sessionsList(): Promise<SessionInfo[]> {
+    return invoke(commands.sessionsList())
+  },
+
+  sessionConnect(connectionId: string): Promise<SessionInfo> {
+    return invoke(commands.sessionConnect(connectionId)).then((result) => unwrap(result))
+  },
+
+  sessionDisconnect(sessionId: string): Promise<void> {
+    return invoke(commands.sessionDisconnect(sessionId)).then((result) => {
       unwrap(result)
     })
   },

@@ -17,8 +17,11 @@ pub fn init(paths: &AppPaths) -> Result<WorkerGuard, AppError> {
     let file_appender = tracing_appender::rolling::daily(&paths.log_dir, "sftply.log");
     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,sftply_lib=debug"));
+    // Protocol crates log protocol traffic at trace level; suppaftp logs the
+    // raw command line, including `PASS`, so clamp them to info even when a
+    // developer sets RUST_LOG=trace for our own crates.
+    let base = std::env::var("RUST_LOG").unwrap_or_else(|_| "info,sftply_lib=debug".to_string());
+    let filter = EnvFilter::new(format!("{base},suppaftp=info,russh=info,russh_sftp=info"));
 
     let file_layer = tracing_subscriber::fmt::layer()
         .with_writer(file_writer)

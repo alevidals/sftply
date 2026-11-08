@@ -1,10 +1,11 @@
-import type { AppError, ErrorCode } from "@/lib/ipc/bindings"
+import type { AppError, ErrorCode, HostKeyChallenge } from "@/lib/ipc/bindings"
 
 /** Error class used at the IPC boundary. `message` is always user-safe. */
 export class IpcError extends Error {
   readonly code: ErrorCode
   readonly detail: string | null
   readonly retryable: boolean
+  readonly hostKey: HostKeyChallenge | null
 
   constructor(error: AppError) {
     super(error.message)
@@ -12,6 +13,7 @@ export class IpcError extends Error {
     this.code = error.code
     this.detail = error.detail ?? null
     this.retryable = error.retryable
+    this.hostKey = error.hostKey ?? null
   }
 }
 

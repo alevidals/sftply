@@ -1,0 +1,571 @@
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use russh::Disconnect;
+use russh::client::{self, Handle};
+use russh::keys::{HashAlg, PrivateKeyWithHashAlg, load_secret_key};
+use russh_sftp::client::SftpSession;
+use russh_sftp::client::error::Error as SftpError;
+use russh_sftp::protocol::{FileAttributes, FileType, StatusCode};
+
+use crate::config::known_hosts::verify_against;
+use crate::domain::connection::{ConnectionAuth, ConnectionProfile};
+use crate::domain::fs::{EntryKind, FsCapabilities, FsEntry, Listing, ResumeSupport};
+use crate::domain::host_key::{HostKeyChallenge, HostKeyVerdict, KnownHost};
+use crate::domain::remote_path::{
+    join_remote, normalize_remote, remote_leaf, remote_parent, validate_remote_name,
+};
+use crate::error::{AppError, ErrorCode};
+use crate::protocol::{RemoteFs, listing, ms_from_secs, protocol_error, sanitize_detail};
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+const REQUEST_TIMEOUT_SECS: u64 = 30;
+
+pub struct SftpCredentials {
+    pub password: Option<String>,
+    pub passphrase: Option<String>,
+}
+
+pub struct SftpRemote {
+    sftp: SftpSession,
+    handle: Handle<HostKeyHandler>,
+    capabilities: FsCapabilities,
+}
+
+/// SSH client handler that enforces our known-hosts policy during the
+/// handshake. A snapshot of trusted keys is used, so the trust store is never
+/// held across an await point.
+pub struct HostKeyHandler {
+    host: String,
+    port: u16,
+    trusted: Vec<KnownHost>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SshConnectError {
+    #[error(transparent)]
+    Client(#[from] russh::Error),
+    #[error("host key is not trusted")]
+    HostKey {
+        key_type: String,
+        fingerprint: String,
+        previous_fingerprint: Option<String>,
+    },
+}
+
+impl client::Handler for HostKeyHandler {
+    type Error = SshConnectError;
+
+    async fn check_server_key(
+        &mut self,
+        server_public_key: &russh::keys::PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
+        let key = server_public_key.public_key();
+        let key_type = key.algorithm().to_string();
+        let fingerprint = key.fingerprint(HashAlg::Sha256).to_string();
+
+        match verify_against(
+            &self.trusted,
+            &self.host,
+            self.port,
+            &key_type,
+            &fingerprint,
+        ) {
+            HostKeyVerdict::Trusted => Ok(true),
+            HostKeyVerdict::Unknown => Err(SshConnectError::HostKey {
+                key_type,
+                fingerprint,
+                previous_fingerprint: None,
+            }),
+            HostKeyVerdict::Changed {
+                previous_fingerprint,
+            } => Err(SshConnectError::HostKey {
+                key_type,
+                fingerprint,
+                previous_fingerprint: Some(previous_fingerprint),
+            }),
+        }
+    }
+}
+
+impl SftpRemote {
+    pub async fn connect(
+        profile: &ConnectionProfile,
+        credentials: SftpCredentials,
+        trusted: Vec<KnownHost>,
+    ) -> Result<Self, AppError> {
+        let key = match &profile.auth {
+            ConnectionAuth::Password => None,
+            ConnectionAuth::Key { key_path, .. } => {
+                let path = key_path.clone();
+                let passphrase = credentials.passphrase.clone();
+                Some(
+                    tokio::task::spawn_blocking(move || {
+                        load_secret_key(Path::new(&path), passphrase.as_deref())
+                    })
+                    .await
+                    .map_err(|error| {
+                        AppError::internal(
+                            "Could not read the private key.",
+                            format!("key loading task failed: {error}"),
+                        )
+                    })?
+                    .map_err(|error| {
+                        AppError::new(
+                            ErrorCode::AuthFailed,
+                            "The private key could not be read. Check the file and passphrase.",
+                        )
+                        .with_detail(error.to_string())
+                    })?,
+                )
+            }
+        };
+
+        let config = Arc::new(client::Config {
+            keepalive_interval: Some(Duration::from_secs(30)),
+            keepalive_max: 3,
+            inactivity_timeout: Some(Duration::from_secs(180)),
+            nodelay: true,
+            ..Default::default()
+        });
+        let handler = HostKeyHandler {
+            host: profile.host.clone(),
+            port: profile.port,
+            trusted,
+        };
+
+        let mut session = tokio::time::timeout(
+            CONNECT_TIMEOUT,
+            client::connect(config, (profile.host.as_str(), profile.port), handler),
+        )
+        .await
+        .map_err(|_| {
+            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+        })?
+        .map_err(|error| map_connect_error(error, profile))?;
+
+        if let Some(key) = key {
+            let hash = session
+                .best_supported_rsa_hash()
+                .await
+                .ok()
+                .flatten()
+                .flatten();
+            let result = session
+                .authenticate_publickey(
+                    profile.username.as_str(),
+                    PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                )
+                .await
+                .map_err(map_russh_error)?;
+            if !result.success() {
+                return Err(AppError::new(
+                    ErrorCode::AuthFailed,
+                    "The server rejected the SSH key.",
+                ));
+            }
+        } else {
+            let password = credentials.password.ok_or_else(|| {
+                AppError::new(
+                    ErrorCode::AuthFailed,
+                    "No password is saved for this connection.",
+                )
+            })?;
+            let result = session
+                .authenticate_password(profile.username.as_str(), password)
+                .await
+                .map_err(map_russh_error)?;
+            if !result.success() {
+                return Err(AppError::new(
+                    ErrorCode::AuthFailed,
+                    "The server rejected the username or password.",
+                ));
+            }
+        }
+
+        let channel = session
+            .channel_open_session()
+            .await
+            .map_err(map_russh_error)?;
+        channel
+            .request_subsystem(true, "sftp")
+            .await
+            .map_err(map_russh_error)?;
+        let sftp = tokio::time::timeout(CONNECT_TIMEOUT, SftpSession::new(channel.into_stream()))
+            .await
+            .map_err(|_| {
+                AppError::new(
+                    ErrorCode::Timeout,
+                    "The SFTP subsystem did not start in time.",
+                )
+                .retryable()
+            })?
+            .map_err(map_sftp_error)?;
+        sftp.set_timeout(REQUEST_TIMEOUT_SECS);
+
+        Ok(Self {
+            sftp,
+            handle: session,
+            capabilities: FsCapabilities {
+                list: true,
+                mkdir: true,
+                remove: true,
+                rename: true,
+                chmod: true,
+                chown: false,
+                symlinks: true,
+                unix_permissions: true,
+                detailed_listing: true,
+                resume_download: ResumeSupport::Supported,
+                resume_upload: ResumeSupport::Supported,
+                server_side_move: true,
+                server_side_copy: false,
+                text_read: false,
+                text_write: false,
+            },
+        })
+    }
+
+    async fn delete_inner(&mut self, path: &str) -> Result<(), AppError> {
+        let entry = self.stat(path).await?;
+        if entry.kind == EntryKind::Directory {
+            let listing = self.list(path).await?;
+            for child in listing.entries {
+                Box::pin(self.delete_inner(&child.path)).await?;
+            }
+            self.sftp.remove_dir(path).await.map_err(map_sftp_error)?;
+        } else {
+            self.sftp.remove_file(path).await.map_err(map_sftp_error)?;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl RemoteFs for SftpRemote {
+    async fn list(&mut self, path: &str) -> Result<Listing, AppError> {
+        let path = normalize_remote(path)?;
+        let parent = remote_parent(&path)?;
+        let mut reader = self.sftp.read_dir(&path).await.map_err(map_sftp_error)?;
+        let mut entries = Vec::new();
+        let mut warnings = Vec::new();
+
+        for entry in reader.by_ref() {
+            let name = entry.file_name();
+            let entry_path = match join_remote(&path, &name) {
+                Ok(path) => path,
+                Err(_) => {
+                    warnings.push("A server entry had a name that could not be displayed.".into());
+                    continue;
+                }
+            };
+            let metadata = entry.metadata();
+            match map_metadata(&name, &entry_path, &metadata) {
+                Ok(mut entry) => {
+                    entry.link_target = if entry.kind == EntryKind::Symlink {
+                        self.sftp.read_link(&entry_path).await.ok()
+                    } else {
+                        None
+                    };
+                    entries.push(entry);
+                }
+                Err(_) => warnings.push(format!("“{name}” could not be read completely.",)),
+            }
+        }
+
+        Ok(listing(
+            path,
+            parent,
+            entries,
+            self.capabilities.clone(),
+            warnings,
+        ))
+    }
+
+    async fn stat(&mut self, path: &str) -> Result<FsEntry, AppError> {
+        let path = normalize_remote(path)?;
+        let metadata = self
+            .sftp
+            .symlink_metadata(&path)
+            .await
+            .map_err(map_sftp_error)?;
+        let name = remote_leaf(&path)?;
+        let mut entry = map_metadata(&name, &path, &metadata)?;
+        if entry.kind == EntryKind::Symlink {
+            entry.link_target = self.sftp.read_link(&path).await.ok();
+        }
+        Ok(entry)
+    }
+
+    async fn mkdir(&mut self, parent: &str, name: &str) -> Result<FsEntry, AppError> {
+        validate_remote_name(name)?;
+        let target = join_remote(parent, name)?;
+        self.sftp
+            .create_dir(&target)
+            .await
+            .map_err(map_sftp_error)?;
+        self.stat(&target).await
+    }
+
+    async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError> {
+        let path = normalize_remote(path)?;
+        if path == "/" {
+            return Err(AppError::invalid_input(
+                "The root folder cannot be renamed.",
+            ));
+        }
+        validate_remote_name(new_name)?;
+        let parent = remote_parent(&path)?.unwrap_or_else(|| "/".to_string());
+        let target = join_remote(&parent, new_name)?;
+        if target == path {
+            return self.stat(&path).await;
+        }
+        self.sftp
+            .rename(&path, &target)
+            .await
+            .map_err(map_sftp_error)?;
+        self.stat(&target).await
+    }
+
+    async fn delete(&mut self, path: &str, recursive: bool) -> Result<(), AppError> {
+        let path = normalize_remote(path)?;
+        if path == "/" {
+            return Err(AppError::invalid_input(
+                "The root folder cannot be deleted.",
+            ));
+        }
+        let entry = self.stat(&path).await?;
+        if entry.kind == EntryKind::Directory {
+            let listing = self.list(&path).await?;
+            if !recursive && !listing.entries.is_empty() {
+                return Err(AppError::new(
+                    ErrorCode::Conflict,
+                    "That folder is not empty.",
+                ));
+            }
+        }
+        self.delete_inner(&path).await
+    }
+
+    async fn chmod(&mut self, path: &str, mode: u32) -> Result<(), AppError> {
+        crate::fs::path::validate_mode(mode)?;
+        let path = normalize_remote(path)?;
+        let attributes = FileAttributes {
+            permissions: Some(mode),
+            ..Default::default()
+        };
+        self.sftp
+            .set_metadata(&path, attributes)
+            .await
+            .map_err(map_sftp_error)
+    }
+
+    async fn disconnect(&mut self) -> Result<(), AppError> {
+        let _ = self.sftp.close().await;
+        let _ = self
+            .handle
+            .disconnect(Disconnect::ByApplication, "Disconnected", "en")
+            .await;
+        Ok(())
+    }
+
+    fn capabilities(&self) -> FsCapabilities {
+        self.capabilities.clone()
+    }
+}
+
+fn map_metadata(name: &str, path: &str, metadata: &FileAttributes) -> Result<FsEntry, AppError> {
+    let kind = match metadata.file_type() {
+        FileType::Dir => EntryKind::Directory,
+        FileType::File => EntryKind::File,
+        FileType::Symlink => EntryKind::Symlink,
+        FileType::Other => EntryKind::Other,
+    };
+    let modified_at = metadata.mtime.map(|seconds| ms_from_secs(seconds as u64));
+    let permissions = metadata.permissions.map(|mode| mode & 0o7777);
+    let owner = metadata
+        .user
+        .clone()
+        .or_else(|| metadata.uid.map(|uid| uid.to_string()));
+    let group = metadata
+        .group
+        .clone()
+        .or_else(|| metadata.gid.map(|gid| gid.to_string()));
+
+    Ok(FsEntry {
+        name: name.to_string(),
+        path: path.to_string(),
+        kind,
+        size: metadata.size.unwrap_or(0) as f64,
+        modified_at,
+        permissions,
+        owner,
+        group,
+        link_target: None,
+        hidden: name.starts_with('.'),
+        metadata_complete: metadata.size.is_some()
+            && metadata.permissions.is_some()
+            && metadata.mtime.is_some(),
+    })
+}
+
+fn map_connect_error(error: SshConnectError, profile: &ConnectionProfile) -> AppError {
+    match error {
+        SshConnectError::HostKey {
+            key_type,
+            fingerprint,
+            previous_fingerprint,
+        } => {
+            let changed = previous_fingerprint.is_some();
+            AppError::new(
+                if changed {
+                    ErrorCode::HostKeyMismatch
+                } else {
+                    ErrorCode::HostKeyUnknown
+                },
+                if changed {
+                    "The server's host key changed. The connection was blocked."
+                } else {
+                    "This server's host key is not trusted yet."
+                },
+            )
+            .with_host_key(HostKeyChallenge {
+                host: profile.host.clone(),
+                port: profile.port,
+                key_type,
+                fingerprint,
+                previous_fingerprint,
+            })
+        }
+        SshConnectError::Client(error) => map_russh_error(error),
+    }
+}
+
+fn map_russh_error(error: russh::Error) -> AppError {
+    use russh::Error;
+
+    match error {
+        Error::NotAuthenticated | Error::UnsupportedAuthMethod => {
+            AppError::new(ErrorCode::AuthFailed, "The server rejected the sign-in.")
+        }
+        Error::CouldNotReadKey | Error::UnknownKey | Error::WrongServerSig => AppError::new(
+            ErrorCode::HostKeyMismatch,
+            "The server's host key could not be verified.",
+        ),
+        Error::KexInit | Error::Kex | Error::Version => {
+            AppError::new(ErrorCode::Protocol, "The SSH handshake failed.")
+        }
+        other => AppError::new(ErrorCode::Network, "The SSH connection failed.")
+            .with_detail(sanitize_detail(&other.to_string()))
+            .retryable(),
+    }
+}
+
+fn map_sftp_error(error: SftpError) -> AppError {
+    match error {
+        SftpError::Status(status) => {
+            let (code, message) = match status.status_code {
+                StatusCode::NoSuchFile => (ErrorCode::NotFound, "That remote item does not exist."),
+                StatusCode::PermissionDenied => (
+                    ErrorCode::PermissionDenied,
+                    "You do not have permission for that item.",
+                ),
+                StatusCode::OpUnsupported => (
+                    ErrorCode::Unsupported,
+                    "The server does not support that operation.",
+                ),
+                StatusCode::NoConnection | StatusCode::ConnectionLost => (
+                    ErrorCode::SessionNotReady,
+                    "The SFTP session was disconnected.",
+                ),
+                StatusCode::Failure => (ErrorCode::Protocol, "The server rejected the request."),
+                _ => (ErrorCode::Protocol, "The server rejected the request."),
+            };
+            let detail = sanitize_detail(&status.error_message);
+            if detail.is_empty() {
+                AppError::new(code, message)
+            } else {
+                protocol_error(code, message, detail)
+            }
+        }
+        SftpError::Timeout => {
+            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+        }
+        SftpError::IO(detail) => AppError::new(ErrorCode::Network, "The SFTP connection failed.")
+            .with_detail(sanitize_detail(&detail))
+            .retryable(),
+        SftpError::Limited(detail) => {
+            AppError::new(ErrorCode::InvalidInput, "The server limit was exceeded.")
+                .with_detail(sanitize_detail(&detail))
+        }
+        SftpError::UnexpectedPacket | SftpError::UnexpectedBehavior(_) => AppError::new(
+            ErrorCode::Protocol,
+            "The server sent an unexpected response.",
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_file_attributes_and_masks_type_bits() {
+        let attributes = FileAttributes {
+            size: Some(1024),
+            permissions: Some(0o100644),
+            mtime: Some(1_700_000_000),
+            user: Some("alice".into()),
+            group: Some("staff".into()),
+            ..Default::default()
+        };
+
+        let entry = map_metadata("file.txt", "/file.txt", &attributes).unwrap();
+        assert_eq!(entry.kind, EntryKind::File);
+        assert_eq!(entry.size, 1024.0);
+        assert_eq!(entry.permissions, Some(0o644));
+        assert_eq!(entry.modified_at, Some(1_700_000_000_000.0));
+        assert_eq!(entry.owner.as_deref(), Some("alice"));
+        assert_eq!(entry.group.as_deref(), Some("staff"));
+        assert!(entry.metadata_complete);
+    }
+
+    #[test]
+    fn maps_directory_attributes_and_reports_incomplete_metadata() {
+        let attributes = FileAttributes {
+            permissions: Some(0o040755),
+            ..Default::default()
+        };
+
+        let entry = map_metadata("docs", "/docs", &attributes).unwrap();
+        assert_eq!(entry.kind, EntryKind::Directory);
+        assert_eq!(entry.permissions, Some(0o755));
+        assert_eq!(entry.size, 0.0);
+        assert!(!entry.metadata_complete);
+    }
+
+    #[test]
+    fn maps_sftp_status_codes_to_stable_errors() {
+        let error = map_sftp_error(SftpError::Status(russh_sftp::protocol::Status {
+            id: 1,
+            status_code: StatusCode::NoSuchFile,
+            error_message: "no such file".into(),
+            language_tag: String::new(),
+        }));
+        assert_eq!(error.code, ErrorCode::NotFound);
+
+        let error = map_sftp_error(SftpError::Status(russh_sftp::protocol::Status {
+            id: 2,
+            status_code: StatusCode::PermissionDenied,
+            error_message: "permission denied".into(),
+            language_tag: String::new(),
+        }));
+        assert_eq!(error.code, ErrorCode::PermissionDenied);
+
+        let error = map_sftp_error(SftpError::Timeout);
+        assert_eq!(error.code, ErrorCode::Timeout);
+        assert!(error.retryable);
+    }
+}

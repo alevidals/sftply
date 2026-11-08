@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::domain::host_key::HostKeyChallenge;
+
 /// Stable, user-safe error codes shared with the frontend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -37,6 +39,9 @@ pub struct AppError {
     pub message: String,
     pub detail: Option<String>,
     pub retryable: bool,
+    /// Present when the user can resolve the failure by trusting a host key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_key: Option<Box<HostKeyChallenge>>,
 }
 
 impl AppError {
@@ -46,11 +51,17 @@ impl AppError {
             message: message.into(),
             detail: None,
             retryable: false,
+            host_key: None,
         }
     }
 
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_host_key(mut self, challenge: HostKeyChallenge) -> Self {
+        self.host_key = Some(Box::new(challenge));
         self
     }
 

@@ -6,6 +6,8 @@ mod domain;
 mod error;
 mod fs;
 mod logging;
+mod protocol;
+mod session;
 
 use app_state::AppState;
 use config::connection_store::ConnectionStore;
@@ -13,6 +15,7 @@ use config::known_hosts::KnownHostsStore;
 use config::paths::AppPaths;
 use config::settings_store::SettingsStore;
 use domain::activity::ActivityEntry;
+use domain::session::SessionStateEvent;
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::Builder;
@@ -47,8 +50,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::connections::known_hosts_list,
             commands::connections::known_host_trust,
             commands::connections::known_host_remove,
+            commands::sessions::session_connect,
+            commands::sessions::session_disconnect,
+            commands::sessions::sessions_list,
         ])
-        .events(tauri_specta::collect_events![ActivityEntry])
+        .events(tauri_specta::collect_events![
+            ActivityEntry,
+            SessionStateEvent
+        ])
 }
 
 /// Generate the TypeScript bindings. Invoked by `cargo run --bin

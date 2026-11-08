@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-07  
-**Current phase:** Phase 3 in progress — connection repository, keychain credentials and known-hosts store are implemented; protocol adapters, sessions and the remote browser are next  
-**Overall status:** Phase 1 shell and Phase 2 local browser are implemented and verified. Phase 3 foundation (connections, credentials, host keys) is implemented with automated gates green. Real-window visual QA, rendered component tests and protocol runtime integration remain pending.
+**Last updated:** 2026-11-08  
+**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust and connection status are implemented. Remaining: quick connect, TLS verification options, reconnect/cancellation, Docker protocol integration, and visual QA.  
+**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Runtime protocol integration against real servers, rendered component tests and real-window visual QA remain pending.
 
 ---
 
@@ -374,3 +374,31 @@ cargo test
 - Add session actors, connection state events, host-key unknown/changed flow and connect/disconnect tests.
 - Build the remote browser from the shared `FileTable`; wire tabs and sidebar status indicators.
 - Add the Docker FTP/FTPS/SFTP integration suite and security redaction/traversal tests.
+
+### 2026-11-08 — Session 5: protocol adapters, sessions and remote browsing
+
+**Done**
+
+- Added `protocol/` with a capability-reporting `RemoteFs` trait and two adapters:
+  - `FtpRemote`: plain FTP, explicit FTPS via `into_secure`, implicit FTPS via `connect_secure_implicit`, rustls platform verification, FEAT detection (`MLSD` enables structured listing and Unix permissions, `SITE CHMOD` enables chmod), MLSD with LIST/POSIX/DOS fallback, binary mode, recursive delete, safe path joins, and stable error mapping.
+  - `SftpRemote`: russh handshake with password, private-key and passphrase auth, keepalive/inactivity timeouts, strict known-hosts checking against a snapshot, SFTP v3 listing/stat/mkdir/rename/delete/chmod, symlink targets, and stable status/error mapping.
+- Added the session layer: `Session`, `SessionManager`, `session_connect`, `session_disconnect`, `sessions_list`, `session://state` events, keychain-to-protocol credential flow, start-folder validation, and last-used updates.
+- Routed all `fs_*` commands through local or remote scope; missing sessions return `SESSION_NOT_READY`.
+- Hardened logging: suppaftp/russh/russh_sftp are clamped to `info` because suppaftp logs raw `PASS` at trace level.
+- Refactored the local file browser into a generic `DirectoryBrowser` with pane identity, scope, capability gating, optional open/reveal actions, path persistence, header extras, and status labels; added `LocalBrowser` and `RemotePane` wrappers.
+- Added a session store, session event bridge, connect/disconnect actions, sidebar connect/disconnect controls with latency and connected state, multi-session tabs, remote status-bar summary, and a host-key trust dialog for unknown and changed keys.
+- Added Rust tests for known-host verdicts (host/port/key-type changes), FTP feature detection and error mapping, SFTP metadata mapping and status errors, and protocol detail sanitization.
+
+**Verified**
+
+- `bun run check` (Biome, 58 Vitest tests, strict TypeScript, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (52 tests).
+- `bun run bindings` regenerates the session commands, `SessionInfo`, `HostKeyChallenge`, and `session://state`.
+
+**Next**
+
+- Add Quick Connect with transient credentials and recent-list updates.
+- Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
+- Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
+- Add the Docker FTP/FTPS/SFTP integration suite and end-to-end host-key trust test.
+- Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs and host-key dialog.

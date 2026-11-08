@@ -3,7 +3,7 @@ import { create } from "zustand"
 export type BottomTab = "transfers" | "activity"
 export type PaneId = "local" | "remote"
 
-interface LocalSummary {
+export interface PaneSummary {
   path: string | null
   items: number
   selected: number
@@ -14,25 +14,31 @@ interface UiState {
   settingsOpen: boolean
   activePane: PaneId
   bottomTab: BottomTab
-  localSummary: LocalSummary
+  localSummary: PaneSummary
+  remoteSummary: PaneSummary
   setPaletteOpen: (open: boolean) => void
   togglePalette: () => void
   setSettingsOpen: (open: boolean) => void
   setActivePane: (pane: PaneId) => void
   setBottomTab: (tab: BottomTab) => void
-  setLocalSummary: (summary: LocalSummary) => void
+  setLocalSummary: (summary: PaneSummary) => void
+  setRemoteSummary: (summary: PaneSummary) => void
 }
+
+const EMPTY_SUMMARY: PaneSummary = { path: null, items: 0, selected: 0 }
 
 export const useUiStore = create<UiState>((set) => ({
   paletteOpen: false,
   settingsOpen: false,
   activePane: "local",
   bottomTab: "activity",
-  localSummary: { path: null, items: 0, selected: 0 },
+  localSummary: EMPTY_SUMMARY,
+  remoteSummary: EMPTY_SUMMARY,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   togglePalette: () => set((state) => ({ paletteOpen: !state.paletteOpen })),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setActivePane: (activePane) => set({ activePane }),
   setBottomTab: (bottomTab) => set({ bottomTab }),
   setLocalSummary: (localSummary) => set({ localSummary }),
+  setRemoteSummary: (remoteSummary) => set({ remoteSummary }),
 }))

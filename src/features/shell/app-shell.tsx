@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { HostKeyDialog } from "@/features/sessions/components/host-key-dialog"
+import { useSessionBridge } from "@/features/sessions/hooks/use-session-bridge"
 import { useSettings } from "@/features/settings/settings-context"
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { BottomPanel } from "@/features/shell/bottom-panel"
@@ -25,6 +27,7 @@ export function AppShell() {
   const reportErrorLogged = useRef(false)
 
   useActivityBridge()
+  useSessionBridge()
   useGlobalShortcuts()
 
   useEffect(() => {
@@ -102,6 +105,7 @@ export function AppShell() {
 
       <CommandPalette />
       <SettingsDialog />
+      <HostKeyDialog />
     </div>
   )
 }

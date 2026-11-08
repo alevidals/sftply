@@ -33,11 +33,21 @@ export const commands = {
 	knownHostsList: () => __TAURI_INVOKE<KnownHost[]>("known_hosts_list"),
 	knownHostTrust: (host: string, port: number, keyType: string, fingerprint: string) => typedError<KnownHost, AppError_Serialize>(__TAURI_INVOKE("known_host_trust", { host, port, keyType, fingerprint })),
 	knownHostRemove: (host: string, port: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("known_host_remove", { host, port })),
+	/**
+	 *  Open a real protocol session for a saved connection.
+	 * 
+	 *  Secrets are read from the OS keychain inside the Rust process and never
+	 *  returned to the frontend. A missing secret fails before any network I/O.
+	 */
+	sessionConnect: (connectionId: string) => typedError<SessionInfo, AppError_Serialize>(__TAURI_INVOKE("session_connect", { connectionId })),
+	sessionDisconnect: (sessionId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("session_disconnect", { sessionId })),
+	sessionsList: () => __TAURI_INVOKE<SessionInfo[]>("sessions_list"),
 };
 
 /** Events */
 export const events = {
 	activityEntry: makeEvent<ActivityEntry, ActivityEntry>("activity://entry"),
+	sessionState: makeEvent<SessionStateEvent_Serialize, SessionStateEvent_Deserialize>("session://state"),
 };
 
 /* Types */
@@ -70,6 +80,8 @@ export type AppError_Deserialize = {
 	message: string,
 	detail?: string | null,
 	retryable: boolean,
+	/**  Present when the user can resolve the failure by trusting a host key. */
+	hostKey?: HostKeyChallenge_Deserialize | null,
 };
 
 /**
@@ -83,6 +95,8 @@ export type AppError_Serialize = {
 	message: string,
 	detail: string | null,
 	retryable: boolean,
+	/**  Present when the user can resolve the failure by trusting a host key. */
+	hostKey?: HostKeyChallenge_Serialize,
 };
 
 export type AppInfo = {
@@ -287,6 +301,40 @@ export type FsEntry_Serialize = {
 export type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string };
 
 /**
+ *  Machine-readable host-key challenge attached to a failed connection so the
+ *  UI can show a trust dialog without parsing free-form error text.
+ */
+export type HostKeyChallenge = HostKeyChallenge_Serialize | HostKeyChallenge_Deserialize;
+
+/**
+ *  Machine-readable host-key challenge attached to a failed connection so the
+ *  UI can show a trust dialog without parsing free-form error text.
+ */
+export type HostKeyChallenge_Deserialize = {
+	host: string,
+	port: number,
+	keyType: string,
+	/**  OpenSSH-style `SHA256:…` fingerprint of the key the server presented. */
+	fingerprint: string,
+	/**  Fingerprint already trusted for this host, when the key changed. */
+	previousFingerprint?: string | null,
+};
+
+/**
+ *  Machine-readable host-key challenge attached to a failed connection so the
+ *  UI can show a trust dialog without parsing free-form error text.
+ */
+export type HostKeyChallenge_Serialize = {
+	host: string,
+	port: number,
+	keyType: string,
+	/**  OpenSSH-style `SHA256:…` fingerprint of the key the server presented. */
+	fingerprint: string,
+	/**  Fingerprint already trusted for this host, when the key changed. */
+	previousFingerprint: string | null,
+};
+
+/**
  *  A trusted SSH host key. `fingerprint` is the SHA-256 fingerprint in the
  *  OpenSSH `SHA256:…` representation.
  */
@@ -334,6 +382,50 @@ export type SecretKind = "password" | "passphrase";
 export type SecretStatus = {
 	password: boolean,
 	passphrase: boolean,
+};
+
+/**  Public description of a live remote session. It never contains credentials. */
+export type SessionInfo = {
+	id: string,
+	connectionId: string,
+	name: string,
+	protocol: ConnectionProtocol,
+	host: string,
+	port: number,
+	username: string,
+	initialPath: string,
+	capabilities: FsCapabilities,
+	/**  Unix epoch milliseconds, UTC. */
+	connectedAt: number,
+	/**  Time spent establishing the connection, in milliseconds. */
+	latencyMs: number,
+};
+
+export type SessionState = "connecting" | "connected" | "disconnected" | "failed";
+
+/**  Lifecycle event emitted whenever a session changes state. */
+export type SessionStateEvent = SessionStateEvent_Serialize | SessionStateEvent_Deserialize;
+
+/**  Lifecycle event emitted whenever a session changes state. */
+export type SessionStateEvent_Deserialize = {
+	session_id: string,
+	connection_id: string,
+	state: SessionState,
+	/**  Optional user-safe detail, for example the failure message. */
+	message?: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	timestamp: number,
+};
+
+/**  Lifecycle event emitted whenever a session changes state. */
+export type SessionStateEvent_Serialize = {
+	session_id: string,
+	connection_id: string,
+	state: SessionState,
+	/**  Optional user-safe detail, for example the failure message. */
+	message: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	timestamp: number,
 };
 
 /**

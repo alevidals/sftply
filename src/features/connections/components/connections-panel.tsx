@@ -2,9 +2,12 @@ import { useQueryClient } from "@tanstack/react-query"
 import { cn } from "cn"
 import {
   CopyIcon,
+  LoaderCircleIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   PlusIcon,
+  PowerIcon,
   ServerIcon,
   StarIcon,
   StarOffIcon,
@@ -43,13 +46,22 @@ import { connectionsApi } from "@/features/connections/api"
 import { ConnectionDialog } from "@/features/connections/components/connection-form-dialog"
 import { connectionsQueryKey, useConnections } from "@/features/connections/hooks/use-connections"
 import { PROTOCOL_LABELS, protocolIsSecure } from "@/features/connections/schema"
+import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
 import { errorMessage } from "@/lib/errors"
-import type { ConnectionProfile_Serialize } from "@/lib/ipc/bindings"
+import type { ConnectionProfile_Serialize, SessionInfo } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
+import { sessionForConnection, useSessionStore } from "@/stores/session-store"
+import { useUiStore } from "@/stores/ui-store"
 
 export function ConnectionsPanel() {
   const { data: connections, isPending, isError, error, refetch } = useConnections()
   const queryClient = useQueryClient()
+  const sessions = useSessionStore((state) => state.sessions)
+  const connecting = useSessionStore((state) => state.connecting)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
+  const setActiveSession = useSessionStore((state) => state.setActiveSession)
+  const setActivePane = useUiStore((state) => state.setActivePane)
+  const { connect, disconnect } = useSessionActions()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ConnectionProfile_Serialize | null>(null)
   const [deleting, setDeleting] = useState<ConnectionProfile_Serialize | null>(null)
@@ -171,6 +183,18 @@ export function ConnectionsPanel() {
               <ConnectionRow
                 key={connection.id}
                 connection={connection}
+                session={sessionForConnection(sessions, connection.id)}
+                connecting={Boolean(connecting[connection.id])}
+                active={
+                  Boolean(sessions[activeSessionId ?? ""]) &&
+                  sessions[activeSessionId ?? ""]?.connectionId === connection.id
+                }
+                onActivate={(sessionId) => {
+                  setActiveSession(sessionId)
+                  setActivePane("remote")
+                }}
+                onConnect={() => void connect(connection.id)}
+                onDisconnect={(sessionId) => void disconnect(sessionId)}
                 onEdit={() => openEdit(connection)}
                 onDuplicate={() => void duplicate(connection)}
                 onFavorite={() => void toggleFavorite(connection)}
@@ -205,12 +229,24 @@ export function ConnectionsPanel() {
 
 function ConnectionRow({
   connection,
+  session,
+  connecting,
+  active,
+  onActivate,
+  onConnect,
+  onDisconnect,
   onEdit,
   onDuplicate,
   onFavorite,
   onDelete,
 }: {
   connection: ConnectionProfile_Serialize
+  session: SessionInfo | null
+  connecting: boolean
+  active: boolean
+  onActivate: (sessionId: string) => void
+  onConnect: () => void
+  onDisconnect: (sessionId: string) => void
   onEdit: () => void
   onDuplicate: () => void
   onFavorite: () => void
@@ -219,22 +255,30 @@ function ConnectionRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex items-center gap-0.5 rounded-md transition-colors hover:bg-sidebar-accent/70">
+        <div
+          className={cn(
+            "group flex items-center gap-0.5 rounded-md transition-colors",
+            active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/70",
+          )}
+        >
           <button
             type="button"
-            onClick={onEdit}
+            onClick={() => (session ? onActivate(session.id) : onConnect())}
             className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-            aria-label={`${connection.name}, ${PROTOCOL_LABELS[connection.protocol]} ${connection.host}`}
+            aria-label={`${connection.name}, ${PROTOCOL_LABELS[connection.protocol]} ${connection.host}${session ? ", connected" : ""}`}
           >
             <span
               className={cn(
-                "flex size-5 shrink-0 items-center justify-center rounded border",
+                "relative flex size-5 shrink-0 items-center justify-center rounded border",
                 protocolIsSecure(connection.protocol)
                   ? "border-success/30 bg-success/10 text-success"
                   : "border-border bg-muted/50 text-muted-foreground",
               )}
             >
               <ServerIcon className="size-3" />
+              {session ? (
+                <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-success ring-2 ring-sidebar" />
+              ) : null}
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1">
@@ -249,7 +293,14 @@ function ConnectionRow({
                 <span>{PROTOCOL_LABELS[connection.protocol]}</span>
                 <span className="text-muted-foreground/40">·</span>
                 <span className="truncate font-mono">{connection.host}</span>
-                {connection.group ? (
+                {session ? (
+                  <>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span className="text-success">
+                      {Math.max(1, Math.round(session.latencyMs))} ms
+                    </span>
+                  </>
+                ) : connection.group ? (
                   <>
                     <span className="text-muted-foreground/40">·</span>
                     <span className="truncate">{connection.group}</span>
@@ -258,6 +309,42 @@ function ConnectionRow({
               </span>
             </span>
           </button>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={
+                  connecting
+                    ? `Connecting to ${connection.name}`
+                    : session
+                      ? `Disconnect from ${connection.name}`
+                      : `Connect to ${connection.name}`
+                }
+                disabled={connecting}
+                onClick={() => (session ? onDisconnect(session.id) : onConnect())}
+                className={cn(
+                  "shrink-0 text-muted-foreground",
+                  session && "text-success",
+                  !session &&
+                    !connecting &&
+                    "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                )}
+              >
+                {connecting ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : session ? (
+                  <PowerIcon />
+                ) : (
+                  <PlayIcon />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={6}>
+              {connecting ? "Connecting…" : session ? "Disconnect" : "Connect"}
+            </TooltipContent>
+          </Tooltip>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -271,6 +358,18 @@ function ConnectionRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              {session ? (
+                <DropdownMenuItem onSelect={() => onDisconnect(session.id)}>
+                  <PowerIcon />
+                  Disconnect
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled={connecting} onSelect={onConnect}>
+                  <PlayIcon />
+                  Connect
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={onEdit}>
                 <PencilIcon />
                 Edit
@@ -294,6 +393,18 @@ function ConnectionRow({
       </ContextMenuTrigger>
 
       <ContextMenuContent className="w-48">
+        {session ? (
+          <ContextMenuItem onSelect={() => onDisconnect(session.id)}>
+            <PowerIcon />
+            Disconnect
+          </ContextMenuItem>
+        ) : (
+          <ContextMenuItem disabled={connecting} onSelect={onConnect}>
+            <PlayIcon />
+            Connect
+          </ContextMenuItem>
+        )}
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={onEdit}>
           <PencilIcon />
           Edit

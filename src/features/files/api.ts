@@ -3,31 +3,47 @@ import { ipc } from "@/lib/ipc/client"
 
 export const LOCAL_SCOPE: FsScope = { kind: "local" }
 
-/** Local filesystem API. Components never call `ipc` directly. */
+export function remoteScope(sessionId: string): FsScope {
+  return { kind: "remote", sessionId }
+}
+
+/** Stable query-key segment for a filesystem scope. */
+export function scopeKey(scope: FsScope): string {
+  return scope.kind === "local" ? "local" : `remote:${scope.sessionId}`
+}
+
+/** Filesystem operations for a scope. Components never call `ipc` directly. */
+export function filesApi(scope: FsScope) {
+  return {
+    list(path: string, showHidden: boolean): Promise<Listing> {
+      return ipc.fsList(scope, path, showHidden)
+    },
+
+    stat(path: string): Promise<FsEntry> {
+      return ipc.fsStat(scope, path)
+    },
+
+    mkdir(parent: string, name: string): Promise<FsEntry> {
+      return ipc.fsMkdir(scope, parent, name)
+    },
+
+    rename(path: string, newName: string): Promise<FsEntry> {
+      return ipc.fsRename(scope, path, newName)
+    },
+
+    remove(path: string, recursive: boolean): Promise<void> {
+      return ipc.fsDelete(scope, path, recursive)
+    },
+
+    chmod(path: string, mode: number): Promise<void> {
+      return ipc.fsChmod(scope, path, mode)
+    },
+  }
+}
+
+/** Local filesystem API, including operations that only make sense locally. */
 export const localFiles = {
-  list(path: string, showHidden: boolean): Promise<Listing> {
-    return ipc.fsList(LOCAL_SCOPE, path, showHidden)
-  },
-
-  stat(path: string): Promise<FsEntry> {
-    return ipc.fsStat(LOCAL_SCOPE, path)
-  },
-
-  mkdir(parent: string, name: string): Promise<FsEntry> {
-    return ipc.fsMkdir(LOCAL_SCOPE, parent, name)
-  },
-
-  rename(path: string, newName: string): Promise<FsEntry> {
-    return ipc.fsRename(LOCAL_SCOPE, path, newName)
-  },
-
-  remove(path: string, recursive: boolean): Promise<void> {
-    return ipc.fsDelete(LOCAL_SCOPE, path, recursive)
-  },
-
-  chmod(path: string, mode: number): Promise<void> {
-    return ipc.fsChmod(LOCAL_SCOPE, path, mode)
-  },
+  ...filesApi(LOCAL_SCOPE),
 
   open(path: string): Promise<void> {
     return ipc.localOpen(path)

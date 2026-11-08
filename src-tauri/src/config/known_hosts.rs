@@ -88,18 +88,7 @@ impl KnownHostsStore {
         fingerprint: &str,
     ) -> HostKeyVerdict {
         let hosts = self.current.read().expect("known hosts lock poisoned");
-        match hosts
-            .iter()
-            .find(|entry| entry.host == host && entry.port == port)
-        {
-            None => HostKeyVerdict::Unknown,
-            Some(entry) if entry.key_type == key_type && entry.fingerprint == fingerprint => {
-                HostKeyVerdict::Trusted
-            }
-            Some(entry) => HostKeyVerdict::Changed {
-                previous_fingerprint: entry.fingerprint.clone(),
-            },
-        }
+        verify_against(&hosts, host, port, key_type, fingerprint)
     }
 
     /// Trust a host key, replacing any existing entry for the same host/port.
@@ -215,6 +204,29 @@ fn backup_path(path: &Path) -> PathBuf {
     path.with_file_name(format!("known_hosts.corrupt-{millis:.0}.json"))
 }
 
+/// Compare a presented key against a snapshot of trusted entries. Session
+/// handshakes use a snapshot so the trust store is never held across awaits.
+pub fn verify_against(
+    hosts: &[KnownHost],
+    host: &str,
+    port: u16,
+    key_type: &str,
+    fingerprint: &str,
+) -> HostKeyVerdict {
+    match hosts
+        .iter()
+        .find(|entry| entry.host == host && entry.port == port)
+    {
+        None => HostKeyVerdict::Unknown,
+        Some(entry) if entry.key_type == key_type && entry.fingerprint == fingerprint => {
+            HostKeyVerdict::Trusted
+        }
+        Some(entry) => HostKeyVerdict::Changed {
+            previous_fingerprint: entry.fingerprint.clone(),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,6 +270,29 @@ mod tests {
         assert_eq!(
             store.verify("example.com", 22, "ssh-ed25519", "SHA256:abc"),
             HostKeyVerdict::Unknown
+        );
+    }
+
+    #[test]
+    fn snapshot_verdict_distinguishes_host_port_and_key_type() {
+        let hosts = vec![host()];
+        assert_eq!(
+            verify_against(&hosts, "example.com", 22, "ssh-ed25519", "SHA256:abc"),
+            HostKeyVerdict::Trusted
+        );
+        assert_eq!(
+            verify_against(&hosts, "example.com", 2222, "ssh-ed25519", "SHA256:abc"),
+            HostKeyVerdict::Unknown
+        );
+        assert_eq!(
+            verify_against(&hosts, "other.example", 22, "ssh-ed25519", "SHA256:abc"),
+            HostKeyVerdict::Unknown
+        );
+        assert_eq!(
+            verify_against(&hosts, "example.com", 22, "rsa-sha2-512", "SHA256:abc"),
+            HostKeyVerdict::Changed {
+                previous_fingerprint: "SHA256:abc".into()
+            }
         );
     }
 

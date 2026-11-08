@@ -1,64 +1,133 @@
+use std::sync::Arc;
+
+use tauri::State;
 use tauri_plugin_opener::{open_path, reveal_item_in_dir};
 
+use crate::app_state::AppState;
 use crate::domain::fs::{FsEntry, FsScope, Listing};
 use crate::error::{AppError, ErrorCode};
 use crate::fs::local;
 use crate::fs::path::normalize_absolute;
+use crate::session::Session;
 
-fn local_scope(scope: &FsScope) -> Result<(), AppError> {
+fn remote_session(state: &AppState, scope: &FsScope) -> Result<Arc<Session>, AppError> {
     match scope {
-        FsScope::Local => Ok(()),
-        FsScope::Remote { .. } => Err(AppError::new(
-            ErrorCode::Unsupported,
-            "Remote sessions are not available in this build.",
+        FsScope::Local => Err(AppError::internal(
+            "A local scope was passed to the remote resolver.",
+            "scope routing error",
         )),
+        FsScope::Remote { session_id } => state.sessions.get(session_id).ok_or_else(|| {
+            AppError::new(
+                ErrorCode::SessionNotReady,
+                "That remote session is not connected. Reconnect and try again.",
+            )
+        }),
     }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fs_list(scope: FsScope, path: String, show_hidden: bool) -> Result<Listing, AppError> {
-    local_scope(&scope)?;
-    local::list(&path, show_hidden).await
+pub async fn fs_list(
+    state: State<'_, AppState>,
+    scope: FsScope,
+    path: String,
+    show_hidden: bool,
+) -> Result<Listing, AppError> {
+    match &scope {
+        FsScope::Local => local::list(&path, show_hidden).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            let mut listing = session.client.lock().await.list(&path).await?;
+            if !show_hidden {
+                listing.entries.retain(|entry| !entry.hidden);
+            }
+            Ok(listing)
+        }
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fs_stat(scope: FsScope, path: String) -> Result<FsEntry, AppError> {
-    local_scope(&scope)?;
-    local::stat(&path).await
+pub async fn fs_stat(
+    state: State<'_, AppState>,
+    scope: FsScope,
+    path: String,
+) -> Result<FsEntry, AppError> {
+    match &scope {
+        FsScope::Local => local::stat(&path).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            session.client.lock().await.stat(&path).await
+        }
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fs_mkdir(scope: FsScope, parent: String, name: String) -> Result<FsEntry, AppError> {
-    local_scope(&scope)?;
-    local::mkdir(&parent, &name).await
+pub async fn fs_mkdir(
+    state: State<'_, AppState>,
+    scope: FsScope,
+    parent: String,
+    name: String,
+) -> Result<FsEntry, AppError> {
+    match &scope {
+        FsScope::Local => local::mkdir(&parent, &name).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            session.client.lock().await.mkdir(&parent, &name).await
+        }
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn fs_rename(
+    state: State<'_, AppState>,
     scope: FsScope,
     path: String,
     new_name: String,
 ) -> Result<FsEntry, AppError> {
-    local_scope(&scope)?;
-    local::rename(&path, &new_name).await
+    match &scope {
+        FsScope::Local => local::rename(&path, &new_name).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            session.client.lock().await.rename(&path, &new_name).await
+        }
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fs_delete(scope: FsScope, path: String, recursive: bool) -> Result<(), AppError> {
-    local_scope(&scope)?;
-    local::delete(&path, recursive).await
+pub async fn fs_delete(
+    state: State<'_, AppState>,
+    scope: FsScope,
+    path: String,
+    recursive: bool,
+) -> Result<(), AppError> {
+    match &scope {
+        FsScope::Local => local::delete(&path, recursive).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            session.client.lock().await.delete(&path, recursive).await
+        }
+    }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fs_chmod(scope: FsScope, path: String, mode: u32) -> Result<(), AppError> {
-    local_scope(&scope)?;
-    local::chmod(&path, mode)
+pub async fn fs_chmod(
+    state: State<'_, AppState>,
+    scope: FsScope,
+    path: String,
+    mode: u32,
+) -> Result<(), AppError> {
+    match &scope {
+        FsScope::Local => local::chmod(&path, mode),
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            session.client.lock().await.chmod(&path, mode).await
+        }
+    }
 }
 
 #[tauri::command]
@@ -92,23 +161,4 @@ pub async fn local_reveal(path: String) -> Result<(), AppError> {
             AppError::new(ErrorCode::Internal, "Could not reveal the item.")
                 .with_detail(error.to_string())
         })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rejects_remote_scopes_honestly() {
-        let error = local_scope(&FsScope::Remote {
-            session_id: "test".into(),
-        })
-        .unwrap_err();
-        assert_eq!(error.code, ErrorCode::Unsupported);
-    }
-
-    #[test]
-    fn accepts_local_scope() {
-        assert!(local_scope(&FsScope::Local).is_ok());
-    }
 }

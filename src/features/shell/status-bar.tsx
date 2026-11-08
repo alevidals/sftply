@@ -1,13 +1,21 @@
-import { ActivityIcon, ArrowDownUpIcon, HardDriveIcon, PanelBottomIcon } from "lucide-react"
+import {
+  ActivityIcon,
+  ArrowDownUpIcon,
+  HardDriveIcon,
+  PanelBottomIcon,
+  ServerIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Kbd } from "@/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { PROTOCOL_LABELS } from "@/features/connections/schema"
 import { pathLeaf } from "@/features/files/model/path"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import { formatCount } from "@/lib/format"
 import { useActivityStore } from "@/stores/activity-store"
+import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
 
 export function StatusBar() {
@@ -15,7 +23,12 @@ export function StatusBar() {
   const appInfo = useAppInfo()
   const activityCount = useActivityStore((state) => state.entries.length)
   const localSummary = useUiStore((state) => state.localSummary)
+  const remoteSummary = useUiStore((state) => state.remoteSummary)
+  const sessions = useSessionStore((state) => state.sessions)
+  const sessionCount = useSessionStore((state) => state.order.length)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
+  const activeSession = activeSessionId ? sessions[activeSessionId] : undefined
 
   const openPanel = (tab: "transfers" | "activity") => {
     setBottomTab(tab)
@@ -50,11 +63,36 @@ export function StatusBar() {
 
       <span className="h-3 w-px bg-border/80" />
 
-      <span className="flex items-center gap-1.5">
-        <span className="size-1.5 rounded-full bg-warning" />
-        <span>Remote</span>
-        <span className="text-muted-foreground/60">Not connected</span>
-      </span>
+      {activeSession ? (
+        <>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <ServerIcon className="size-3 shrink-0 text-success" />
+            <span className="max-w-[160px] truncate text-foreground">{activeSession.name}</span>
+            <span className="shrink-0 text-muted-foreground/60">
+              {PROTOCOL_LABELS[activeSession.protocol]}
+            </span>
+          </span>
+          {remoteSummary.path ? (
+            <span className="shrink-0 tabular">
+              {formatCount(remoteSummary.items)} items
+              {remoteSummary.selected > 0
+                ? ` · ${formatCount(remoteSummary.selected)} selected`
+                : ""}
+            </span>
+          ) : null}
+          {sessionCount > 1 ? (
+            <span className="shrink-0 text-muted-foreground/60 tabular">
+              {sessionCount} sessions
+            </span>
+          ) : null}
+        </>
+      ) : (
+        <span className="flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-warning" />
+          <span>Remote</span>
+          <span className="text-muted-foreground/60">Not connected</span>
+        </span>
+      )}
 
       <div className="ml-auto flex items-center gap-0.5">
         <StatusButton label="Transfers" onClick={() => openPanel("transfers")}>
