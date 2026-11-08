@@ -24,6 +24,7 @@ import { useHostKeyStore } from "@/stores/host-key-store"
 export function HostKeyDialog() {
   const challenge = useHostKeyStore((state) => state.challenge)
   const connectionId = useHostKeyStore((state) => state.connectionId)
+  const retry = useHostKeyStore((state) => state.retry)
   const clear = useHostKeyStore((state) => state.clear)
   const { connect } = useSessionActions()
   const [busy, setBusy] = useState(false)
@@ -31,7 +32,7 @@ export function HostKeyDialog() {
   const changed = Boolean(challenge?.previousFingerprint)
 
   const trustAndConnect = async () => {
-    if (!challenge || !connectionId) return
+    if (!challenge) return
     setBusy(true)
     try {
       await ipc.knownHostTrust(
@@ -44,8 +45,18 @@ export function HostKeyDialog() {
         "success",
         `${changed ? "Replaced" : "Trusted"} host key for ${challenge.host}:${challenge.port}`,
       )
+      const retryConnection = retry
       clear()
-      await connect(connectionId)
+      if (retryConnection) {
+        try {
+          await retryConnection()
+        } catch (cause) {
+          const error = normalizeError(cause)
+          toast.error("Could not connect", { description: error.message })
+        }
+      } else if (connectionId) {
+        await connect(connectionId)
+      }
     } catch (cause) {
       const error = normalizeError(cause)
       toast.error("Could not save the host key", { description: error.message })

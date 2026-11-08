@@ -40,6 +40,14 @@ export const commands = {
 	 *  returned to the frontend. A missing secret fails before any network I/O.
 	 */
 	sessionConnect: (connectionId: string) => typedError<SessionInfo, AppError_Serialize>(__TAURI_INVOKE("session_connect", { connectionId })),
+	/**
+	 *  Connect with credentials supplied for this one request.
+	 * 
+	 *  `save` persists the profile and secret first; otherwise the profile is
+	 *  transient and never touches the config file or the keychain. The secret
+	 *  stays in Rust memory and is dropped when the session closes.
+	 */
+	sessionConnectQuick: (input: ConnectionInput_Deserialize, secret: string, save: boolean) => typedError<SessionInfo, AppError_Serialize>(__TAURI_INVOKE("session_connect_quick", { input, secret, save })),
 	sessionDisconnect: (sessionId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("session_disconnect", { sessionId })),
 	sessionsList: () => __TAURI_INVOKE<SessionInfo[]>("sessions_list"),
 };

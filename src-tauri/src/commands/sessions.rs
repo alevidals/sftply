@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::app_state::AppState;
 use crate::credentials;
-use crate::domain::connection::{ConnectionAuth, ConnectionProfile};
+use crate::domain::connection::{ConnectionAuth, ConnectionInput, ConnectionProfile};
 use crate::domain::credentials::SecretKind;
 use crate::domain::fs::EntryKind;
 use crate::domain::session::{SessionInfo, SessionState};
@@ -31,23 +31,127 @@ pub async fn session_connect(
         .connections
         .get(&connection_id)
         .ok_or_else(|| AppError::not_found("That connection no longer exists."))?;
-    let session_id = Uuid::new_v4().to_string();
+    open_session(
+        &app,
+        &state,
+        &profile,
+        Uuid::new_v4().to_string(),
+        None,
+        true,
+    )
+    .await
+}
+
+/// Connect with credentials supplied for this one request.
+///
+/// `save` persists the profile and secret first; otherwise the profile is
+/// transient and never touches the config file or the keychain. The secret
+/// stays in Rust memory and is dropped when the session closes.
+#[tauri::command]
+#[specta::specta]
+pub async fn session_connect_quick(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: ConnectionInput,
+    secret: String,
+    save: bool,
+) -> Result<SessionInfo, AppError> {
+    let input = input.normalized().map_err(AppError::invalid_input)?;
+    let secret_kind = match input.auth {
+        ConnectionAuth::Password => SecretKind::Password,
+        ConnectionAuth::Key { .. } => SecretKind::Passphrase,
+    };
+
+    let (profile, stores_secret) = if save {
+        let saved = state.connections.create(input).await?;
+        // Only key connections whose key is passphrase-protected need a stored
+        // secret; an unprotected key saves no keychain entry at all.
+        let stores_secret = match saved.auth {
+            ConnectionAuth::Password => true,
+            ConnectionAuth::Key {
+                passphrase_protected,
+                ..
+            } => passphrase_protected,
+        };
+        if stores_secret
+            && let Err(error) = credentials::set_secret(&saved.id, secret_kind, &secret).await
+        {
+            // Do not leave a saved row whose credentials failed to persist.
+            let _ = state.connections.delete(&saved.id).await;
+            return Err(error);
+        }
+        (saved, stores_secret)
+    } else {
+        (
+            ConnectionProfile::from_input(
+                Uuid::new_v4().to_string(),
+                input,
+                crate::domain::activity::unix_millis(),
+            ),
+            false,
+        )
+    };
+
+    let transient = match &profile.auth {
+        ConnectionAuth::Password => TransientSecret {
+            password: Some(secret),
+            passphrase: None,
+        },
+        ConnectionAuth::Key { .. } => TransientSecret {
+            password: None,
+            passphrase: (!secret.is_empty()).then_some(secret),
+        },
+    };
+
+    let result = open_session(
+        &app,
+        &state,
+        &profile,
+        Uuid::new_v4().to_string(),
+        Some(transient),
+        save,
+    )
+    .await;
+
+    // A failed save must not leave a half-configured profile behind. This also
+    // keeps the host-key retry from duplicating the saved connection.
+    if save && result.is_err() {
+        if stores_secret {
+            let _ = credentials::delete_secret(&profile.id, secret_kind).await;
+        }
+        let _ = state.connections.delete(&profile.id).await;
+    }
+
+    result
+}
+
+struct TransientSecret {
+    password: Option<String>,
+    passphrase: Option<String>,
+}
+
+async fn open_session(
+    app: &AppHandle,
+    state: &AppState,
+    profile: &ConnectionProfile,
+    session_id: String,
+    transient: Option<TransientSecret>,
+    mark_used: bool,
+) -> Result<SessionInfo, AppError> {
     let started = Instant::now();
     emit_state(
-        &app,
+        app,
         &session_id,
-        &connection_id,
+        &profile.id,
         SessionState::Connecting,
         None,
     );
 
-    let result = connect_session(&state, &profile, &session_id).await;
-
-    match result {
+    match connect_session(state, profile, transient).await {
         Ok((client, capabilities)) => {
             let info = SessionInfo {
                 id: session_id.clone(),
-                connection_id: connection_id.clone(),
+                connection_id: profile.id.clone(),
                 name: profile.name.clone(),
                 protocol: profile.protocol,
                 host: profile.host.clone(),
@@ -62,23 +166,17 @@ pub async fn session_connect(
                 info: info.clone(),
                 client: tokio::sync::Mutex::new(client),
             }));
-            if let Err(error) = state.connections.mark_used(&connection_id).await {
+            if mark_used && let Err(error) = state.connections.mark_used(&profile.id).await {
                 tracing::warn!(%error, "could not update connection last-used time");
             }
-            emit_state(
-                &app,
-                &session_id,
-                &connection_id,
-                SessionState::Connected,
-                None,
-            );
+            emit_state(app, &session_id, &profile.id, SessionState::Connected, None);
             Ok(info)
         }
         Err(error) => {
             emit_state(
-                &app,
+                app,
                 &session_id,
-                &connection_id,
+                &profile.id,
                 SessionState::Failed,
                 Some(error.message.clone()),
             );
@@ -90,35 +188,39 @@ pub async fn session_connect(
 async fn connect_session(
     state: &AppState,
     profile: &ConnectionProfile,
-    _session_id: &str,
+    transient: Option<TransientSecret>,
 ) -> Result<(Box<dyn RemoteFs>, crate::domain::fs::FsCapabilities), AppError> {
     let connection_id = &profile.id;
 
-    let (password, passphrase) = match &profile.auth {
-        ConnectionAuth::Password => {
-            let password = credentials::get_secret(connection_id, SecretKind::Password)
-                .await?
-                .ok_or_else(|| {
-                    AppError::new(
-                        ErrorCode::AuthFailed,
-                        "No password is saved for this connection. Edit it to add one.",
-                    )
-                })?;
-            (Some(password), None)
-        }
-        ConnectionAuth::Key {
-            passphrase_protected,
-            ..
-        } => {
-            let passphrase = credentials::get_secret(connection_id, SecretKind::Passphrase).await?;
-            if *passphrase_protected && passphrase.is_none() {
-                return Err(AppError::new(
-                    ErrorCode::AuthFailed,
-                    "No key passphrase is saved for this connection. Edit it to add one.",
-                ));
+    let (password, passphrase) = match transient {
+        Some(transient) => (transient.password, transient.passphrase),
+        None => match &profile.auth {
+            ConnectionAuth::Password => {
+                let password = credentials::get_secret(connection_id, SecretKind::Password)
+                    .await?
+                    .ok_or_else(|| {
+                        AppError::new(
+                            ErrorCode::AuthFailed,
+                            "No password is saved for this connection. Edit it to add one.",
+                        )
+                    })?;
+                (Some(password), None)
             }
-            (None, passphrase)
-        }
+            ConnectionAuth::Key {
+                passphrase_protected,
+                ..
+            } => {
+                let passphrase =
+                    credentials::get_secret(connection_id, SecretKind::Passphrase).await?;
+                if *passphrase_protected && passphrase.is_none() {
+                    return Err(AppError::new(
+                        ErrorCode::AuthFailed,
+                        "No key passphrase is saved for this connection. Edit it to add one.",
+                    ));
+                }
+                (None, passphrase)
+            }
+        },
     };
 
     let mut client: Box<dyn RemoteFs> = match profile.protocol {

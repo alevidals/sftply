@@ -9,6 +9,7 @@ import {
   ServerIcon,
   Settings2Icon,
   SunIcon,
+  ZapIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -40,6 +41,7 @@ export function CommandPalette() {
   const setOpen = useUiStore((state) => state.setPaletteOpen)
   const setActivePane = useUiStore((state) => state.setActivePane)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
+  const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
 
   const run = (action: () => void) => {
@@ -155,6 +157,22 @@ export function CommandPalette() {
             <PanelBottomIcon className="text-muted-foreground" />
             Toggle bottom panel
             <CommandShortcut>⌘J</CommandShortcut>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+
+        <CommandGroup heading="Connections">
+          <CommandItem
+            value="quick connect ad hoc server"
+            onSelect={() =>
+              run(() => {
+                setQuickConnectOpen(true)
+              })
+            }
+          >
+            <ZapIcon className="text-muted-foreground" />
+            Quick connect…
           </CommandItem>
         </CommandGroup>
 

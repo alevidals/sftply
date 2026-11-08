@@ -166,6 +166,16 @@ export const ipc = {
     return invoke(commands.sessionConnect(connectionId)).then((result) => unwrap(result))
   },
 
+  sessionConnectQuick(
+    input: ConnectionInput_Deserialize,
+    secret: string,
+    save: boolean,
+  ): Promise<SessionInfo> {
+    return invoke(commands.sessionConnectQuick(input, secret, save)).then((result) =>
+      unwrap(result),
+    )
+  },
+
   sessionDisconnect(sessionId: string): Promise<void> {
     return invoke(commands.sessionDisconnect(sessionId)).then((result) => {
       unwrap(result)

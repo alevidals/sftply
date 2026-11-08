@@ -13,10 +13,11 @@ fn entry(connection_id: &str, kind: SecretKind) -> Result<keyring::Entry, AppErr
 pub async fn set_secret(
     connection_id: &str,
     kind: SecretKind,
-    secret: String,
+    secret: &str,
 ) -> Result<(), AppError> {
-    validate_secret(&secret)?;
+    validate_secret(secret)?;
     let connection_id = connection_id.to_string();
+    let secret = secret.to_string();
     run_blocking(move || {
         entry(&connection_id, kind)?
             .set_password(&secret)

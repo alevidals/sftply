@@ -1,7 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { toast } from "sonner"
+import { connectionsQueryKey } from "@/features/connections/hooks/use-connections"
 import { sessionsApi } from "@/features/sessions/api"
 import { normalizeError } from "@/lib/errors"
+import type { ConnectionInput_Deserialize, SessionInfo } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
 import { useHostKeyStore } from "@/stores/host-key-store"
 import { useSessionStore } from "@/stores/session-store"
@@ -9,7 +12,62 @@ import { useUiStore } from "@/stores/ui-store"
 
 /** Connect/disconnect orchestration shared by the sidebar, tabs and dialogs. */
 export function useSessionActions() {
+  const queryClient = useQueryClient()
   const requestHostKey = useHostKeyStore((state) => state.request)
+
+  const applySession = useCallback((session: SessionInfo) => {
+    const current = useSessionStore.getState()
+    current.upsertSession(session)
+    current.setActiveSession(session.id)
+    useUiStore.getState().setActivePane("remote")
+    recordActivity("success", `Connected to “${session.name}” (${session.host})`)
+    toast.success(`Connected to ${session.name}`, {
+      description: `${session.host}:${session.port}`,
+    })
+  }, [])
+
+  const runQuickConnect = useCallback(
+    async (input: ConnectionInput_Deserialize, secret: string, save: boolean) => {
+      const session = await sessionsApi.quickConnect(input, secret, save)
+      applySession(session)
+      if (save) {
+        await queryClient.invalidateQueries({ queryKey: connectionsQueryKey })
+      }
+      return session
+    },
+    [applySession, queryClient],
+  )
+
+  /**
+   * Connect with transient credentials. Host-key challenges keep the secret in
+   * a one-shot retry closure; cancelling the dialog drops it.
+   */
+  const quickConnect = useCallback(
+    async (
+      input: ConnectionInput_Deserialize,
+      secret: string,
+      save: boolean,
+    ): Promise<SessionInfo | null> => {
+      const attempt = async (): Promise<SessionInfo | null> => {
+        try {
+          return await runQuickConnect(input, secret, save)
+        } catch (cause) {
+          const error = normalizeError(cause)
+          if (error.hostKey) {
+            // Re-challenges after a retry keep the same closure alive.
+            requestHostKey(null, error.hostKey, async () => {
+              await attempt()
+            })
+            recordActivity("warning", `Host key verification required for ${error.hostKey.host}`)
+            return null
+          }
+          throw error
+        }
+      }
+      return attempt()
+    },
+    [requestHostKey, runQuickConnect],
+  )
 
   const connect = useCallback(
     async (connectionId: string) => {
@@ -19,14 +77,7 @@ export function useSessionActions() {
       store.setConnecting(connectionId, true)
       try {
         const session = await sessionsApi.connect(connectionId)
-        const current = useSessionStore.getState()
-        current.upsertSession(session)
-        current.setActiveSession(session.id)
-        useUiStore.getState().setActivePane("remote")
-        recordActivity("success", `Connected to “${session.name}” (${session.host})`)
-        toast.success(`Connected to ${session.name}`, {
-          description: `${session.host}:${session.port}`,
-        })
+        applySession(session)
       } catch (cause) {
         const error = normalizeError(cause)
         if (error.hostKey) {
@@ -40,7 +91,7 @@ export function useSessionActions() {
         useSessionStore.getState().setConnecting(connectionId, false)
       }
     },
-    [requestHostKey],
+    [applySession, requestHostKey],
   )
 
   const disconnect = useCallback(async (sessionId: string) => {
@@ -56,5 +107,5 @@ export function useSessionActions() {
     }
   }, [])
 
-  return { connect, disconnect }
+  return { connect, quickConnect, disconnect }
 }

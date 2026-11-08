@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { QuickConnectDialog } from "@/features/connections/components/quick-connect-dialog"
 import { HostKeyDialog } from "@/features/sessions/components/host-key-dialog"
 import { useSessionBridge } from "@/features/sessions/hooks/use-session-bridge"
 import { useSettings } from "@/features/settings/settings-context"
@@ -105,6 +106,7 @@ export function AppShell() {
 
       <CommandPalette />
       <SettingsDialog />
+      <QuickConnectDialog />
       <HostKeyDialog />
     </div>
   )

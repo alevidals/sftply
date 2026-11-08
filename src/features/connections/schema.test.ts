@@ -3,8 +3,11 @@ import {
   connectionSchema,
   defaultPort,
   emptyConnectionValues,
+  emptyQuickConnectValues,
+  quickConnectSchema,
   secretKindFor,
   toConnectionInput,
+  toQuickConnectInput,
   valuesFromProfile,
 } from "@/features/connections/schema"
 import type { ConnectionProfile_Serialize } from "@/lib/ipc/bindings"
@@ -64,6 +67,54 @@ describe("connectionSchema", () => {
     expect(connectionSchema.safeParse(base).success).toBe(true)
     expect(connectionSchema.safeParse({ ...base, keyPath: "" }).success).toBe(false)
     expect(connectionSchema.safeParse({ ...base, protocol: "ftp" as const }).success).toBe(false)
+  })
+})
+
+describe("quickConnectSchema", () => {
+  const quick = {
+    ...emptyQuickConnectValues(),
+    host: "ftp.example.com",
+    username: "ada",
+    secret: "hunter2",
+  }
+
+  it("allows a transient connection without a name", () => {
+    expect(quickConnectSchema.safeParse(quick).success).toBe(true)
+  })
+
+  it("requires a name and secret when saving", () => {
+    expect(quickConnectSchema.safeParse({ ...quick, save: true }).success).toBe(false)
+    expect(quickConnectSchema.safeParse({ ...quick, save: true, name: "Saved" }).success).toBe(true)
+    expect(
+      quickConnectSchema.safeParse({ ...quick, save: true, name: "Saved", secret: "" }).success,
+    ).toBe(false)
+  })
+
+  it("only requires a passphrase for protected keys", () => {
+    const key = {
+      ...quick,
+      protocol: "sftp" as const,
+      authKind: "key" as const,
+      keyPath: "/home/ada/.ssh/id_ed25519",
+      save: true,
+      name: "Saved",
+      secret: "",
+    }
+    expect(quickConnectSchema.safeParse(key).success).toBe(true)
+    expect(quickConnectSchema.safeParse({ ...key, passphraseProtected: true }).success).toBe(false)
+  })
+
+  it("falls back to user@host for transient names", () => {
+    const input = toQuickConnectInput({
+      ...quick,
+      name: "   ",
+      host: " example.com ",
+      username: " ada ",
+    })
+    expect(input.name).toBe("ada@example.com")
+    expect(input.host).toBe("example.com")
+    expect(input.username).toBe("ada")
+    expect(input.favorite).toBe(false)
   })
 })
 

@@ -1,4 +1,4 @@
-import type { SessionInfo } from "@/lib/ipc/bindings"
+import type { ConnectionInput_Deserialize, SessionInfo } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 
 /** Session lifecycle API. Credentials stay in the Rust process. */
@@ -9,6 +9,14 @@ export const sessionsApi = {
 
   connect(connectionId: string): Promise<SessionInfo> {
     return ipc.sessionConnect(connectionId)
+  },
+
+  quickConnect(
+    input: ConnectionInput_Deserialize,
+    secret: string,
+    save: boolean,
+  ): Promise<SessionInfo> {
+    return ipc.sessionConnectQuick(input, secret, save)
   },
 
   disconnect(sessionId: string): Promise<void> {

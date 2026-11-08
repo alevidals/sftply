@@ -51,6 +51,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::connections::known_host_trust,
             commands::connections::known_host_remove,
             commands::sessions::session_connect,
+            commands::sessions::session_connect_quick,
             commands::sessions::session_disconnect,
             commands::sessions::sessions_list,
         ])

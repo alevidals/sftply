@@ -12,6 +12,7 @@ import {
   StarIcon,
   StarOffIcon,
   Trash2Icon,
+  ZapIcon,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -61,6 +62,7 @@ export function ConnectionsPanel() {
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const setActiveSession = useSessionStore((state) => state.setActiveSession)
   const setActivePane = useUiStore((state) => state.setActivePane)
+  const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
   const { connect, disconnect } = useSessionActions()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ConnectionProfile_Serialize | null>(null)
@@ -129,16 +131,38 @@ export function ConnectionsPanel() {
         <span className="text-2xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
           Connections
         </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label="New connection" onClick={openCreate}>
-              <PlusIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            New connection
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Quick connect"
+                onClick={() => setQuickConnectOpen(true)}
+              >
+                <ZapIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Quick connect
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="New connection"
+                onClick={openCreate}
+              >
+                <PlusIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              New connection
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">

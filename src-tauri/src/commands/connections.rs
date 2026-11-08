@@ -81,7 +81,7 @@ pub async fn connection_secret_set(
     if state.connections.get(&id).is_none() {
         return Err(AppError::not_found("That connection no longer exists."));
     }
-    credentials::set_secret(&id, kind, secret).await
+    credentials::set_secret(&id, kind, &secret).await
 }
 
 #[tauri::command]

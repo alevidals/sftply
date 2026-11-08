@@ -3,7 +3,7 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-08  
-**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status and a real-server Docker integration suite are implemented. Remaining: quick connect, TLS verification options, reconnect/cancellation, and visual QA.  
+**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect and a real-server Docker integration suite are implemented. Remaining: TLS verification options, reconnect/cancellation, and visual QA.  
 **Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers. Rendered component tests and real-window visual QA remain pending.
 
 ---
@@ -438,3 +438,37 @@ cargo test
 - Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
 - Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
 - Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs and host-key dialog.
+
+### 2026-11-08 — Session 7: Quick Connect
+
+**Done**
+
+- Added `session_connect_quick(input, secret, save)`:
+  - `save = false` builds a transient profile and passes the secret through `TransientSecret`; nothing is written to `connections.json` or the keychain.
+  - `save = true` creates the profile and stores the secret in the keychain before connecting.
+  - A failed saved connection rolls the profile and stored secret back, so a host-key retry cannot duplicate the saved row and a bad password does not leave a broken profile behind.
+  - Unprotected SSH keys skip the keychain entirely instead of trying to store an empty passphrase.
+- Refactored saved and quick connects through a shared `open_session`/`connect_session` path.
+- Changed `credentials::set_secret` to take `&str` so quick-connect secrets are not cloned unnecessarily.
+- Added the Quick Connect dialog with protocol/host/port/username, password or SSH-key auth, key picker, start folder, and an optional "Save this connection" switch that reveals name and group fields.
+- Added Quick Connect entry points in the Connections sidebar header and the command palette.
+- Extended the connection schema with `quickConnectSchema`, `emptyQuickConnectValues` and `toQuickConnectInput`; saving now requires a name and the secret the selected auth method needs.
+- Host-key challenges from a quick connect keep the secret in a one-shot retry closure. Re-challenges after a retry reuse the same closure, and cancelling the host-key dialog drops the secret.
+- Saved quick connects invalidate the connections query after a successful retry so the new row appears in the sidebar.
+
+**Verified**
+
+- `bun run check` (Biome, 62 Vitest tests, strict TypeScript, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (53 passed, 6 ignored).
+- `bun run bindings`.
+
+**Notes**
+
+- Transient sessions have a generated `connectionId` that is intentionally absent from the sidebar; only saved profiles map to connection rows.
+- The retry closure keeps the typed secret in JavaScript memory until the host key is trusted or the dialog is cancelled.
+
+**Next**
+
+- Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
+- Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
+- Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs, host-key dialog and quick connect.
