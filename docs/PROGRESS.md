@@ -3,8 +3,8 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-08  
-**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust and connection status are implemented. Remaining: quick connect, TLS verification options, reconnect/cancellation, Docker protocol integration, and visual QA.  
-**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Runtime protocol integration against real servers, rendered component tests and real-window visual QA remain pending.
+**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status and a real-server Docker integration suite are implemented. Remaining: quick connect, TLS verification options, reconnect/cancellation, and visual QA.  
+**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers. Rendered component tests and real-window visual QA remain pending.
 
 ---
 
@@ -401,4 +401,40 @@ cargo test
 - Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
 - Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
 - Add the Docker FTP/FTPS/SFTP integration suite and end-to-end host-key trust test.
+- Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs and host-key dialog.
+
+### 2026-11-08 — Session 6: Docker protocol integration suite
+
+**Done**
+
+- Added a native arm64 integration stack under `tests/integration/`:
+  - `pure-ftpd/` builds Alpine Pure-FTPd for plain FTP (`2121`) and explicit FTPS (`2122`) with per-service passive ranges.
+  - `pure-ftpd-implicit/` compiles Pure-FTPd from source with `--with-implicittls` for implicit FTPS (`2990`). Alpine's package enables explicit TLS only, and Pure-FTPd treats implicit TLS as a compile-time, mutually exclusive switch.
+  - `sftp` uses `atmoz/sftp:alpine` on `2222` with the user chrooted to `/home/sftply`.
+  - `generate-certs.sh` creates a throwaway CA and server certificate (with Authority Key Identifier, required by OpenSSL 3 verification); `certs/` is gitignored.
+  - `run.sh` builds the images, waits for each service by log line and port, runs the ignored tests, and tears the stack down (`--keep` leaves it running).
+  - `README.md` documents ports, credentials, and the implicit-TLS constraint.
+- Added ignored Rust integration tests:
+  - `protocol::ftp::integration`: plain FTP, explicit FTPS, implicit FTPS full CRUD (list, mkdir, rename, stat, recursive delete), plus wrong-password rejection.
+  - `protocol::sftp::integration`: unknown host key produces `HOST_KEY_UNKNOWN` with a challenge, changed fingerprint produces `HOST_KEY_MISMATCH`, and trusting the presented key allows CRUD in `/upload`.
+- Refactored `FtpRemote::connect` through a private `connect_with` that accepts an optional connector, so tests can trust the throwaway CA without weakening the production platform verifier. Added `rustls-pemfile` as a dev-dependency.
+- Fixed the serialized-profile test to assert on secret-bearing field names instead of the `passphraseProtected` metadata flag.
+
+**Verified**
+
+- `tests/integration/run.sh` → 6 integration tests passed against real servers; stack removed afterwards.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (53 passed, 6 ignored).
+- `bun run check` (Biome, 58 Vitest tests, strict TypeScript, production build) and `bun run bindings`.
+
+**Notes**
+
+- Pure-FTPd implicit TLS still requires `-Y 2` at runtime so `tls_init_library()` runs; without it the control connection closes before the handshake.
+- vsftpd's implicit TLS segfaulted when rustls connected, so the suite uses the Pure-FTPd source build instead.
+- `nc -z` alone is not a readiness check: Docker accepts the mapped port before sshd is listening. `run.sh` also waits for each service's startup log line.
+
+**Next**
+
+- Add Quick Connect with transient credentials and recent-list updates.
+- Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
+- Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
 - Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs and host-key dialog.

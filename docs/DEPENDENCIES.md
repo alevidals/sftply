@@ -110,7 +110,7 @@ No maintained crate unifies FTP/FTPS/SFTP behind one accurate async capability m
 | `specta-typescript`         | 0.0.13      | TypeScript exporter            | MIT/Apache-2.0 | Paired with the specta v2 RC; generates `src/lib/ipc/bindings.ts`                        |
 | `chrono`                    | 0.4.45      | FTP date parsing               | MIT/Apache-2.0 | Transitive via suppaftp; use only at protocol boundary                                   |
 
-**Dev dependencies:** `tempfile 3.27.0`, `insta 1.49.0`, `proptest 1.12.0`, `tokio-test`, `serial_test` (only where server fixtures require isolation). Tooling: `cargo-nextest`, `cargo-deny`, `cargo-audit`, `rustfmt`, `clippy`.
+**Dev dependencies:** `tempfile 3.27.0`, `rustls-pemfile 2.2.0` (integration-suite CA trust), `insta 1.49.0`, `proptest 1.12.0`, `tokio-test`, `serial_test` (only where server fixtures require isolation). Tooling: `cargo-nextest`, `cargo-deny`, `cargo-audit`, `rustfmt`, `clippy`.
 
 ### Rejected or deferred Rust dependencies
 

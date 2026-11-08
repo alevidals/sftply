@@ -1,0 +1,67 @@
+name: sftply-integration
+
+x-pure-ftpd: &pure-ftpd
+  build:
+    context: ./pure-ftpd
+  image: sftply/pure-ftpd-test:latest
+  restart: "no"
+
+services:
+  ftp:
+    <<: *pure-ftpd
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
+    environment:
+      FTP_USER: sftply
+      FTP_PASSWORD: sftply-test
+      FTP_HOME: /home/ftpuser
+      FTP_PASSIVE: 30000:30009
+      FTP_TLS: "0"
+    volumes:
+      - ftp-data:/home/ftpuser
+
+  ftps-explicit:
+    <<: *pure-ftpd
+    ports:
+      - "2122:21"
+      - "30010-30019:30010-30019"
+    environment:
+      FTP_USER: sftply
+      FTP_PASSWORD: sftply-test
+      FTP_HOME: /home/ftpuser
+      FTP_PASSIVE: 30010:30019
+      FTP_TLS: "1"
+    volumes:
+      - ftps-explicit-data:/home/ftpuser
+      - ./certs/pure-ftpd.pem:/etc/ssl/private/pure-ftpd.pem:ro
+
+  ftps-implicit:
+    build:
+      context: ./pure-ftpd-implicit
+    image: sftply/pure-ftpd-implicit-test:latest
+    restart: "no"
+    ports:
+      - "2990:990"
+      - "30020-30029:30020-30029"
+    environment:
+      FTP_USER: sftply
+      FTP_PASSWORD: sftply-test
+      FTP_HOME: /home/ftpuser
+      FTP_PASSIVE: 30020:30029
+      FTP_PORT: "990"
+    volumes:
+      - ftps-implicit-data:/home/ftpuser
+      - ./certs/pure-ftpd.pem:/etc/ssl/private/pure-ftpd.pem:ro
+
+  sftp:
+    image: atmoz/sftp:alpine
+    restart: "no"
+    ports:
+      - "2222:22"
+    command: sftply:sftply-test:1001:1001:upload
+
+volumes:
+  ftp-data:
+  ftps-explicit-data:
+  ftps-implicit-data:

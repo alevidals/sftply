@@ -303,4 +303,28 @@ mod tests {
         assert_eq!(ConnectionProtocol::FtpsImplicit.default_port(), 990);
         assert_eq!(ConnectionProtocol::Sftp.default_port(), 22);
     }
+
+    #[test]
+    fn serialized_profiles_never_contain_secrets() {
+        let mut with_key = input();
+        with_key.protocol = ConnectionProtocol::Sftp;
+        with_key.auth = ConnectionAuth::Key {
+            key_path: "/home/ada/.ssh/id_ed25519".into(),
+            passphrase_protected: true,
+        };
+        let profile = ConnectionProfile::from_input("id".into(), with_key, 0.0);
+        let json = serde_json::to_string(&profile).unwrap();
+        // Secret-bearing fields must never be part of the profile. The
+        // `passphraseProtected` boolean flag is metadata, not a secret.
+        for key in [
+            "\"password\"",
+            "\"passphrase\"",
+            "\"secret\"",
+            "\"privateKey\"",
+            "\"private_key\"",
+        ] {
+            assert!(!json.contains(key), "profile leaked {key}: {json}");
+        }
+        assert!(json.contains("/home/ada/.ssh/id_ed25519"));
+    }
 }

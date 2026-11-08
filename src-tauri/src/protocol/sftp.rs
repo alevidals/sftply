@@ -569,3 +569,137 @@ mod tests {
         assert!(error.retryable);
     }
 }
+
+/// End-to-end tests against the Docker services in `tests/integration`.
+/// Run with `cargo test -- --ignored` after starting the compose stack.
+#[cfg(test)]
+mod integration {
+    use super::*;
+    use crate::domain::connection::{ConnectionAuth, ConnectionInput};
+
+    const USER: &str = "sftply";
+    const PASSWORD: &str = "sftply-test";
+    /// The atmoz/sftp image chroots the user to `/home/sftply` and only the
+    /// `upload` folder is writable.
+    const WRITABLE: &str = "/upload";
+
+    fn profile() -> ConnectionProfile {
+        ConnectionProfile::from_input(
+            "integration".into(),
+            ConnectionInput {
+                name: "Integration".into(),
+                protocol: crate::domain::connection::ConnectionProtocol::Sftp,
+                host: "127.0.0.1".into(),
+                port: 2222,
+                username: USER.into(),
+                auth: ConnectionAuth::Password,
+                initial_path: WRITABLE.into(),
+                favorite: false,
+                group: None,
+            },
+            0.0,
+        )
+    }
+
+    fn credentials() -> SftpCredentials {
+        SftpCredentials {
+            password: Some(PASSWORD.into()),
+            passphrase: None,
+        }
+    }
+
+    async fn trusted_host(profile: &ConnectionProfile) -> KnownHost {
+        let result = SftpRemote::connect(profile, credentials(), Vec::new()).await;
+        let error = match result {
+            Ok(_) => panic!("an unknown host key must block the connection"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code, ErrorCode::HostKeyUnknown);
+        let challenge = error
+            .host_key
+            .expect("unknown host key carries a challenge");
+        assert_eq!(challenge.host, profile.host);
+        assert_eq!(challenge.port, profile.port);
+        assert!(challenge.fingerprint.starts_with("SHA256:"));
+        assert!(challenge.previous_fingerprint.is_none());
+        KnownHost {
+            host: challenge.host,
+            port: challenge.port,
+            key_type: challenge.key_type,
+            fingerprint: challenge.fingerprint,
+            added_at: 0.0,
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn rejects_changed_host_key() {
+        let profile = profile();
+        let mut known = trusted_host(&profile).await;
+        known.fingerprint = "SHA256:this-is-not-the-real-key".into();
+
+        let result = SftpRemote::connect(&profile, credentials(), vec![known]).await;
+        match result {
+            Ok(_) => panic!("a changed host key must block the connection"),
+            Err(error) => {
+                assert_eq!(error.code, ErrorCode::HostKeyMismatch);
+                let challenge = error.host_key.expect("changed key carries a challenge");
+                assert!(challenge.previous_fingerprint.is_some());
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn sftp_crud_after_trusting_host_key() {
+        let profile = profile();
+        let known = trusted_host(&profile).await;
+        let mut remote = SftpRemote::connect(&profile, credentials(), vec![known])
+            .await
+            .expect("connect with a trusted host key");
+
+        let capabilities = remote.capabilities();
+        assert!(capabilities.list);
+        assert!(capabilities.mkdir);
+        assert!(capabilities.remove);
+        assert!(capabilities.rename);
+        assert!(capabilities.chmod);
+
+        let root = remote.list(WRITABLE).await.expect("list writable folder");
+        assert_eq!(root.path, WRITABLE);
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("it-{stamp}");
+        let path = format!("{WRITABLE}/{folder}");
+
+        let created = remote
+            .mkdir(WRITABLE, &folder)
+            .await
+            .expect("mkdir inside the writable folder");
+        assert_eq!(created.kind, EntryKind::Directory);
+        assert_eq!(created.path, path);
+
+        let listing = remote.list(WRITABLE).await.expect("list after mkdir");
+        assert!(listing.entries.iter().any(|entry| entry.name == folder));
+
+        let renamed_name = format!("{folder}-renamed");
+        let renamed_path = format!("{WRITABLE}/{renamed_name}");
+        let renamed = remote.rename(&path, &renamed_name).await.expect("rename");
+        assert_eq!(renamed.name, renamed_name);
+
+        let stat = remote.stat(&renamed_path).await.expect("stat renamed");
+        assert_eq!(stat.kind, EntryKind::Directory);
+
+        remote.delete(&renamed_path, true).await.expect("delete");
+        let missing = remote.stat(&renamed_path).await;
+        assert_eq!(
+            missing.expect_err("deleted folder is gone").code,
+            ErrorCode::NotFound
+        );
+
+        remote.disconnect().await.expect("disconnect");
+    }
+}
