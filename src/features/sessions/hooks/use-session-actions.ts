@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { toast } from "sonner"
 import { connectionsQueryKey } from "@/features/connections/hooks/use-connections"
+import { remoteScope, scopeKey } from "@/features/files/api"
 import { sessionsApi } from "@/features/sessions/api"
 import { normalizeError } from "@/lib/errors"
 import type { ConnectionInput_Deserialize, SessionInfo } from "@/lib/ipc/bindings"
@@ -107,5 +108,57 @@ export function useSessionActions() {
     }
   }, [])
 
-  return { connect, quickConnect, disconnect }
+  /**
+   * Reconnect a session in place. The same session id is kept so tabs and
+   * browser state survive; remote query caches are dropped so the new
+   * connection never shows stale listings.
+   */
+  const reconnect = useCallback(
+    async (sessionId: string) => {
+      const attempt = async (): Promise<void> => {
+        const store = useSessionStore.getState()
+        if (store.reconnecting[sessionId]) return
+        store.setReconnecting(sessionId, true)
+        try {
+          const session = await sessionsApi.reconnect(sessionId)
+          const current = useSessionStore.getState()
+          current.upsertSession(session)
+          current.clearLost(sessionId)
+          current.setActiveSession(session.id)
+          useUiStore.getState().setActivePane("remote")
+          await queryClient.removeQueries({
+            queryKey: ["fs", scopeKey(remoteScope(sessionId))],
+          })
+          recordActivity("success", `Reconnected to “${session.name}”`)
+          toast.success(`Reconnected to ${session.name}`)
+        } catch (cause) {
+          const error = normalizeError(cause)
+          if (error.hostKey) {
+            requestHostKey(null, error.hostKey, attempt)
+            recordActivity("warning", `Host key verification required for ${error.hostKey.host}`)
+            return
+          }
+          useSessionStore.getState().setLost(sessionId, error.message)
+          toast.error("Could not reconnect", { description: error.message })
+        } finally {
+          useSessionStore.getState().setReconnecting(sessionId, false)
+        }
+      }
+      await attempt()
+    },
+    [queryClient, requestHostKey],
+  )
+
+  /** Ask the backend to abort the operation currently using the session. */
+  const cancel = useCallback(async (sessionId: string) => {
+    try {
+      const cancelled = await sessionsApi.cancel(sessionId)
+      if (cancelled) recordActivity("info", "Cancelled the remote operation")
+    } catch (cause) {
+      const error = normalizeError(cause)
+      toast.error("Could not cancel the operation", { description: error.message })
+    }
+  }, [])
+
+  return { connect, quickConnect, disconnect, reconnect, cancel }
 }

@@ -6,9 +6,11 @@ import {
   MonitorIcon,
   MoonIcon,
   PanelBottomIcon,
+  RefreshCwIcon,
   ServerIcon,
   Settings2Icon,
   SunIcon,
+  XIcon,
   ZapIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -22,10 +24,12 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command"
+import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
 
 const THEME_COMMANDS: Array<{ mode: ThemeMode; label: string; icon: typeof SunIcon }> = [
@@ -43,6 +47,26 @@ export function CommandPalette() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
   const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
+  const { reconnect, cancel } = useSessionActions()
+
+  const reconnectActive = () => {
+    const sessionId = useSessionStore.getState().activeSessionId
+    if (!sessionId) {
+      toast.info("No remote session is active.")
+      return
+    }
+    void reconnect(sessionId)
+  }
+
+  const cancelActive = () => {
+    const sessionId = useSessionStore.getState().activeSessionId
+    if (!sessionId) {
+      toast.info("No remote session is active.")
+      return
+    }
+    void cancel(sessionId)
+  }
 
   const run = (action: () => void) => {
     setOpen(false)
@@ -173,6 +197,22 @@ export function CommandPalette() {
           >
             <ZapIcon className="text-muted-foreground" />
             Quick connect…
+          </CommandItem>
+          <CommandItem
+            value="reconnect active session"
+            disabled={!activeSessionId}
+            onSelect={() => run(reconnectActive)}
+          >
+            <RefreshCwIcon className="text-muted-foreground" />
+            Reconnect active session
+          </CommandItem>
+          <CommandItem
+            value="cancel remote operation"
+            disabled={!activeSessionId}
+            onSelect={() => run(cancelActive)}
+          >
+            <XIcon className="text-muted-foreground" />
+            Cancel remote operation
           </CommandItem>
         </CommandGroup>
 

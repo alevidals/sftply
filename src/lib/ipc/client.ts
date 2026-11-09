@@ -181,4 +181,12 @@ export const ipc = {
       unwrap(result)
     })
   },
+
+  sessionReconnect(sessionId: string): Promise<SessionInfo> {
+    return invoke(commands.sessionReconnect(sessionId)).then((result) => unwrap(result))
+  },
+
+  sessionCancel(sessionId: string): Promise<boolean> {
+    return invoke(commands.sessionCancel(sessionId)).then((result) => unwrap(result))
+  },
 }

@@ -45,10 +45,17 @@ export const commands = {
 	 * 
 	 *  `save` persists the profile and secret first; otherwise the profile is
 	 *  transient and never touches the config file or the keychain. The secret
-	 *  stays in Rust memory and is dropped when the session closes.
+	 *  stays in Rust memory for the lifetime of the session so reconnect works.
 	 */
 	sessionConnectQuick: (input: ConnectionInput_Deserialize, secret: string, save: boolean) => typedError<SessionInfo, AppError_Serialize>(__TAURI_INVOKE("session_connect_quick", { input, secret, save })),
+	/**
+	 *  Reconnect an existing session in place. The session id and profile are
+	 *  preserved so open browser state, tabs and query keys stay valid.
+	 */
+	sessionReconnect: (sessionId: string) => typedError<SessionInfo, AppError_Serialize>(__TAURI_INVOKE("session_reconnect", { sessionId })),
 	sessionDisconnect: (sessionId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("session_disconnect", { sessionId })),
+	/**  Cancel the remote operation currently running on a session, if any. */
+	sessionCancel: (sessionId: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("session_cancel", { sessionId })),
 	sessionsList: () => __TAURI_INVOKE<SessionInfo[]>("sessions_list"),
 };
 
@@ -127,6 +134,10 @@ export type AppSettings_Deserialize = {
 	confirmDelete?: boolean,
 	transferConcurrency?: number,
 	bandwidthLimitKbps?: number | null,
+	/**  Maximum time to establish a connection, in seconds. */
+	connectTimeoutSeconds?: number,
+	/**  Maximum time a single remote filesystem operation may run, in seconds. */
+	operationTimeoutSeconds?: number,
 	sidebarWidth?: number,
 	bottomPanelHeight?: number,
 	bottomPanelOpen?: boolean,
@@ -143,6 +154,10 @@ export type AppSettings_Serialize = {
 	confirmDelete: boolean,
 	transferConcurrency: number,
 	bandwidthLimitKbps: number | null,
+	/**  Maximum time to establish a connection, in seconds. */
+	connectTimeoutSeconds: number,
+	/**  Maximum time a single remote filesystem operation may run, in seconds. */
+	operationTimeoutSeconds: number,
 	sidebarWidth: number,
 	bottomPanelHeight: number,
 	bottomPanelOpen: boolean,
@@ -425,6 +440,8 @@ export type SessionInfo = {
 	connectedAt: number,
 	/**  Time spent establishing the connection, in milliseconds. */
 	latencyMs: number,
+	/**  False when the stream is no longer trustworthy and reconnect is needed. */
+	usable: boolean,
 };
 
 export type SessionState = "connecting" | "connected" | "disconnected" | "failed";

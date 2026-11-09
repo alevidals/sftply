@@ -3,7 +3,7 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-09  
-**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect, TLS verification options, FTP data-channel policy and a real-server Docker integration suite are implemented. Remaining: reconnect/cancellation/timeouts and visual QA.  
+**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect, TLS verification options, FTP data-channel policy, reconnect/cancellation/timeouts and a real-server Docker integration suite are implemented. Remaining: visual QA and rendered component tests.
 **Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA and certificate pinning. Rendered component tests and real-window visual QA remain pending.
 
 ---
@@ -506,3 +506,39 @@ cargo test
 - Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
 - Run real-window visual QA for local and remote panes, including the new TLS and data-channel sections.
 - Add rendered component tests for the connection row, tabs, host-key dialog and Quick Connect.
+
+### 2026-11-09 — Session 9: reconnect, cancellation and operation timeouts
+
+**Done**
+
+- Added per-session operation timeouts and connect timeouts as persisted settings (`connectTimeoutSeconds`, `operationTimeoutSeconds`), with validation ranges and a new **Connections** tab in the Settings dialog.
+- Added `Session::run_operation`, which serializes remote operations, bounds them with the configured timeout, and cancels them through a `CancellationToken`.
+- Added `session_cancel(session_id)` to abort the operation currently holding a session's protocol stream.
+- Added `session_reconnect(session_id)`, which keeps the session id and profile, retires the old stream, opens a new connection with the retained credentials, and refreshes the session metadata. Transient Quick Connect sessions can reconnect because their credentials stay in Rust memory for the session lifetime.
+- Retained session credentials use `zeroize` and are zeroed when the session is dropped. They are never serialized, logged, or sent to the frontend.
+- Cancelled, timed-out, or network-failed operations mark the session unusable. `fs_*` commands then return `SESSION_NOT_READY` instead of guessing whether the control channel is in sync.
+- Backend emits `session://state` `Failed` when an established session becomes unusable, and `SessionInfo.usable` lets the frontend restore lost-session state after a reload.
+- Frontend session store tracks `lost`, `reconnecting`, and the last visited folder per session.
+- Remote pane now shows a connection-lost state with Reconnect/Disconnect actions, marks lost tabs, and offers a Cancel button while a remote listing is in flight.
+- Sidebar rows show a warning dot and "Connection lost" for unusable sessions, with Reconnect actions in the row menu and context menu.
+- Command palette gained "Reconnect active session" and "Cancel remote operation".
+- Reconnect preserves the current folder and handles host-key challenges through the existing trust dialog.
+- Added unit tests for the operation runner (success, timeout, cancellation, lost session), settings timeout validation, and the new session-store state.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (61 passed, 8 ignored).
+- `bun run check` (Biome, 71 Vitest tests, strict TypeScript, production build) and `bun run bindings`.
+- `tests/integration/run.sh` → 8 integration tests passed.
+
+**Notes**
+
+- Cancelling or timing out a protocol operation is treated conservatively: the stream is not reused because FTP has a single control channel and SFTP requests may still be in flight. The UI asks for an explicit reconnect.
+- A network error during a data-channel operation also marks the session unusable. This avoids showing a listing that may be out of sync with the server.
+- Reconnect uses the profile stored with the session, so a transient Quick Connect session can be retried even though it has no saved profile row.
+
+**Next**
+
+- Run real-window visual QA for local/remote panes, the lost-session state, and the new Connections settings tab.
+- Add rendered component tests for the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane.
+- Add a CI workflow that runs the non-Docker gates on every push.

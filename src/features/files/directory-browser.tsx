@@ -89,6 +89,8 @@ interface DirectoryBrowserProps {
   statusLabel?: string
   /** Optional location for the error state's "Go home" action. */
   homePath?: string
+  /** Cancel the in-flight remote operation, when supported by the scope. */
+  onCancel?: () => void
 }
 
 export function DirectoryBrowser({
@@ -104,6 +106,7 @@ export function DirectoryBrowser({
   emptyDescription,
   statusLabel,
   homePath,
+  onCancel,
 }: DirectoryBrowserProps) {
   const { settings, updateSettings } = useSettings()
   const queryClient = useQueryClient()
@@ -413,6 +416,11 @@ export function DirectoryBrowser({
           >
             <RefreshCwIcon className={cn(listingQuery.isFetching && "animate-spin")} />
           </ToolbarButton>
+          {onCancel && listingQuery.isFetching ? (
+            <ToolbarButton label="Cancel this operation" onClick={onCancel}>
+              <XIcon />
+            </ToolbarButton>
+          ) : null}
           <ActionsMenu
             canOpen={Boolean(activeEntry) && (activeEntry?.kind === "directory" || allowOpenFile)}
             canRename={Boolean(activeEntry) && canRename}

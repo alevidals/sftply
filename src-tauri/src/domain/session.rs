@@ -23,6 +23,8 @@ pub struct SessionInfo {
     /// Time spent establishing the connection, in milliseconds.
     #[specta(type = specta_typescript::Number)]
     pub latency_ms: f64,
+    /// False when the stream is no longer trustworthy and reconnect is needed.
+    pub usable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]

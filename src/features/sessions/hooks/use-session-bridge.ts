@@ -26,6 +26,7 @@ export function useSessionBridge(): void {
     onSessionState((event) => {
       const store = useSessionStore.getState()
       if (event.state === "connected") {
+        if (event.sessionId) store.clearLost(event.sessionId)
         sessionsApi
           .list()
           .then((sessions) => {
@@ -34,11 +35,21 @@ export function useSessionBridge(): void {
           .catch(() => undefined)
         return
       }
-      if (event.state === "disconnected" || event.state === "failed") {
-        if (event.sessionId) store.removeSession(event.sessionId)
-        if (event.state === "failed" && event.message) {
-          recordActivity("error", event.message)
+      if (event.state === "failed") {
+        // A failed connect attempt has no tab yet; the action that started it
+        // already reports the error. An established session keeps its tab so
+        // the user can reconnect without losing their place.
+        if (event.sessionId && store.sessions[event.sessionId]) {
+          store.setLost(
+            event.sessionId,
+            event.message ?? "The connection was lost. Reconnect to continue.",
+          )
+          if (event.message) recordActivity("error", event.message)
         }
+        return
+      }
+      if (event.state === "disconnected") {
+        if (event.sessionId) store.removeSession(event.sessionId)
       }
     })
       .then((stop) => {

@@ -52,7 +52,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::connections::known_host_remove,
             commands::sessions::session_connect,
             commands::sessions::session_connect_quick,
+            commands::sessions::session_reconnect,
             commands::sessions::session_disconnect,
+            commands::sessions::session_cancel,
             commands::sessions::sessions_list,
         ])
         .events(tauri_specta::collect_events![

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, State};
 use uuid::Uuid;
@@ -8,13 +8,13 @@ use crate::app_state::AppState;
 use crate::credentials;
 use crate::domain::connection::{ConnectionAuth, ConnectionInput, ConnectionProfile};
 use crate::domain::credentials::SecretKind;
-use crate::domain::fs::EntryKind;
+use crate::domain::fs::{EntryKind, FsCapabilities};
 use crate::domain::session::{SessionInfo, SessionState};
 use crate::error::{AppError, ErrorCode};
 use crate::protocol::RemoteFs;
 use crate::protocol::ftp::FtpRemote;
 use crate::protocol::sftp::{SftpCredentials, SftpRemote};
-use crate::session::{Session, emit_state};
+use crate::session::{Session, SessionCredentials, emit_state, timeout_error};
 
 /// Open a real protocol session for a saved connection.
 ///
@@ -46,7 +46,7 @@ pub async fn session_connect(
 ///
 /// `save` persists the profile and secret first; otherwise the profile is
 /// transient and never touches the config file or the keychain. The secret
-/// stays in Rust memory and is dropped when the session closes.
+/// stays in Rust memory for the lifetime of the session so reconnect works.
 #[tauri::command]
 #[specta::specta]
 pub async fn session_connect_quick(
@@ -93,12 +93,8 @@ pub async fn session_connect_quick(
     };
 
     let transient = match &profile.auth {
-        ConnectionAuth::Password => TransientSecret {
-            password: Some(secret),
-            passphrase: None,
-        },
-        ConnectionAuth::Key { .. } => TransientSecret {
-            password: None,
+        ConnectionAuth::Password => SessionCredentials::Password(secret),
+        ConnectionAuth::Key { .. } => SessionCredentials::Key {
             passphrase: (!secret.is_empty()).then_some(secret),
         },
     };
@@ -125,9 +121,97 @@ pub async fn session_connect_quick(
     result
 }
 
-struct TransientSecret {
-    password: Option<String>,
-    passphrase: Option<String>,
+/// Reconnect an existing session in place. The session id and profile are
+/// preserved so open browser state, tabs and query keys stay valid.
+#[tauri::command]
+#[specta::specta]
+pub async fn session_reconnect(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<SessionInfo, AppError> {
+    let existing = state
+        .sessions
+        .get(&session_id)
+        .ok_or_else(|| AppError::not_found("That session is no longer open."))?;
+
+    let started = Instant::now();
+    emit_state(
+        &app,
+        &session_id,
+        &existing.info.connection_id,
+        SessionState::Connecting,
+        None,
+    );
+
+    // Stop any in-flight operation and close the old stream before opening a
+    // new one. A wedged server must not block reconnect forever. Marking the
+    // session unusable also rejects operations that were already queued.
+    existing.mark_unusable();
+    existing.retire().await;
+
+    let timeout = Duration::from_secs(state.settings.get().connect_timeout_seconds.into());
+    let result = tokio::time::timeout(
+        timeout,
+        establish(&state, &existing.profile, &existing.credentials),
+    )
+    .await;
+
+    match result {
+        Ok(Ok((client, capabilities))) => {
+            let info = SessionInfo {
+                id: session_id.clone(),
+                connection_id: existing.profile.id.clone(),
+                name: existing.profile.name.clone(),
+                protocol: existing.profile.protocol,
+                host: existing.profile.host.clone(),
+                port: existing.profile.port,
+                username: existing.profile.username.clone(),
+                initial_path: existing.profile.initial_path.clone(),
+                capabilities,
+                connected_at: crate::domain::activity::unix_millis(),
+                latency_ms: started.elapsed().as_millis() as f64,
+                usable: true,
+            };
+            state.sessions.insert(Arc::new(Session::new(
+                info.clone(),
+                existing.profile.clone(),
+                existing.credentials.clone(),
+                client,
+            )));
+            emit_state(
+                &app,
+                &session_id,
+                &info.connection_id,
+                SessionState::Connected,
+                None,
+            );
+            Ok(info)
+        }
+        Ok(Err(error)) => {
+            existing.mark_unusable();
+            emit_state(
+                &app,
+                &session_id,
+                &existing.info.connection_id,
+                SessionState::Failed,
+                Some(error.message.clone()),
+            );
+            Err(error)
+        }
+        Err(_) => {
+            existing.mark_unusable();
+            let error = timeout_error();
+            emit_state(
+                &app,
+                &session_id,
+                &existing.info.connection_id,
+                SessionState::Failed,
+                Some(error.message.clone()),
+            );
+            Err(error)
+        }
+    }
 }
 
 async fn open_session(
@@ -135,7 +219,7 @@ async fn open_session(
     state: &AppState,
     profile: &ConnectionProfile,
     session_id: String,
-    transient: Option<TransientSecret>,
+    transient: Option<SessionCredentials>,
     mark_used: bool,
 ) -> Result<SessionInfo, AppError> {
     let started = Instant::now();
@@ -147,8 +231,28 @@ async fn open_session(
         None,
     );
 
-    match connect_session(state, profile, transient).await {
-        Ok((client, capabilities)) => {
+    let credentials = match transient {
+        Some(credentials) => credentials,
+        None => match resolve_credentials(profile).await {
+            Ok(credentials) => credentials,
+            Err(error) => {
+                emit_state(
+                    app,
+                    &session_id,
+                    &profile.id,
+                    SessionState::Failed,
+                    Some(error.message.clone()),
+                );
+                return Err(error);
+            }
+        },
+    };
+
+    let timeout = Duration::from_secs(state.settings.get().connect_timeout_seconds.into());
+    let result = tokio::time::timeout(timeout, establish(state, profile, &credentials)).await;
+
+    match result {
+        Ok(Ok((client, capabilities))) => {
             let info = SessionInfo {
                 id: session_id.clone(),
                 connection_id: profile.id.clone(),
@@ -161,18 +265,32 @@ async fn open_session(
                 capabilities,
                 connected_at: crate::domain::activity::unix_millis(),
                 latency_ms: started.elapsed().as_millis() as f64,
+                usable: true,
             };
-            state.sessions.insert(Arc::new(Session {
-                info: info.clone(),
-                client: tokio::sync::Mutex::new(client),
-            }));
+            state.sessions.insert(Arc::new(Session::new(
+                info.clone(),
+                profile.clone(),
+                credentials,
+                client,
+            )));
             if mark_used && let Err(error) = state.connections.mark_used(&profile.id).await {
                 tracing::warn!(%error, "could not update connection last-used time");
             }
             emit_state(app, &session_id, &profile.id, SessionState::Connected, None);
             Ok(info)
         }
-        Err(error) => {
+        Ok(Err(error)) => {
+            emit_state(
+                app,
+                &session_id,
+                &profile.id,
+                SessionState::Failed,
+                Some(error.message.clone()),
+            );
+            Err(error)
+        }
+        Err(_) => {
+            let error = timeout_error();
             emit_state(
                 app,
                 &session_id,
@@ -185,64 +303,70 @@ async fn open_session(
     }
 }
 
-async fn connect_session(
+/// Read the credentials for a saved connection from the OS keychain.
+async fn resolve_credentials(profile: &ConnectionProfile) -> Result<SessionCredentials, AppError> {
+    match &profile.auth {
+        ConnectionAuth::Password => {
+            let password = credentials::get_secret(&profile.id, SecretKind::Password)
+                .await?
+                .ok_or_else(|| {
+                    AppError::new(
+                        ErrorCode::AuthFailed,
+                        "No password is saved for this connection. Edit it to add one.",
+                    )
+                })?;
+            Ok(SessionCredentials::Password(password))
+        }
+        ConnectionAuth::Key {
+            passphrase_protected,
+            ..
+        } => {
+            let passphrase = credentials::get_secret(&profile.id, SecretKind::Passphrase).await?;
+            if *passphrase_protected && passphrase.is_none() {
+                return Err(AppError::new(
+                    ErrorCode::AuthFailed,
+                    "No key passphrase is saved for this connection. Edit it to add one.",
+                ));
+            }
+            Ok(SessionCredentials::Key { passphrase })
+        }
+    }
+}
+
+async fn establish(
     state: &AppState,
     profile: &ConnectionProfile,
-    transient: Option<TransientSecret>,
-) -> Result<(Box<dyn RemoteFs>, crate::domain::fs::FsCapabilities), AppError> {
-    let connection_id = &profile.id;
-
-    let (password, passphrase) = match transient {
-        Some(transient) => (transient.password, transient.passphrase),
-        None => match &profile.auth {
-            ConnectionAuth::Password => {
-                let password = credentials::get_secret(connection_id, SecretKind::Password)
-                    .await?
-                    .ok_or_else(|| {
-                        AppError::new(
-                            ErrorCode::AuthFailed,
-                            "No password is saved for this connection. Edit it to add one.",
-                        )
-                    })?;
-                (Some(password), None)
-            }
-            ConnectionAuth::Key {
-                passphrase_protected,
-                ..
-            } => {
-                let passphrase =
-                    credentials::get_secret(connection_id, SecretKind::Passphrase).await?;
-                if *passphrase_protected && passphrase.is_none() {
+    credentials: &SessionCredentials,
+) -> Result<(Box<dyn RemoteFs>, FsCapabilities), AppError> {
+    let mut client: Box<dyn RemoteFs> = match profile.protocol {
+        crate::domain::connection::ConnectionProtocol::Sftp => {
+            let (password, passphrase) = match credentials {
+                SessionCredentials::Password(password) => (Some(password.clone()), None),
+                SessionCredentials::Key { passphrase } => (None, passphrase.clone()),
+            };
+            Box::new(
+                SftpRemote::connect(
+                    profile,
+                    SftpCredentials {
+                        password,
+                        passphrase,
+                    },
+                    state.known_hosts.list(),
+                )
+                .await?,
+            )
+        }
+        _ => {
+            let password = match credentials {
+                SessionCredentials::Password(password) => password,
+                SessionCredentials::Key { .. } => {
                     return Err(AppError::new(
                         ErrorCode::AuthFailed,
-                        "No key passphrase is saved for this connection. Edit it to add one.",
+                        "No password is saved for this connection.",
                     ));
                 }
-                (None, passphrase)
-            }
-        },
-    };
-
-    let mut client: Box<dyn RemoteFs> = match profile.protocol {
-        crate::domain::connection::ConnectionProtocol::Sftp => Box::new(
-            SftpRemote::connect(
-                profile,
-                SftpCredentials {
-                    password,
-                    passphrase,
-                },
-                state.known_hosts.list(),
-            )
-            .await?,
-        ),
-        _ => {
-            let password = password.ok_or_else(|| {
-                AppError::new(
-                    ErrorCode::AuthFailed,
-                    "No password is saved for this connection.",
-                )
-            })?;
-            Box::new(FtpRemote::connect(profile, &password).await?)
+            };
+            Box::new(FtpRemote::connect(profile, password).await?)
         }
     };
 
@@ -279,7 +403,12 @@ pub async fn session_disconnect(
         .remove(&session_id)
         .ok_or_else(|| AppError::not_found("That session is no longer open."))?;
 
-    let result = session.client.lock().await.disconnect().await;
+    // Reject operations that were queued before the session was removed.
+    session.mark_unusable();
+
+    // The session is already removed, so a wedged stream must not keep the UI
+    // waiting. The socket is closed when the session is dropped either way.
+    let result = tokio::time::timeout(Duration::from_secs(5), session.disconnect()).await;
     emit_state(
         &app,
         &session_id,
@@ -287,7 +416,21 @@ pub async fn session_disconnect(
         SessionState::Disconnected,
         None,
     );
-    result
+    match result {
+        Ok(result) => result,
+        Err(_) => Ok(()),
+    }
+}
+
+/// Cancel the remote operation currently running on a session, if any.
+#[tauri::command]
+#[specta::specta]
+pub fn session_cancel(state: State<'_, AppState>, session_id: String) -> Result<bool, AppError> {
+    let session = state
+        .sessions
+        .get(&session_id)
+        .ok_or_else(|| AppError::not_found("That session is no longer open."))?;
+    Ok(session.cancel_current())
 }
 
 #[tauri::command]

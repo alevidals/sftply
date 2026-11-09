@@ -8,6 +8,7 @@ import {
   PlayIcon,
   PlusIcon,
   PowerIcon,
+  RefreshCwIcon,
   ServerIcon,
   StarIcon,
   StarOffIcon,
@@ -59,11 +60,12 @@ export function ConnectionsPanel() {
   const queryClient = useQueryClient()
   const sessions = useSessionStore((state) => state.sessions)
   const connecting = useSessionStore((state) => state.connecting)
+  const lost = useSessionStore((state) => state.lost)
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const setActiveSession = useSessionStore((state) => state.setActiveSession)
   const setActivePane = useUiStore((state) => state.setActivePane)
   const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
-  const { connect, disconnect } = useSessionActions()
+  const { connect, disconnect, reconnect } = useSessionActions()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ConnectionProfile_Serialize | null>(null)
   const [deleting, setDeleting] = useState<ConnectionProfile_Serialize | null>(null)
@@ -203,28 +205,33 @@ export function ConnectionsPanel() {
               </Button>
             </div>
           ) : (
-            sorted.map((connection) => (
-              <ConnectionRow
-                key={connection.id}
-                connection={connection}
-                session={sessionForConnection(sessions, connection.id)}
-                connecting={Boolean(connecting[connection.id])}
-                active={
-                  Boolean(sessions[activeSessionId ?? ""]) &&
-                  sessions[activeSessionId ?? ""]?.connectionId === connection.id
-                }
-                onActivate={(sessionId) => {
-                  setActiveSession(sessionId)
-                  setActivePane("remote")
-                }}
-                onConnect={() => void connect(connection.id)}
-                onDisconnect={(sessionId) => void disconnect(sessionId)}
-                onEdit={() => openEdit(connection)}
-                onDuplicate={() => void duplicate(connection)}
-                onFavorite={() => void toggleFavorite(connection)}
-                onDelete={() => setDeleting(connection)}
-              />
-            ))
+            sorted.map((connection) => {
+              const session = sessionForConnection(sessions, connection.id)
+              return (
+                <ConnectionRow
+                  key={connection.id}
+                  connection={connection}
+                  session={session}
+                  lost={Boolean(session && lost[session.id])}
+                  connecting={Boolean(connecting[connection.id])}
+                  active={
+                    Boolean(sessions[activeSessionId ?? ""]) &&
+                    sessions[activeSessionId ?? ""]?.connectionId === connection.id
+                  }
+                  onActivate={(sessionId) => {
+                    setActiveSession(sessionId)
+                    setActivePane("remote")
+                  }}
+                  onConnect={() => void connect(connection.id)}
+                  onDisconnect={(sessionId) => void disconnect(sessionId)}
+                  onReconnect={(sessionId) => void reconnect(sessionId)}
+                  onEdit={() => openEdit(connection)}
+                  onDuplicate={() => void duplicate(connection)}
+                  onFavorite={() => void toggleFavorite(connection)}
+                  onDelete={() => setDeleting(connection)}
+                />
+              )
+            })
           )}
         </div>
       </ScrollArea>
@@ -254,11 +261,13 @@ export function ConnectionsPanel() {
 function ConnectionRow({
   connection,
   session,
+  lost,
   connecting,
   active,
   onActivate,
   onConnect,
   onDisconnect,
+  onReconnect,
   onEdit,
   onDuplicate,
   onFavorite,
@@ -266,11 +275,13 @@ function ConnectionRow({
 }: {
   connection: ConnectionProfile_Serialize
   session: SessionInfo | null
+  lost: boolean
   connecting: boolean
   active: boolean
   onActivate: (sessionId: string) => void
   onConnect: () => void
   onDisconnect: (sessionId: string) => void
+  onReconnect: (sessionId: string) => void
   onEdit: () => void
   onDuplicate: () => void
   onFavorite: () => void
@@ -289,7 +300,7 @@ function ConnectionRow({
             type="button"
             onClick={() => (session ? onActivate(session.id) : onConnect())}
             className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-            aria-label={`${connection.name}, ${PROTOCOL_LABELS[connection.protocol]} ${connection.host}${session ? ", connected" : ""}`}
+            aria-label={`${connection.name}, ${PROTOCOL_LABELS[connection.protocol]} ${connection.host}${session ? (lost ? ", connection lost" : ", connected") : ""}`}
           >
             <span
               className={cn(
@@ -301,7 +312,12 @@ function ConnectionRow({
             >
               <ServerIcon className="size-3" />
               {session ? (
-                <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-success ring-2 ring-sidebar" />
+                <span
+                  className={cn(
+                    "absolute -top-0.5 -right-0.5 size-1.5 rounded-full ring-2 ring-sidebar",
+                    lost ? "bg-warning" : "bg-success",
+                  )}
+                />
               ) : null}
             </span>
             <span className="min-w-0 flex-1">
@@ -320,8 +336,10 @@ function ConnectionRow({
                 {session ? (
                   <>
                     <span className="text-muted-foreground/40">·</span>
-                    <span className="text-success">
-                      {Math.max(1, Math.round(session.latencyMs))} ms
+                    <span className={lost ? "text-warning" : "text-success"}>
+                      {lost
+                        ? "Connection lost"
+                        : `${Math.max(1, Math.round(session.latencyMs))} ms`}
                     </span>
                   </>
                 ) : connection.group ? (
@@ -383,10 +401,18 @@ function ConnectionRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {session ? (
-                <DropdownMenuItem onSelect={() => onDisconnect(session.id)}>
-                  <PowerIcon />
-                  Disconnect
-                </DropdownMenuItem>
+                <>
+                  {lost ? (
+                    <DropdownMenuItem onSelect={() => onReconnect(session.id)}>
+                      <RefreshCwIcon />
+                      Reconnect
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem onSelect={() => onDisconnect(session.id)}>
+                    <PowerIcon />
+                    Disconnect
+                  </DropdownMenuItem>
+                </>
               ) : (
                 <DropdownMenuItem disabled={connecting} onSelect={onConnect}>
                   <PlayIcon />
@@ -418,10 +444,18 @@ function ConnectionRow({
 
       <ContextMenuContent className="w-48">
         {session ? (
-          <ContextMenuItem onSelect={() => onDisconnect(session.id)}>
-            <PowerIcon />
-            Disconnect
-          </ContextMenuItem>
+          <>
+            {lost ? (
+              <ContextMenuItem onSelect={() => onReconnect(session.id)}>
+                <RefreshCwIcon />
+                Reconnect
+              </ContextMenuItem>
+            ) : null}
+            <ContextMenuItem onSelect={() => onDisconnect(session.id)}>
+              <PowerIcon />
+              Disconnect
+            </ContextMenuItem>
+          </>
         ) : (
           <ContextMenuItem disabled={connecting} onSelect={onConnect}>
             <PlayIcon />

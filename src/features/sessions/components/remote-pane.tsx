@@ -1,11 +1,20 @@
 import { cn } from "cn"
-import { ServerIcon, XIcon } from "lucide-react"
+import {
+  LoaderCircleIcon,
+  PowerIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  WifiOffIcon,
+  XIcon,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { PROTOCOL_LABELS, protocolIsSecure } from "@/features/connections/schema"
 import { remoteScope } from "@/features/files/api"
 import { DirectoryBrowser } from "@/features/files/directory-browser"
 import { FilePane } from "@/features/files/file-pane"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
+import type { SessionInfo } from "@/lib/ipc/bindings"
 import { useSessionStore } from "@/stores/session-store"
 
 /** Remote pane: one tab per live session, each with an isolated browser. */
@@ -13,8 +22,12 @@ export function RemotePane() {
   const sessions = useSessionStore((state) => state.sessions)
   const order = useSessionStore((state) => state.order)
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
+  const lost = useSessionStore((state) => state.lost)
+  const reconnecting = useSessionStore((state) => state.reconnecting)
+  const paths = useSessionStore((state) => state.paths)
   const setActiveSession = useSessionStore((state) => state.setActiveSession)
-  const { disconnect } = useSessionActions()
+  const setPath = useSessionStore((state) => state.setPath)
+  const { disconnect, reconnect, cancel } = useSessionActions()
 
   const active = activeSessionId ? (sessions[activeSessionId] ?? null) : null
 
@@ -33,6 +46,8 @@ export function RemotePane() {
     )
   }
 
+  const lostMessage = lost[active.id]
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {order.length > 1 ? (
@@ -45,6 +60,7 @@ export function RemotePane() {
             const session = sessions[id]
             if (!session) return null
             const selected = session.id === active.id
+            const sessionLost = Boolean(lost[session.id])
             return (
               <div
                 key={session.id}
@@ -62,7 +78,11 @@ export function RemotePane() {
                   onClick={() => setActiveSession(session.id)}
                   className="flex h-full max-w-44 items-center gap-1.5 rounded-l-md px-2 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                 >
-                  <ServerIcon className="size-3 shrink-0" />
+                  {sessionLost ? (
+                    <WifiOffIcon className="size-3 shrink-0 text-warning" />
+                  ) : (
+                    <ServerIcon className="size-3 shrink-0" />
+                  )}
                   <span className="truncate">{session.name}</span>
                 </button>
                 <button
@@ -80,35 +100,116 @@ export function RemotePane() {
       ) : null}
 
       <div className="min-h-0 flex-1">
-        <DirectoryBrowser
-          key={active.id}
-          pane="remote"
-          title={active.name}
-          icon={ServerIcon}
-          scope={remoteScope(active.id)}
-          initialPath={active.initialPath}
-          allowOpenFile={false}
-          allowReveal={false}
-          statusLabel={`${PROTOCOL_LABELS[active.protocol]} · ${active.host}:${active.port}`}
-          emptyDescription="This folder is empty. Remote uploads arrive with transfers."
-          headerExtra={
-            <>
-              <Badge
-                variant={protocolIsSecure(active.protocol) ? "secondary" : "outline"}
-                className={cn(
-                  "h-4.5 px-1.5 text-[10px] font-medium",
-                  !protocolIsSecure(active.protocol) && "border-warning/40 text-warning",
-                )}
-              >
-                {PROTOCOL_LABELS[active.protocol]}
-              </Badge>
-              <span className="text-2xs text-muted-foreground tabular">
-                {Math.max(1, Math.round(active.latencyMs))} ms
-              </span>
-            </>
-          }
-        />
+        {lostMessage ? (
+          <ConnectionLostPane
+            session={active}
+            message={lostMessage}
+            reconnecting={Boolean(reconnecting[active.id])}
+            onReconnect={() => void reconnect(active.id)}
+            onDisconnect={() => void disconnect(active.id)}
+          />
+        ) : (
+          <DirectoryBrowser
+            key={active.id}
+            pane="remote"
+            title={active.name}
+            icon={ServerIcon}
+            scope={remoteScope(active.id)}
+            initialPath={paths[active.id] ?? active.initialPath}
+            allowOpenFile={false}
+            allowReveal={false}
+            statusLabel={`${PROTOCOL_LABELS[active.protocol]} · ${active.host}:${active.port}`}
+            emptyDescription="This folder is empty. Remote uploads arrive with transfers."
+            onPathChange={(path) => setPath(active.id, path)}
+            onCancel={() => void cancel(active.id)}
+            headerExtra={
+              <>
+                <Badge
+                  variant={protocolIsSecure(active.protocol) ? "secondary" : "outline"}
+                  className={cn(
+                    "h-4.5 px-1.5 text-[10px] font-medium",
+                    !protocolIsSecure(active.protocol) && "border-warning/40 text-warning",
+                  )}
+                >
+                  {PROTOCOL_LABELS[active.protocol]}
+                </Badge>
+                <span className="text-2xs text-muted-foreground tabular">
+                  {Math.max(1, Math.round(active.latencyMs))} ms
+                </span>
+              </>
+            }
+          />
+        )}
       </div>
     </div>
+  )
+}
+
+function ConnectionLostPane({
+  session,
+  message,
+  reconnecting,
+  onReconnect,
+  onDisconnect,
+}: {
+  session: SessionInfo
+  message: string
+  reconnecting: boolean
+  onReconnect: () => void
+  onDisconnect: () => void
+}) {
+  return (
+    <section
+      aria-label={`${session.name} connection lost`}
+      className="flex h-full min-h-0 flex-col bg-background"
+    >
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/70 bg-panel-header px-3">
+        <ServerIcon className="size-3.5 text-warning" />
+        <span className="min-w-0 truncate text-xs font-semibold text-foreground">
+          {session.name}
+        </span>
+        <Badge
+          variant="outline"
+          className="h-4.5 gap-1 border-warning/40 px-1.5 text-[10px] font-medium text-warning"
+        >
+          <span className="size-1.5 rounded-full bg-warning" />
+          Connection lost
+        </Badge>
+        <span className="ml-auto text-2xs text-muted-foreground">
+          {PROTOCOL_LABELS[session.protocol]} · {session.host}:{session.port}
+        </span>
+      </div>
+
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+        <div className="flex max-w-[320px] flex-col items-center text-center">
+          <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-warning/30 bg-warning/10 text-warning">
+            <WifiOffIcon className="size-5" />
+          </span>
+          <h2 className="text-sm font-medium text-foreground">The connection was lost</h2>
+          <p className="mt-1 text-xs leading-relaxed text-balance text-muted-foreground">
+            {message}
+          </p>
+          <p className="mt-1 text-2xs leading-relaxed text-balance text-muted-foreground">
+            Reconnecting opens a new stream to the same server. Your tab and current folder are
+            kept.
+          </p>
+          <div className="mt-4 flex items-center gap-2">
+            <Button size="sm" disabled={reconnecting} onClick={onReconnect}>
+              {reconnecting ? <LoaderCircleIcon className="animate-spin" /> : <RefreshCwIcon />}
+              {reconnecting ? "Reconnecting…" : "Reconnect"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDisconnect}>
+              <PowerIcon />
+              Disconnect
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex h-7 shrink-0 items-center justify-between border-t border-border/60 px-3 text-2xs text-muted-foreground">
+        <span>Session paused</span>
+        <span className="tabular">—</span>
+      </div>
+    </section>
   )
 }

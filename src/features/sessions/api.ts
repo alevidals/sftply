@@ -22,4 +22,12 @@ export const sessionsApi = {
   disconnect(sessionId: string): Promise<void> {
     return ipc.sessionDisconnect(sessionId)
   },
+
+  reconnect(sessionId: string): Promise<SessionInfo> {
+    return ipc.sessionReconnect(sessionId)
+  },
+
+  cancel(sessionId: string): Promise<boolean> {
+    return ipc.sessionCancel(sessionId)
+  },
 }

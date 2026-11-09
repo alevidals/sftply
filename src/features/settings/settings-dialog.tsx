@@ -32,6 +32,8 @@ const settingsSchema = z.object({
   showHiddenFiles: z.boolean(),
   confirmDelete: z.boolean(),
   transferConcurrency: z.number().int().min(1).max(8),
+  connectTimeoutSeconds: z.number().int().min(5).max(300),
+  operationTimeoutSeconds: z.number().int().min(5).max(600),
 })
 
 type SettingsFormValues = z.infer<typeof settingsSchema>
@@ -54,6 +56,8 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
     showHiddenFiles: settings.showHiddenFiles,
     confirmDelete: settings.confirmDelete,
     transferConcurrency: settings.transferConcurrency,
+    connectTimeoutSeconds: settings.connectTimeoutSeconds,
+    operationTimeoutSeconds: settings.operationTimeoutSeconds,
   }
 }
 
@@ -110,6 +114,9 @@ export function SettingsDialog() {
               </TabsTrigger>
               <TabsTrigger value="behavior" className="h-8 justify-start px-2.5 text-xs">
                 Behavior
+              </TabsTrigger>
+              <TabsTrigger value="connections" className="h-8 justify-start px-2.5 text-xs">
+                Connections
               </TabsTrigger>
               <TabsTrigger value="transfers" className="h-8 justify-start px-2.5 text-xs">
                 Transfers
@@ -251,6 +258,52 @@ export function SettingsDialog() {
                     </SettingRow>
                   )}
                 />
+              </TabsContent>
+
+              <TabsContent value="connections" forceMount className="space-y-4">
+                <Field data-invalid={Boolean(formState.errors.connectTimeoutSeconds)}>
+                  <FieldLabel htmlFor="connect-timeout">Connection timeout</FieldLabel>
+                  <FieldDescription>
+                    Seconds to wait while opening a connection. Values from 5 to 300.
+                  </FieldDescription>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="connect-timeout"
+                      type="number"
+                      min={5}
+                      max={300}
+                      className="w-24"
+                      aria-invalid={Boolean(formState.errors.connectTimeoutSeconds)}
+                      {...register("connectTimeoutSeconds", { valueAsNumber: true })}
+                    />
+                    <span className="text-xs text-muted-foreground">seconds</span>
+                  </div>
+                  <FieldError errors={[formState.errors.connectTimeoutSeconds]} />
+                </Field>
+                <Field data-invalid={Boolean(formState.errors.operationTimeoutSeconds)}>
+                  <FieldLabel htmlFor="operation-timeout">Operation timeout</FieldLabel>
+                  <FieldDescription>
+                    Seconds a single remote listing or file operation may run before it is
+                    cancelled. Values from 5 to 600.
+                  </FieldDescription>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="operation-timeout"
+                      type="number"
+                      min={5}
+                      max={600}
+                      className="w-24"
+                      aria-invalid={Boolean(formState.errors.operationTimeoutSeconds)}
+                      {...register("operationTimeoutSeconds", { valueAsNumber: true })}
+                    />
+                    <span className="text-xs text-muted-foreground">seconds</span>
+                  </div>
+                  <FieldError errors={[formState.errors.operationTimeoutSeconds]} />
+                </Field>
+                <p className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-2xs leading-relaxed text-muted-foreground">
+                  A cancelled or timed-out remote operation may leave the protocol stream out of
+                  sync. sftply asks you to reconnect rather than guessing the stream state.
+                </p>
               </TabsContent>
 
               <TabsContent value="transfers" forceMount className="space-y-4">

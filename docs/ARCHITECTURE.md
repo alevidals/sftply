@@ -370,7 +370,7 @@ The local implementation wraps `tokio::fs::File`. The FTP implementation wraps s
 
 ## 6. Session model
 
-Each open remote connection is a **session actor**:
+Each open remote connection behaves as a **session actor**:
 
 ```
 commands ──► SessionHandle (mpsc Sender)
@@ -382,6 +382,12 @@ commands ──► SessionHandle (mpsc Sender)
                   ├─ connection state machine
                   └─ transfer connector factory
 ```
+
+> **Implementation note:** the current code stores an `Arc<Session>` with a
+> `tokio::sync::Mutex<Box<dyn RemoteFs>>`, a `CancellationToken` for the
+> running operation, and the retained profile/credentials needed for
+> reconnect. It provides the same serialization and lifecycle contract as the
+> actor design above without a dedicated task per session.
 
 ### State machine
 
@@ -415,7 +421,7 @@ Known hosts are stored under the app config directory in an OpenSSH-compatible `
 
 - Saved connection profiles contain **no secrets**. Secrets are keyed as `connection/<uuid>/password`, `connection/<uuid>/key_passphrase`.
 - `CredentialService` resolves secrets only inside the Rust process when opening a session or transfer connection. It never exposes a `get_secret` command.
-- Quick Connect passes a transient auth input once; it is wrapped in `secrecy::SecretString` immediately and zeroized on drop. It is not persisted unless the user checks "Save in Keychain".
+- Quick Connect passes a transient auth input once; it is held in a zeroizing buffer (`zeroize`) and cleared on drop. It is not persisted unless the user checks "Save in Keychain".
 - Session actors hold resolved credentials only while needed for reconnects/transfer connections; transfer workers get a scoped credential handle, not a global copy.
 - If the OS keychain is unavailable (e.g. headless Linux), saving a password fails loudly with actionable guidance. There is no plaintext fallback.
 

@@ -31,6 +31,10 @@ pub struct AppSettings {
     pub confirm_delete: bool,
     pub transfer_concurrency: u8,
     pub bandwidth_limit_kbps: Option<u32>,
+    /// Maximum time to establish a connection, in seconds.
+    pub connect_timeout_seconds: u16,
+    /// Maximum time a single remote filesystem operation may run, in seconds.
+    pub operation_timeout_seconds: u16,
     pub sidebar_width: u16,
     pub bottom_panel_height: u16,
     pub bottom_panel_open: bool,
@@ -48,6 +52,8 @@ impl Default for AppSettings {
             confirm_delete: true,
             transfer_concurrency: 3,
             bandwidth_limit_kbps: None,
+            connect_timeout_seconds: 30,
+            operation_timeout_seconds: 45,
             sidebar_width: 248,
             bottom_panel_height: 200,
             bottom_panel_open: true,
@@ -71,6 +77,12 @@ impl AppSettings {
 
         if !(1..=8).contains(&self.transfer_concurrency) {
             return Err("Transfer concurrency must be between 1 and 8.".into());
+        }
+        if !(5..=300).contains(&self.connect_timeout_seconds) {
+            return Err("The connection timeout must be between 5 and 300 seconds.".into());
+        }
+        if !(5..=600).contains(&self.operation_timeout_seconds) {
+            return Err("The operation timeout must be between 5 and 600 seconds.".into());
         }
         if !(200..=420).contains(&self.sidebar_width) {
             return Err("Sidebar width is out of range.".into());
@@ -124,6 +136,21 @@ mod tests {
             ..AppSettings::default()
         };
         assert!(settings.normalized().is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_range_timeouts() {
+        let too_short = AppSettings {
+            connect_timeout_seconds: 4,
+            ..AppSettings::default()
+        };
+        assert!(too_short.normalized().is_err());
+
+        let too_long = AppSettings {
+            operation_timeout_seconds: 601,
+            ..AppSettings::default()
+        };
+        assert!(too_long.normalized().is_err());
     }
 
     #[test]
