@@ -5,6 +5,7 @@ use crate::error::AppError;
 
 pub mod ftp;
 pub mod sftp;
+pub mod tls;
 
 /// Unified remote filesystem boundary. Implementations report their real
 /// capabilities and must never emulate an operation the protocol cannot do.

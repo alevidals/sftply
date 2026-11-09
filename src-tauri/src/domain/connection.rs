@@ -25,6 +25,85 @@ impl ConnectionProtocol {
     }
 }
 
+/// How FTP opens its data channel. Passive works through most firewalls;
+/// active requires the server to connect back to this machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum FtpDataMode {
+    #[default]
+    Passive,
+    ExtendedPassive,
+    Active,
+}
+
+/// TLS verification settings for FTPS. These are not secrets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TlsOptions {
+    /// Absolute path to a PEM bundle used instead of the system trust store.
+    #[serde(default)]
+    pub ca_file: Option<String>,
+    /// Expected SHA-256 fingerprint of the server certificate. Accepts colon
+    /// separators and an optional `sha256:` prefix; stored as lowercase hex.
+    #[serde(default)]
+    pub certificate_pin: Option<String>,
+    /// Explicitly accept certificates that fail chain or hostname checks.
+    #[serde(default)]
+    pub allow_invalid_certificates: bool,
+}
+
+impl TlsOptions {
+    pub fn normalized(self) -> Result<Self, String> {
+        let ca_file = normalize_optional_path(self.ca_file, "CA file")?;
+        let certificate_pin = self
+            .certificate_pin
+            .and_then(|pin| {
+                let pin = pin.trim().to_string();
+                (!pin.is_empty()).then_some(pin)
+            })
+            .map(|pin| normalize_certificate_pin(&pin))
+            .transpose()?;
+        Ok(Self {
+            ca_file,
+            certificate_pin,
+            allow_invalid_certificates: self.allow_invalid_certificates,
+        })
+    }
+}
+
+/// Validate and canonicalize a SHA-256 certificate fingerprint.
+pub fn normalize_certificate_pin(pin: &str) -> Result<String, String> {
+    let trimmed = pin.trim();
+    let body = match trimmed.get(..7) {
+        Some(prefix) if prefix.eq_ignore_ascii_case("sha256:") => &trimmed[7..],
+        _ => trimmed,
+    };
+    let hex: String = body
+        .chars()
+        .filter(|character| *character != ':' && !character.is_whitespace())
+        .collect();
+    if hex.len() != 64 || !hex.chars().all(|character| character.is_ascii_hexdigit()) {
+        return Err(
+            "The certificate pin must be a SHA-256 fingerprint (64 hex characters).".into(),
+        );
+    }
+    Ok(hex.to_ascii_lowercase())
+}
+
+fn normalize_optional_path(value: Option<String>, label: &str) -> Result<Option<String>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    if value.contains('\0') || !Path::new(&value).is_absolute() {
+        return Err(format!("The {label} path must be absolute."));
+    }
+    Ok(Some(value))
+}
+
 /// How a connection authenticates. Secrets are never part of this model; they
 /// live in the OS keychain and are referenced by connection id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -57,6 +136,12 @@ pub struct ConnectionProfile {
     pub initial_path: String,
     pub favorite: bool,
     pub group: Option<String>,
+    /// TLS settings for FTPS; ignored by plain FTP and SFTP.
+    #[serde(default)]
+    pub tls: TlsOptions,
+    /// Data-channel policy for FTP/FTPS; ignored by SFTP.
+    #[serde(default)]
+    pub ftp_data_mode: FtpDataMode,
     /// Unix epoch milliseconds, UTC.
     #[specta(type = specta_typescript::Number)]
     pub created_at: f64,
@@ -77,6 +162,10 @@ pub struct ConnectionInput {
     pub initial_path: String,
     pub favorite: bool,
     pub group: Option<String>,
+    #[serde(default)]
+    pub tls: TlsOptions,
+    #[serde(default)]
+    pub ftp_data_mode: FtpDataMode,
 }
 
 impl ConnectionProfile {
@@ -92,6 +181,8 @@ impl ConnectionProfile {
             initial_path: input.initial_path,
             favorite: input.favorite,
             group: input.group,
+            tls: input.tls,
+            ftp_data_mode: input.ftp_data_mode,
             created_at: now,
             last_used_at: None,
         }
@@ -109,6 +200,8 @@ impl ConnectionProfile {
             initial_path: self.initial_path,
             favorite: self.favorite,
             group: self.group,
+            tls: self.tls,
+            ftp_data_mode: self.ftp_data_mode,
         }
         .normalized()?;
 
@@ -122,6 +215,8 @@ impl ConnectionProfile {
             initial_path: input.initial_path,
             favorite: input.favorite,
             group: input.group,
+            tls: input.tls,
+            ftp_data_mode: input.ftp_data_mode,
             ..self
         })
     }
@@ -210,6 +305,8 @@ impl ConnectionInput {
             return Err("The group name contains invalid characters.".into());
         }
 
+        let tls = self.tls.normalized()?;
+
         Ok(Self {
             name,
             protocol: self.protocol,
@@ -220,6 +317,8 @@ impl ConnectionInput {
             initial_path,
             favorite: self.favorite,
             group,
+            tls,
+            ftp_data_mode: self.ftp_data_mode,
         })
     }
 }
@@ -243,6 +342,8 @@ mod tests {
             initial_path: "".into(),
             favorite: false,
             group: Some("  Work  ".into()),
+            tls: TlsOptions::default(),
+            ftp_data_mode: FtpDataMode::Passive,
         }
     }
 
@@ -302,6 +403,35 @@ mod tests {
         assert_eq!(ConnectionProtocol::FtpsExplicit.default_port(), 21);
         assert_eq!(ConnectionProtocol::FtpsImplicit.default_port(), 990);
         assert_eq!(ConnectionProtocol::Sftp.default_port(), 22);
+    }
+
+    #[test]
+    fn normalizes_tls_options_and_pins() {
+        let mut with_tls = input();
+        with_tls.protocol = ConnectionProtocol::FtpsExplicit;
+        with_tls.tls = TlsOptions {
+            ca_file: Some("  /etc/ssl/private/ca.pem  ".into()),
+            certificate_pin: Some("SHA256:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99".into()),
+            allow_invalid_certificates: true,
+        };
+        let normalized = with_tls.normalized().unwrap();
+        assert_eq!(
+            normalized.tls.ca_file.as_deref(),
+            Some("/etc/ssl/private/ca.pem")
+        );
+        assert_eq!(
+            normalized.tls.certificate_pin.as_deref(),
+            Some("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+        );
+        assert!(normalized.tls.allow_invalid_certificates);
+
+        let mut bad_path = input();
+        bad_path.tls.ca_file = Some("relative/ca.pem".into());
+        assert!(bad_path.normalized().is_err());
+
+        let mut bad_pin = input();
+        bad_pin.tls.certificate_pin = Some("not-a-fingerprint".into());
+        assert!(bad_pin.normalized().is_err());
     }
 
     #[test]

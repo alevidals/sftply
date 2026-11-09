@@ -28,6 +28,14 @@ export function protocolIsSecure(protocol: ConnectionProtocol): boolean {
   return protocol !== "ftp"
 }
 
+export function protocolIsFtps(protocol: ConnectionProtocol): boolean {
+  return protocol === "ftpsExplicit" || protocol === "ftpsImplicit"
+}
+
+export function protocolUsesDataMode(protocol: ConnectionProtocol): boolean {
+  return protocol !== "sftp"
+}
+
 const nameSchema = z
   .string()
   .trim()
@@ -59,6 +67,32 @@ const usernameSchema = z
   .max(128, "The username is too long.")
 
 const authKindSchema = z.enum(["password", "key"])
+
+const ftpDataModeSchema = z.enum(["passive", "extendedPassive", "active"])
+
+const absolutePathSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value),
+    "Enter an absolute path.",
+  )
+
+const certificatePinSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || normalizeCertificatePin(value) !== null,
+    "Enter a SHA-256 fingerprint (64 hex characters).",
+  )
+
+/** Canonical lowercase hex fingerprint, or null when the value is invalid. */
+export function normalizeCertificatePin(value: string): string | null {
+  const trimmed = value.trim()
+  const body = trimmed.slice(0, 7).toLowerCase() === "sha256:" ? trimmed.slice(7) : trimmed
+  const hex = body.replace(/[:\s]/g, "")
+  return /^[0-9a-fA-F]{64}$/.test(hex) ? hex.toLowerCase() : null
+}
 
 interface SharedFields {
   protocol: ConnectionProtocol
@@ -107,6 +141,10 @@ export const connectionSchema = z
     favorite: z.boolean(),
     group: z.string().max(64, "The group name is too long."),
     secret: z.string(),
+    tlsCaFile: absolutePathSchema,
+    tlsCertificatePin: certificatePinSchema,
+    tlsAllowInvalid: z.boolean(),
+    ftpDataMode: ftpDataModeSchema,
   })
   .superRefine(refineSharedFields)
 
@@ -126,6 +164,10 @@ export const quickConnectSchema = z
     group: z.string().max(64, "The group name is too long."),
     secret: z.string(),
     save: z.boolean(),
+    tlsCaFile: absolutePathSchema,
+    tlsCertificatePin: certificatePinSchema,
+    tlsAllowInvalid: z.boolean(),
+    ftpDataMode: ftpDataModeSchema,
   })
   .superRefine((values, ctx) => {
     refineSharedFields(values, ctx)
@@ -168,6 +210,10 @@ export function emptyConnectionValues(): ConnectionFormValues {
     favorite: false,
     group: "",
     secret: "",
+    tlsCaFile: "",
+    tlsCertificatePin: "",
+    tlsAllowInvalid: false,
+    ftpDataMode: "passive",
   }
 }
 
@@ -185,6 +231,10 @@ export function emptyQuickConnectValues(): QuickConnectValues {
     group: "",
     secret: "",
     save: false,
+    tlsCaFile: "",
+    tlsCertificatePin: "",
+    tlsAllowInvalid: false,
+    ftpDataMode: "passive",
   }
 }
 
@@ -202,6 +252,10 @@ export function valuesFromProfile(profile: ConnectionProfile_Serialize): Connect
     favorite: profile.favorite,
     group: profile.group ?? "",
     secret: "",
+    tlsCaFile: profile.tls.caFile ?? "",
+    tlsCertificatePin: profile.tls.certificatePin ?? "",
+    tlsAllowInvalid: profile.tls.allowInvalidCertificates,
+    ftpDataMode: profile.ftpDataMode,
   }
 }
 
@@ -223,6 +277,12 @@ export function toConnectionInput(values: ConnectionFormValues): ConnectionInput
     initialPath: values.initialPath.trim() || "/",
     favorite: values.favorite,
     group: values.group.trim() || null,
+    tls: {
+      caFile: values.tlsCaFile.trim() || null,
+      certificatePin: values.tlsCertificatePin.trim() || null,
+      allowInvalidCertificates: values.tlsAllowInvalid,
+    },
+    ftpDataMode: values.ftpDataMode,
   }
 }
 
@@ -244,6 +304,12 @@ export function toQuickConnectInput(values: QuickConnectValues): ConnectionInput
     initialPath: values.initialPath.trim() || "/",
     favorite: false,
     group: values.group.trim() || null,
+    tls: {
+      caFile: values.tlsCaFile.trim() || null,
+      certificatePin: values.tlsCertificatePin.trim() || null,
+      allowInvalidCertificates: values.tlsAllowInvalid,
+    },
+    ftpDataMode: values.ftpDataMode,
   }
 }
 

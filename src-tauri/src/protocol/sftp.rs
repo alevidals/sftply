@@ -596,6 +596,8 @@ mod integration {
                 initial_path: WRITABLE.into(),
                 favorite: false,
                 group: None,
+                tls: crate::domain::connection::TlsOptions::default(),
+                ftp_data_mode: crate::domain::connection::FtpDataMode::Passive,
             },
             0.0,
         )

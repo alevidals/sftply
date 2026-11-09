@@ -308,7 +308,7 @@ fn backup_path(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::connection::{ConnectionAuth, ConnectionProtocol};
+    use crate::domain::connection::{ConnectionAuth, ConnectionProtocol, FtpDataMode, TlsOptions};
 
     fn input(name: &str) -> ConnectionInput {
         ConnectionInput {
@@ -321,6 +321,8 @@ mod tests {
             initial_path: "/".into(),
             favorite: false,
             group: None,
+            tls: TlsOptions::default(),
+            ftp_data_mode: FtpDataMode::Passive,
         }
     }
 
@@ -415,6 +417,8 @@ mod tests {
                 initial_path: "/".into(),
                 favorite: false,
                 group: None,
+                tls: TlsOptions::default(),
+                ftp_data_mode: FtpDataMode::Passive,
                 created_at: 0.0,
                 last_used_at: None,
             }],

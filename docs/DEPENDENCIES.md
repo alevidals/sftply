@@ -102,6 +102,8 @@ No maintained crate unifies FTP/FTPS/SFTP behind one accurate async capability m
 | `globset`                   | 0.4.21      | Filter/ignore patterns         | MIT/Unlicense  | Used by later sync/compare                                                               |
 | `base64`                    | 0.23.1      | Key/hash encoding              | MIT/Apache-2.0 | Only where needed                                                                        |
 | `rustls-platform-verifier`  | 0.7.1       | OS trust store for FTPS        | MIT/Apache-2.0 | Preferred over a baked root store; verify suppaftp connector integration                 |
+| `rustls-pemfile`            | 2.2.0       | Parse custom CA bundles        | MIT/Apache-2.0 | Loads user-provided PEM roots for FTPS                                                   |
+| `sha2`                      | 0.10.9      | Certificate pin fingerprints   | MIT/Apache-2.0 | SHA-256 of the server certificate; no secret material                                    |
 | `tauri-plugin-dialog`       | 2.8.4       | Native file/folder pickers     | MIT/Apache-2.0 | Key file, CA file, export path only                                                      |
 | `tauri-plugin-opener`       | 2.7.2       | Reveal/open local files        | MIT/Apache-2.0 | Already in template; scoped to local paths                                               |
 | `tauri-plugin-window-state` | 2.5.0       | Window geometry persistence    | MIT/Apache-2.0 | Small, stable                                                                            |
@@ -110,7 +112,7 @@ No maintained crate unifies FTP/FTPS/SFTP behind one accurate async capability m
 | `specta-typescript`         | 0.0.13      | TypeScript exporter            | MIT/Apache-2.0 | Paired with the specta v2 RC; generates `src/lib/ipc/bindings.ts`                        |
 | `chrono`                    | 0.4.45      | FTP date parsing               | MIT/Apache-2.0 | Transitive via suppaftp; use only at protocol boundary                                   |
 
-**Dev dependencies:** `tempfile 3.27.0`, `rustls-pemfile 2.2.0` (integration-suite CA trust), `insta 1.49.0`, `proptest 1.12.0`, `tokio-test`, `serial_test` (only where server fixtures require isolation). Tooling: `cargo-nextest`, `cargo-deny`, `cargo-audit`, `rustfmt`, `clippy`.
+**Dev dependencies:** `tempfile 3.27.0`, `insta 1.49.0`, `proptest 1.12.0`, `tokio-test`, `serial_test` (only where server fixtures require isolation). Tooling: `cargo-nextest`, `cargo-deny`, `cargo-audit`, `rustfmt`, `clippy`.
 
 ### Rejected or deferred Rust dependencies
 

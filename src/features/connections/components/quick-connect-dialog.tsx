@@ -26,6 +26,8 @@ import {
   defaultPort,
   emptyQuickConnectValues,
   PROTOCOL_LABELS,
+  protocolIsFtps,
+  protocolUsesDataMode,
   type QuickConnectValues,
   quickConnectSchema,
   toQuickConnectInput,
@@ -52,6 +54,7 @@ export function QuickConnectDialog() {
   const authKind = form.watch("authKind")
   const protocol = form.watch("protocol")
   const save = form.watch("save")
+  const tlsAllowInvalid = form.watch("tlsAllowInvalid")
 
   useEffect(() => {
     if (!open) return
@@ -83,6 +86,17 @@ export function QuickConnectDialog() {
     }
   }
 
+  const pickCaFile = async () => {
+    const selected = await openFileDialog({
+      multiple: false,
+      directory: false,
+      title: "Choose a CA certificate bundle",
+    })
+    if (typeof selected === "string") {
+      form.setValue("tlsCaFile", selected, { shouldValidate: true })
+    }
+  }
+
   const submit = form.handleSubmit(async (values) => {
     setConnecting(true)
     setError(null)
@@ -103,7 +117,7 @@ export function QuickConnectDialog() {
   return (
     <Dialog open={open} onOpenChange={(next) => !connecting && setOpen(next)}>
       <DialogContent className="sm:max-w-lg">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ZapIcon className="size-4 text-primary" />
@@ -285,6 +299,90 @@ export function QuickConnectDialog() {
               />
               <FieldMessage message={form.formState.errors.initialPath?.message} />
             </div>
+
+            {protocolUsesDataMode(protocol) ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="quick-connect-data-mode">Data channel</Label>
+                <Controller
+                  control={form.control}
+                  name="ftpDataMode"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="quick-connect-data-mode" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="passive">Passive (PASV)</SelectItem>
+                        <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
+                        <SelectItem value="active">Active (PORT)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            ) : null}
+
+            {protocolIsFtps(protocol) ? (
+              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-ca-file">Custom CA file (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="quick-connect-ca-file"
+                      {...form.register("tlsCaFile")}
+                      aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
+                      placeholder="/etc/ssl/certs/private-ca.pem"
+                      spellCheck={false}
+                      className="font-mono text-xs"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
+                      <FolderOpenIcon />
+                      Choose…
+                    </Button>
+                  </div>
+                  <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-pin">Certificate pin (optional)</Label>
+                  <Input
+                    id="quick-connect-pin"
+                    {...form.register("tlsCertificatePin")}
+                    aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
+                    placeholder="SHA-256 fingerprint"
+                    spellCheck={false}
+                    className="font-mono text-xs"
+                  />
+                  <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="quick-connect-invalid">Allow invalid certificates</Label>
+                    <p className="text-2xs text-muted-foreground">
+                      Only use this on a trusted network.
+                    </p>
+                  </div>
+                  <Controller
+                    control={form.control}
+                    name="tlsAllowInvalid"
+                    render={({ field }) => (
+                      <Switch
+                        id="quick-connect-invalid"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+
+                {tlsAllowInvalid ? (
+                  <p className="text-2xs font-medium text-destructive" role="alert">
+                    TLS certificate verification is disabled for this connection.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
               <div className="space-y-0.5">

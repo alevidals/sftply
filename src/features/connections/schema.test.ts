@@ -4,6 +4,7 @@ import {
   defaultPort,
   emptyConnectionValues,
   emptyQuickConnectValues,
+  normalizeCertificatePin,
   quickConnectSchema,
   secretKindFor,
   toConnectionInput,
@@ -33,6 +34,12 @@ function profile(
     initialPath: "/",
     favorite: false,
     group: null,
+    tls: {
+      caFile: null,
+      certificatePin: null,
+      allowInvalidCertificates: false,
+    },
+    ftpDataMode: "passive",
     createdAt: 0,
     lastUsedAt: null,
     ...overrides,
@@ -151,5 +158,36 @@ describe("form conversion", () => {
     expect(defaultPort("ftpsExplicit")).toBe(21)
     expect(defaultPort("ftpsImplicit")).toBe(990)
     expect(defaultPort("sftp")).toBe(22)
+  })
+
+  it("normalizes certificate pins and rejects malformed ones", () => {
+    expect(
+      normalizeCertificatePin(
+        "SHA256:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+      ),
+    ).toBe("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+    expect(normalizeCertificatePin("not-a-pin")).toBeNull()
+    expect(normalizeCertificatePin("00".repeat(31))).toBeNull()
+  })
+
+  it("maps TLS and FTP data-mode fields", () => {
+    const input = toConnectionInput({
+      ...valid,
+      protocol: "ftpsExplicit",
+      tlsCaFile: " /etc/ssl/private/ca.pem ",
+      tlsCertificatePin: "00".repeat(32),
+      tlsAllowInvalid: true,
+      ftpDataMode: "active",
+    })
+    expect(input.tls).toEqual({
+      caFile: "/etc/ssl/private/ca.pem",
+      certificatePin: "00".repeat(32),
+      allowInvalidCertificates: true,
+    })
+    expect(input.ftpDataMode).toBe("active")
+  })
+
+  it("rejects relative CA paths", () => {
+    expect(connectionSchema.safeParse({ ...valid, tlsCaFile: "certs/ca.pem" }).success).toBe(false)
   })
 })

@@ -36,6 +36,8 @@ import {
   defaultPort,
   emptyConnectionValues,
   PROTOCOL_LABELS,
+  protocolIsFtps,
+  protocolUsesDataMode,
   secretKindFor,
   toConnectionInput,
   valuesFromProfile,
@@ -61,6 +63,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   const secretStatus = useSecretStatus(connection?.id ?? null, open)
   const authKind = form.watch("authKind")
   const protocol = form.watch("protocol")
+  const tlsAllowInvalid = form.watch("tlsAllowInvalid")
 
   useEffect(() => {
     if (!open) return
@@ -92,6 +95,17 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
     })
     if (typeof selected === "string") {
       form.setValue("keyPath", selected, { shouldValidate: true })
+    }
+  }
+
+  const pickCaFile = async () => {
+    const selected = await openFileDialog({
+      multiple: false,
+      directory: false,
+      title: "Choose a CA certificate bundle",
+    })
+    if (typeof selected === "string") {
+      form.setValue("tlsCaFile", selected, { shouldValidate: true })
     }
   }
 
@@ -139,7 +153,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   return (
     <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
       <DialogContent className="sm:max-w-lg">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ServerIcon className="size-4 text-primary" />
@@ -353,6 +367,105 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                 <FieldMessage message={form.formState.errors.group?.message} />
               </div>
             </div>
+
+            {protocolUsesDataMode(protocol) ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="connection-data-mode">Data channel</Label>
+                <Controller
+                  control={form.control}
+                  name="ftpDataMode"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="connection-data-mode" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="passive">Passive (PASV)</SelectItem>
+                        <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
+                        <SelectItem value="active">Active (PORT)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-2xs text-muted-foreground">
+                  Passive works through most firewalls. Active requires the server to reach this
+                  machine.
+                </p>
+              </div>
+            ) : null}
+
+            {protocolIsFtps(protocol) ? (
+              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium text-foreground">TLS verification</p>
+                  <p className="text-2xs text-muted-foreground">
+                    The system trust store is used unless you choose a CA or pin a certificate.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-ca-file">Custom CA file (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="connection-ca-file"
+                      {...form.register("tlsCaFile")}
+                      aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
+                      placeholder="/etc/ssl/certs/private-ca.pem"
+                      spellCheck={false}
+                      className="font-mono text-xs"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
+                      <FolderOpenIcon />
+                      Choose…
+                    </Button>
+                  </div>
+                  <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-pin">Certificate pin (optional)</Label>
+                  <Input
+                    id="connection-pin"
+                    {...form.register("tlsCertificatePin")}
+                    aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
+                    placeholder="SHA-256 fingerprint"
+                    spellCheck={false}
+                    className="font-mono text-xs"
+                  />
+                  <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
+                  <p className="text-2xs text-muted-foreground">
+                    Pinning rejects any server certificate whose SHA-256 fingerprint differs.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="connection-allow-invalid">Allow invalid certificates</Label>
+                    <p className="text-2xs text-muted-foreground">
+                      Accepts self-signed or expired certificates. Only use this on a trusted
+                      network.
+                    </p>
+                  </div>
+                  <Controller
+                    control={form.control}
+                    name="tlsAllowInvalid"
+                    render={({ field }) => (
+                      <Switch
+                        id="connection-allow-invalid"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+
+                {tlsAllowInvalid ? (
+                  <p className="text-2xs font-medium text-destructive" role="alert">
+                    TLS certificate verification is disabled for this connection.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
               <div className="space-y-0.5">

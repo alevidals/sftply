@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-08  
-**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect and a real-server Docker integration suite are implemented. Remaining: TLS verification options, reconnect/cancellation, and visual QA.  
-**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers. Rendered component tests and real-window visual QA remain pending.
+**Last updated:** 2026-11-09  
+**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect, TLS verification options, FTP data-channel policy and a real-server Docker integration suite are implemented. Remaining: reconnect/cancellation/timeouts and visual QA.  
+**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA and certificate pinning. Rendered component tests and real-window visual QA remain pending.
 
 ---
 
@@ -472,3 +472,37 @@ cargo test
 - Add TLS options (custom CA, pinning, explicit insecure toggle with warning) and an FTP active/passive policy.
 - Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
 - Run real-window visual QA for local and remote panes; add rendered component tests for the connection row, tabs, host-key dialog and quick connect.
+
+### 2026-11-09 — Session 8: TLS options and FTP data-channel policy
+
+**Done**
+
+- Extended the connection model with `TlsOptions` and `FtpDataMode`. Both are optional on disk via `serde(default)`, so existing `connections.json` files keep loading.
+- FTPS TLS policy:
+  - System trust store by default.
+  - Custom CA PEM bundle replaces the trust store.
+  - Optional SHA-256 certificate pin, accepted with colons or a `sha256:` prefix and stored as canonical lowercase hex.
+  - Explicit "allow invalid certificates" switch. It skips chain/hostname checks but still verifies the handshake signature and any configured pin, and the UI shows a persistent warning.
+- Added `protocol/tls.rs` with the production rustls connector, a pin-enforcing verifier wrapper, and an explicit no-chain-verification verifier for the insecure toggle.
+- FTP data-channel policy: passive (PASV), extended passive (EPSV), or active (PORT), applied to the suppaftp client after login. The connection form and Quick Connect expose it for FTP/FTPS only.
+- Connection and Quick Connect forms now include TLS fields for FTPS and the data-channel selector for FTP/FTPS. Both dialogs scroll within the viewport.
+- Added frontend validation for absolute CA paths and SHA-256 pin format, plus unit tests for pin canonicalization and TLS/FTP input mapping.
+- Extended the Docker integration suite with custom-CA verification and certificate-pin enforcement tests.
+
+**Verified**
+
+- `tests/integration/run.sh` → 8 integration tests passed, including `custom_ca_verifies_explicit_ftps` and `certificate_pin_is_enforced`.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (56 passed, 8 ignored).
+- `bun run check` (Biome, 65 Vitest tests, strict TypeScript, production build) and `bun run bindings`.
+
+**Notes**
+
+- The insecure toggle is intentionally opt-in per connection and never a global default.
+- Active FTP depends on the server being able to reach the client's listener; it is offered for compatibility but passive remains the default.
+- Certificate pins are metadata, not secrets, and are stored in `connections.json`.
+
+**Next**
+
+- Add reconnect, cancellation, and per-session operation timeouts surfaced in the UI.
+- Run real-window visual QA for local and remote panes, including the new TLS and data-channel sections.
+- Add rendered component tests for the connection row, tabs, host-key dialog and Quick Connect.

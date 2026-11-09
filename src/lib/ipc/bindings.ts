@@ -174,6 +174,8 @@ export type ConnectionInput_Deserialize = {
 	initialPath: string,
 	favorite: boolean,
 	group?: string | null,
+	tls?: TlsOptions_Deserialize,
+	ftpDataMode?: FtpDataMode,
 };
 
 /**  Fields the frontend may submit when creating or updating a connection. */
@@ -187,6 +189,8 @@ export type ConnectionInput_Serialize = {
 	initialPath: string,
 	favorite: boolean,
 	group: string | null,
+	tls: TlsOptions_Serialize,
+	ftpDataMode: FtpDataMode,
 };
 
 /**  Non-secret connection metadata persisted in `connections.json`. */
@@ -204,6 +208,10 @@ export type ConnectionProfile_Deserialize = {
 	initialPath: string,
 	favorite: boolean,
 	group?: string | null,
+	/**  TLS settings for FTPS; ignored by plain FTP and SFTP. */
+	tls?: TlsOptions_Deserialize,
+	/**  Data-channel policy for FTP/FTPS; ignored by SFTP. */
+	ftpDataMode?: FtpDataMode,
 	/**  Unix epoch milliseconds, UTC. */
 	createdAt: number,
 	lastUsedAt?: number | null,
@@ -221,6 +229,10 @@ export type ConnectionProfile_Serialize = {
 	initialPath: string,
 	favorite: boolean,
 	group: string | null,
+	/**  TLS settings for FTPS; ignored by plain FTP and SFTP. */
+	tls: TlsOptions_Serialize,
+	/**  Data-channel policy for FTP/FTPS; ignored by SFTP. */
+	ftpDataMode: FtpDataMode,
 	/**  Unix epoch milliseconds, UTC. */
 	createdAt: number,
 	lastUsedAt: number | null,
@@ -307,6 +319,12 @@ export type FsEntry_Serialize = {
  *  scope and never accepts caller-supplied protocol or credential data.
  */
 export type FsScope = { kind: "local" } | { kind: "remote"; sessionId: string };
+
+/**
+ *  How FTP opens its data channel. Passive works through most firewalls;
+ *  active requires the server to connect back to this machine.
+ */
+export type FtpDataMode = "passive" | "extendedPassive" | "active";
 
 /**
  *  Machine-readable host-key challenge attached to a failed connection so the
@@ -445,6 +463,35 @@ export type StartupReport = {
 };
 
 export type ThemeMode = "system" | "dark" | "light";
+
+/**  TLS verification settings for FTPS. These are not secrets. */
+export type TlsOptions = TlsOptions_Serialize | TlsOptions_Deserialize;
+
+/**  TLS verification settings for FTPS. These are not secrets. */
+export type TlsOptions_Deserialize = {
+	/**  Absolute path to a PEM bundle used instead of the system trust store. */
+	caFile?: string | null,
+	/**
+	 *  Expected SHA-256 fingerprint of the server certificate. Accepts colon
+	 *  separators and an optional `sha256:` prefix; stored as lowercase hex.
+	 */
+	certificatePin?: string | null,
+	/**  Explicitly accept certificates that fail chain or hostname checks. */
+	allowInvalidCertificates?: boolean,
+};
+
+/**  TLS verification settings for FTPS. These are not secrets. */
+export type TlsOptions_Serialize = {
+	/**  Absolute path to a PEM bundle used instead of the system trust store. */
+	caFile: string | null,
+	/**
+	 *  Expected SHA-256 fingerprint of the server certificate. Accepts colon
+	 *  separators and an optional `sha256:` prefix; stored as lowercase hex.
+	 */
+	certificatePin: string | null,
+	/**  Explicitly accept certificates that fail chain or hostname checks. */
+	allowInvalidCertificates: boolean,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
