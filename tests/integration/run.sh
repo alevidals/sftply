@@ -17,7 +17,10 @@ fi
 
 cleanup() {
   if [[ "$KEEP" -eq 0 ]]; then
-    "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+    # Remove containers, volumes, networks and every image used by this
+    # compose project (built and pulled), so a test run leaves no Docker
+    # state behind.
+    "${COMPOSE[@]}" down --volumes --remove-orphans --rmi all >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT

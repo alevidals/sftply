@@ -34,7 +34,10 @@ tests/integration/run.sh
 
 The script generates a throwaway CA and server certificate in `certs/`
 (gitignored), starts the stack, waits for each service, runs
-`cargo test --lib -- --ignored`, and tears everything down.
+`cargo test --lib -- --ignored`, and tears everything down. The default
+teardown also removes the containers, volumes, networks and images used by the
+stack, including the pulled `atmoz/sftp` image, so a run leaves no Docker
+state behind.
 
 Use `tests/integration/run.sh --keep` to leave the containers running, for
 example while iterating on a single test:
