@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-09  
+**Last updated:** 2026-11-10  
 **Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect, TLS verification options, FTP data-channel policy, reconnect/cancellation/timeouts and a real-server Docker integration suite are implemented. Remaining: visual QA and rendered component tests.
-**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA and certificate pinning. Rendered component tests and real-window visual QA remain pending.
+**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA and certificate pinning. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane; real-window visual QA remains pending.
 
 ---
 
@@ -63,7 +63,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - Runtime FTPS/SFTP/keyring spikes still need local test servers (Docker or local daemons). Compile-time validation proceeds without them; protocol crates and their features are not yet added to `Cargo.toml`.
 - The `suppaftp`/implicit-FTPS and `russh` + `russh-sftp` version pairings remain unproven at runtime; if they fail, the dependency ADRs must be updated before Phase 3.
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
-- The production JS bundle is a single chunk slightly above Vite's 500 kB warning threshold (≈781 kB raw / 238 kB gzip). Code splitting belongs in the Phase 5 performance pass unless it starts blocking work.
+- The production JS bundle is a single chunk above Vite's 500 kB warning threshold (≈860 kB raw / 257 kB gzip). Code splitting belongs in the Phase 5 performance pass unless it starts blocking work.
 - Biome's `useSemanticElements` / `useFocusableInteractive` are disabled for the virtualized file table and column header only. They are an ARIA grid with a single roving tab stop, not semantic `<table>` markup; keyboard access is handled on the grid container.
 
 ---
@@ -162,6 +162,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [ ] Sidebar connection status indicators
 - [ ] Security tests: no secrets in config/logs/export; traversal rejected
 - [ ] Docker integration suite (FTP/FTPS/SFTP)
+- [x] Rendered component tests for the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane
 
 ### Phase 3 exit criteria
 
@@ -541,4 +542,31 @@ cargo test
 
 - Run real-window visual QA for local/remote panes, the lost-session state, and the new Connections settings tab.
 - Add rendered component tests for the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane.
+- Add a CI workflow that runs the non-Docker gates on every push.
+
+### 2026-11-10 — Session 10: rendered component tests
+
+**Done**
+
+- Added rendered tests for `RemotePane`: lost-session state with Reconnect/Disconnect, tab switching with remembered folders, and cancelling the active listing.
+- Added rendered tests for `HostKeyDialog`: trusting an unknown key and retrying a transient connection, falling back to reconnecting a saved profile, warning on a changed key with the previous fingerprint, and clearing the challenge on cancel.
+- Added rendered tests for `QuickConnectDialog`: connecting without saving, requiring a name before saving, revealing FTPS TLS and data-channel options, and keeping the dialog open when the connection fails.
+- Added jsdom stubs for `ResizeObserver`, `scrollIntoView` and pointer capture so Radix select/tooltip primitives can render in tests.
+- Made `tests/integration/generate-certs.sh` regenerate the throwaway CA and server certificate when the existing certificate expires within an hour, instead of only when the PEM file is missing. The two-day test certificate had silently expired, failing every FTPS integration test.
+
+**Verified**
+
+- `bun run check` (Biome, 86 Vitest tests, strict TypeScript, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (61 passed, 8 ignored).
+- `tests/integration/run.sh` → 8 integration tests passed after regenerating the expired certificate.
+
+**Notes**
+
+- The rendered tests mock session actions and the IPC client; they exercise dialog state, validation and callbacks, not real networking.
+- The integration certificate still has a two-day lifetime by design; the script now renews it automatically before each suite run.
+
+**Next**
+
+- Run real-window visual QA for local/remote panes, the lost-session state, and the Connections settings tab.
+- Add rendered component tests for keyboard table navigation and the rename/delete dialogs (Phase 2).
 - Add a CI workflow that runs the non-Docker gates on every push.
