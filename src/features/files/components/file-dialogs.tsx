@@ -195,7 +195,16 @@ export function DeleteDialog({ open, entries, onOpenChange, onConfirm }: DeleteD
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={busy} onClick={confirm}>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={busy}
+            onClick={(event) => {
+              // Radix closes the dialog on click by default; keep it open until
+              // the backend confirms, so failures stay visible.
+              event.preventDefault()
+              void confirm()
+            }}
+          >
             {busy ? "Deleting…" : "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>
