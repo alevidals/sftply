@@ -54,7 +54,7 @@ These were recommended in the architecture package. Implementation proceeds with
 ### In progress
 
 - [ ] Phase 1 + 2 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity, local browser interactions)
-- [ ] Rendered component tests for keyboard table navigation and rename/delete dialog flows
+- [x] Rendered component tests for keyboard table navigation and rename/delete dialog flows
 - [ ] First CI run on a remote (workflow definition exists)
 
 ### Known issues / blockers
@@ -134,7 +134,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Loading/empty/error/permission-denied states
 - [x] 10k-entry performance check (Rust listing + frontend sort/filter smoke test)
 - [x] Tests: selection/sort/path/name models and backend list/stat/mutations/traversal/symlink/chmod/error mapping
-- [ ] Rendered component tests for the keyboard table and rename/delete dialogs
+- [x] Rendered component tests for the keyboard table and rename/delete dialogs
 - [ ] Visual runtime QA of the local browser in the Tauri window
 
 ### Phase 2 exit criteria
@@ -143,7 +143,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - 10k entries meet performance budget — listing took **71.9 ms** locally (5 s test ceiling).
 - No mock listings in production paths — local commands call the real filesystem; remote scopes return `UNSUPPORTED`.
 
-**Status:** Backend and frontend implementation complete, automated gates green. Runtime visual QA and rendered interaction tests remain.
+**Status:** Backend and frontend implementation complete, automated gates green, including rendered keyboard and dialog tests. Runtime visual QA remains.
 
 ---
 
@@ -570,4 +570,30 @@ cargo test
 
 - Run real-window visual QA for local/remote panes, the lost-session state, and the Connections settings tab.
 - Add rendered component tests for keyboard table navigation and the rename/delete dialogs (Phase 2).
+- Push the repository to a remote and confirm the first CI run is green.
+
+### 2026-11-10 — Session 11: local table and dialog rendered tests
+
+**Done**
+
+- Added rendered keyboard tests for `FileTable`: arrow/Home/End movement with shift extension, `⌘A`, `⌘⌫`, `⌘↑`, Backspace-to-parent, Enter, F2, Delete, Escape, Space toggling, type-ahead, click selection and double-click open.
+- Added inline rename tests: submitting a changed name, cancelling an unchanged name, Escape handling, and rejecting names with path separators.
+- Added rendered tests for `NewFolderDialog`, `DeleteDialog` and `PermissionsDialog`, covering validation, backend failures, recursive folder deletion and octal mode parsing.
+- Fixed `DeleteDialog`: Radix's `AlertDialogAction` closes on click by default, so a failed delete used to dismiss the dialog and hide the error. The action now prevents the default close and waits for `onConfirm` to succeed.
+- Mocked TanStack Virtual in the table test so rows render without layout measurements.
+
+**Verified**
+
+- `bun run check` (Biome, 101 Vitest tests, strict TypeScript, production build).
+- No Rust changes in this session; the previous `cargo fmt`, clippy and test run remains valid.
+
+**Notes**
+
+- The rendered table test mocks the virtualizer rather than measuring layout; virtualization math is already covered by the model and 10k-entry performance checks.
+- The DeleteDialog regression test asserts that a backend error leaves the dialog open, which is what caught the default-close behaviour.
+
+**Next**
+
+- Run real-window visual QA for local/remote panes, the lost-session state, and the Connections settings tab.
+- Start Phase 4 transfers (single-file pipeline, progress, cancellation, conflicts).
 - Push the repository to a remote and confirm the first CI run is green.
