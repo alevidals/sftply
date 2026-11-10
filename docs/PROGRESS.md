@@ -55,11 +55,11 @@ These were recommended in the architecture package. Implementation proceeds with
 
 - [ ] Phase 1 + 2 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity, local browser interactions)
 - [ ] Rendered component tests for keyboard table navigation and rename/delete dialog flows
-- [ ] Phase 0 CI skeleton (frontend + Rust + audit)
+- [ ] First CI run on a remote (workflow definition exists)
 
 ### Known issues / blockers
 
-- No CI workflow exists yet; all gates are currently run locally.
+- A CI workflow now covers the frontend and non-Docker Rust gates, but it has not run yet because the repository has no remote configured.
 - Runtime FTPS/SFTP/keyring spikes still need local test servers (Docker or local daemons). Compile-time validation proceeds without them; protocol crates and their features are not yet added to `Cargo.toml`.
 - The `suppaftp`/implicit-FTPS and `russh` + `russh-sftp` version pairings remain unproven at runtime; if they fail, the dependency ADRs must be updated before Phase 3.
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
@@ -75,7 +75,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Confirm Bun usage and add scripts (`dev`, `build`, `typecheck`, `lint`, `format`, `test`, `check`, `bindings`, Rust gates)
 - [x] Install and configure frontend foundations (React 19, TS 6 strict, Tailwind v4, Biome 2, Vitest + Testing Library, Zustand, TanStack Query/Virtual, RHF + Zod, cmdk, sonner, dnd-kit, tinykeys)
 - [x] Initialize shadcn/ui + Tailwind v4 (Radix base, `nova` preset, 28 primitives)
-- [ ] Add CI skeleton (frontend + Rust + audit)
+- [x] Add CI skeleton (frontend + Rust; dependency audit still to add)
 - [ ] Spike: suppaftp + FTPS API compiles; custom rustls connector shape validated (crates not added yet)
 - [ ] Spike: russh 0.65 + russh-sftp 3.0.1 compile together (crates not added yet)
 - [x] Spike: tauri-specta command/event generation (v2 RC, command + event + types verified)
@@ -89,7 +89,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - Typed IPC generation works.
 - Known limitations documented; no security fallback chosen silently.
 
-**Status:** Typed IPC works. CI, protocol crates and keyring spikes remain outstanding.
+**Status:** Typed IPC works and a CI workflow definition exists. The first remote CI run, the dependency audit, and the protocol/keyring runtime spikes remain outstanding.
 
 ---
 
@@ -542,7 +542,7 @@ cargo test
 
 - Run real-window visual QA for local/remote panes, the lost-session state, and the new Connections settings tab.
 - Add rendered component tests for the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane.
-- Add a CI workflow that runs the non-Docker gates on every push.
+- Push the repository to a remote and confirm the first CI run is green.
 
 ### 2026-11-10 — Session 10: rendered component tests
 
@@ -553,6 +553,7 @@ cargo test
 - Added rendered tests for `QuickConnectDialog`: connecting without saving, requiring a name before saving, revealing FTPS TLS and data-channel options, and keeping the dialog open when the connection fails.
 - Added jsdom stubs for `ResizeObserver`, `scrollIntoView` and pointer capture so Radix select/tooltip primitives can render in tests.
 - Made `tests/integration/generate-certs.sh` regenerate the throwaway CA and server certificate when the existing certificate expires within an hour, instead of only when the PEM file is missing. The two-day test certificate had silently expired, failing every FTPS integration test.
+- Added `.github/workflows/ci.yml` with two jobs: frontend (typecheck, Biome, Vitest, production build) and Rust (rustfmt, clippy, tests) on Ubuntu with the Tauri system dependencies. It runs on pushes to `main`, pull requests and manual dispatch.
 
 **Verified**
 
@@ -569,4 +570,4 @@ cargo test
 
 - Run real-window visual QA for local/remote panes, the lost-session state, and the Connections settings tab.
 - Add rendered component tests for keyboard table navigation and the rename/delete dialogs (Phase 2).
-- Add a CI workflow that runs the non-Docker gates on every push.
+- Push the repository to a remote and confirm the first CI run is green.
