@@ -258,7 +258,7 @@ export function ConnectionsPanel() {
   )
 }
 
-function ConnectionRow({
+export function ConnectionRow({
   connection,
   session,
   lost,
