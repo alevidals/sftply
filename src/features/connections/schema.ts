@@ -60,11 +60,7 @@ const portSchema = z
     return Number.isInteger(port) && port >= 1 && port <= 65535
   }, "Enter a port between 1 and 65535.")
 
-const usernameSchema = z
-  .string()
-  .trim()
-  .min(1, "A username is required.")
-  .max(128, "The username is too long.")
+const usernameSchema = z.string().trim().max(128, "The username is too long.")
 
 const authKindSchema = z.enum(["password", "key"])
 
@@ -96,12 +92,20 @@ export function normalizeCertificatePin(value: string): string | null {
 
 interface SharedFields {
   protocol: ConnectionProtocol
+  username: string
   authKind: "password" | "key"
   keyPath: string
   initialPath: string
 }
 
 function refineSharedFields(values: SharedFields, ctx: z.RefinementCtx) {
+  if (values.protocol === "sftp" && !values.username.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["username"],
+      message: "SFTP requires a username.",
+    })
+  }
   if (values.authKind === "key") {
     if (!values.keyPath.trim()) {
       ctx.addIssue({
@@ -178,7 +182,12 @@ export const quickConnectSchema = z
         message: "A name is required to save the connection.",
       })
     }
-    if (values.save && values.authKind === "password" && !values.secret) {
+    if (
+      values.save &&
+      values.authKind === "password" &&
+      !values.secret &&
+      (values.protocol === "sftp" || values.username.trim())
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["secret"],
@@ -287,12 +296,13 @@ export function toConnectionInput(values: ConnectionFormValues): ConnectionInput
 }
 
 export function toQuickConnectInput(values: QuickConnectValues): ConnectionInput_Deserialize {
+  const username = values.username.trim() || "anonymous"
   return {
-    name: values.name.trim() || `${values.username.trim()}@${values.host.trim()}`,
+    name: values.name.trim() || `${username}@${values.host.trim()}`,
     protocol: values.protocol,
     host: values.host.trim(),
     port: Number(values.port),
-    username: values.username.trim(),
+    username,
     auth:
       values.authKind === "key"
         ? {

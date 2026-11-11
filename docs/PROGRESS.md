@@ -704,3 +704,37 @@ which is only correct for local client connections. See
 - Persist transfer history and add OS file drag-and-drop (Finder → pane, drag-out).
 - Real-window visual QA for the transfer panel, conflict dialog, drag overlay and status bar.
 - Push the repository to a remote and confirm the first CI run is green.
+
+### 2026-11-11 — Session 14: drag-and-drop, auto-refresh and anonymous FTP
+
+**Fixed**
+
+- Cross-pane drag-and-drop never transferred anything. The drop handler used the hook's "other pane" target, so dropping local files into the remote pane resolved to local→local and was rejected. `transferFrom` now targets the pane that received the drop, and uses that pane's current folder when no folder row was targeted. Added hook tests for both directions.
+- Drag payloads now also set a `text/plain` mirror, and drop targets accept either MIME. Some WebViews hide custom MIME types during dragover; reads still validate the JSON, so arbitrary text drops are ignored.
+- The destination pane did not refresh after a transfer finished. The transfer bridge now invalidates the `["fs"]` query family when a transfer reaches `completed`, `failed` or `cancelled`, coalescing a whole batch into one refresh after 250 ms. Added bridge tests for terminal and running events.
+- `bun run tauri -- dev` failed with "could not determine which binary to run" because the crate has both `sftply` and `export-bindings`. Added `default-run = "sftply"` to `Cargo.toml`.
+
+**Added**
+
+- Anonymous FTP/FTPS support: leaving the username blank maps to the conventional `anonymous` account, and the password may be left blank or set to an email/identifier if the server requires one. The connection form and Quick Connect explain this next to the username field.
+- Saved anonymous connections reconnect without a keychain entry: the password resolver falls back to an empty password only for the `anonymous` username. Quick Connect also allows saving anonymous profiles without a secret. SFTP still requires a username.
+- Schema and Rust validation tests for blank FTP usernames, anonymous saved profiles and the unchanged SFTP requirement.
+
+**Verified**
+
+- `bun run check` (Biome, 125 Vitest tests in 21 files, strict TypeScript, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (68 passed, 14 ignored).
+- `bun run bindings` (no diff).
+- `tests/integration/run.sh` → 14 integration tests passed. The dev FTP server was stopped temporarily because both stacks bind port 2121, then restarted.
+- `cargo metadata` reports `default_run = "sftply"`.
+
+**Notes**
+
+- Anonymous login uses an empty password by default. Some public servers expect an email address as the anonymous password; entering one in the password field is supported.
+- SFTP cannot be anonymous: SSH always needs an account name, even when the key is the only credential.
+- The dev FTP server still uses `-E` (anonymous disabled) and stays running on `127.0.0.1:2121` with `sftply` / `sftply-dev`.
+
+**Next**
+
+- Re-run manual QA of drag-and-drop and post-transfer refresh in the real Tauri window.
+- Phase 4c hardening and persistent transfer history.

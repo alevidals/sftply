@@ -65,7 +65,7 @@ pub async fn session_connect_quick(
         // Only key connections whose key is passphrase-protected need a stored
         // secret; an unprotected key saves no keychain entry at all.
         let stores_secret = match saved.auth {
-            ConnectionAuth::Password => true,
+            ConnectionAuth::Password => !secret.is_empty(),
             ConnectionAuth::Key {
                 passphrase_protected,
                 ..
@@ -305,15 +305,20 @@ async fn open_session(
 async fn resolve_credentials(profile: &ConnectionProfile) -> Result<SessionCredentials, AppError> {
     match &profile.auth {
         ConnectionAuth::Password => {
-            let password = credentials::get_secret(&profile.id, SecretKind::Password)
-                .await?
-                .ok_or_else(|| {
-                    AppError::new(
-                        ErrorCode::AuthFailed,
-                        "No password is saved for this connection. Edit it to add one.",
-                    )
-                })?;
-            Ok(SessionCredentials::Password(password))
+            let password = credentials::get_secret(&profile.id, SecretKind::Password).await?;
+            match password {
+                Some(password) => Ok(SessionCredentials::Password(password)),
+                // Anonymous FTP has no secret. The profile stores the
+                // conventional "anonymous" username, so reconnect works
+                // without a keychain entry.
+                None if profile.username.eq_ignore_ascii_case("anonymous") => {
+                    Ok(SessionCredentials::Password(String::new()))
+                }
+                None => Err(AppError::new(
+                    ErrorCode::AuthFailed,
+                    "No password is saved for this connection. Edit it to add one.",
+                )),
+            }
         }
         ConnectionAuth::Key {
             passphrase_protected,

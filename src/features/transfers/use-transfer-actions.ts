@@ -67,6 +67,7 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
       : null
     : LOCAL_SCOPE
   const targetDirectory = upload ? remotePath : localPath
+  const paneDirectory = upload ? localPath : remotePath
   const canTransfer = Boolean(targetScope && targetDirectory && (upload ? activeSession : true))
   const transferLabel = upload ? "Upload to remote" : "Download to local"
 
@@ -232,18 +233,20 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
 
   const transferFrom = useCallback(
     (sourceScope: FsScope, entries: readonly FsEntry[], directory?: string) => {
-      if (!targetScope) {
+      // The drop target is this pane, not the pane the menu action would use.
+      // `scope` is local for the local pane and the session scope for remote.
+      if (scope.kind === "remote" && !sessions[scope.sessionId]) {
         toast.info("Connect to a remote server first.")
         return
       }
-      const destination = directory ?? targetDirectory
+      const destination = directory ?? paneDirectory
       if (!destination) {
         toast.info("Choose a destination folder first.")
         return
       }
-      transferBetween(sourceScope, targetScope, destination, entries)
+      transferBetween(sourceScope, scope, destination, entries)
     },
-    [targetDirectory, targetScope, transferBetween],
+    [paneDirectory, scope, sessions, transferBetween],
   )
 
   const onConfirm = useCallback(

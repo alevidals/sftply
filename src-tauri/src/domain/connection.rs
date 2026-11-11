@@ -257,8 +257,17 @@ impl ConnectionInput {
 
         let username = self.username.trim().to_string();
         if username.is_empty() {
-            return Err("A username is required.".into());
+            // Plain FTP and FTPS convention: an empty username means the
+            // anonymous account. SFTP always requires a real account.
+            if matches!(self.protocol, ConnectionProtocol::Sftp) {
+                return Err("A username is required for SFTP.".into());
+            }
         }
+        let username = if username.is_empty() {
+            "anonymous".to_string()
+        } else {
+            username
+        };
         if username.chars().count() > 128 || has_control(&username) {
             return Err("The username contains invalid characters.".into());
         }
@@ -372,6 +381,11 @@ mod tests {
         let mut bad = input();
         bad.username = "".into();
         assert!(bad.normalized().is_err());
+
+        let mut anonymous = input();
+        anonymous.protocol = ConnectionProtocol::Ftp;
+        anonymous.username = "   ".into();
+        assert_eq!(anonymous.normalized().unwrap().username, "anonymous");
 
         let mut bad = input();
         bad.initial_path = "relative".into();

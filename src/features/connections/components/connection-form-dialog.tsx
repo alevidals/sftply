@@ -236,10 +236,16 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                   id="connection-username"
                   {...form.register("username")}
                   aria-invalid={Boolean(form.formState.errors.username)}
+                  placeholder={protocol === "sftp" ? "ada" : "anonymous"}
                   autoComplete="username"
                   spellCheck={false}
                 />
                 <FieldMessage message={form.formState.errors.username?.message} />
+                {protocol !== "sftp" ? (
+                  <p className="text-2xs text-muted-foreground">
+                    Leave blank to connect anonymously. The password is optional.
+                  </p>
+                ) : null}
               </div>
             </div>
 

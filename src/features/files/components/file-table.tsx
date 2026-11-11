@@ -25,8 +25,8 @@ import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/col
 import { entryNameError } from "@/features/files/model/names"
 import type { SelectionMode, SelectionState } from "@/features/files/model/selection"
 import {
+  isTransferDrag,
   readTransferDrag,
-  TRANSFER_DRAG_MIME,
   type TransferDragPayload,
   transferableEntries,
   writeTransferDrag,
@@ -298,7 +298,7 @@ export function FileTable({
                   }}
                   onDragOver={(event) => {
                     if (entry.kind !== "directory") return
-                    if (!event.dataTransfer.types.includes(TRANSFER_DRAG_MIME)) return
+                    if (!isTransferDrag(event.dataTransfer)) return
                     event.preventDefault()
                     event.stopPropagation()
                     event.dataTransfer.dropEffect = "copy"

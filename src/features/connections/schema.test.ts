@@ -51,10 +51,16 @@ describe("connectionSchema", () => {
     expect(connectionSchema.safeParse(valid).success).toBe(true)
   })
 
-  it("requires a name, host and username", () => {
+  it("requires a name, host and username for SFTP", () => {
     expect(connectionSchema.safeParse({ ...valid, name: "  " }).success).toBe(false)
     expect(connectionSchema.safeParse({ ...valid, host: "" }).success).toBe(false)
     expect(connectionSchema.safeParse({ ...valid, username: "" }).success).toBe(false)
+  })
+
+  it("allows an empty username for anonymous FTP", () => {
+    const anonymous = { ...valid, protocol: "ftp" as const, username: "" }
+    expect(connectionSchema.safeParse(anonymous).success).toBe(true)
+    expect(toConnectionInput(anonymous).username).toBe("")
   })
 
   it("validates the port range", () => {
@@ -97,6 +103,18 @@ describe("quickConnectSchema", () => {
     ).toBe(false)
   })
 
+  it("allows saving anonymous FTP without a secret", () => {
+    const anonymous = {
+      ...quick,
+      protocol: "ftp" as const,
+      username: "",
+      secret: "",
+      save: true,
+      name: "Public mirror",
+    }
+    expect(quickConnectSchema.safeParse(anonymous).success).toBe(true)
+  })
+
   it("only requires a passphrase for protected keys", () => {
     const key = {
       ...quick,
@@ -122,6 +140,18 @@ describe("quickConnectSchema", () => {
     expect(input.host).toBe("example.com")
     expect(input.username).toBe("ada")
     expect(input.favorite).toBe(false)
+  })
+
+  it("uses the anonymous account for a blank FTP username", () => {
+    const input = toQuickConnectInput({
+      ...quick,
+      protocol: "ftp",
+      name: "   ",
+      host: "example.com",
+      username: " ",
+    })
+    expect(input.username).toBe("anonymous")
+    expect(input.name).toBe("anonymous@example.com")
   })
 })
 

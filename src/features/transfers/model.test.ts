@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   canDropTransfer,
+  isTransferDrag,
   joinLocalPath,
   joinRemotePath,
   readTransferDrag,
@@ -54,15 +55,18 @@ describe("transfer paths", () => {
 describe("transfer drag payloads", () => {
   function dataTransfer(): DataTransfer {
     const store = new Map<string, string>()
-    return {
+    const transfer = {
       effectAllowed: "all",
       dropEffect: "none",
-      types: [],
+      get types() {
+        return [...store.keys()]
+      },
       setData: (type: string, value: string) => {
         store.set(type, value)
       },
       getData: (type: string) => store.get(type) ?? "",
-    } as unknown as DataTransfer
+    }
+    return transfer as unknown as DataTransfer
   }
 
   it("round-trips a payload and accepts cross-pane drops only", () => {
@@ -73,9 +77,21 @@ describe("transfer drag payloads", () => {
     }
     writeTransferDrag(transfer, payload)
 
+    expect(isTransferDrag(transfer)).toBe(true)
     expect(readTransferDrag(transfer)).toEqual(payload)
     expect(canDropTransfer(payload, { kind: "remote", sessionId: "s1" })).toBe(true)
     expect(canDropTransfer(payload, { kind: "local" })).toBe(false)
+  })
+
+  it("reads the plain-text mirror when the custom MIME is unavailable", () => {
+    const transfer = dataTransfer()
+    const payload = {
+      scope: { kind: "remote" as const, sessionId: "s1" },
+      entries: [entry("a.txt")],
+    }
+    transfer.setData("text/plain", JSON.stringify(payload))
+
+    expect(readTransferDrag(transfer)).toEqual(payload)
   })
 
   it("ignores malformed payloads", () => {

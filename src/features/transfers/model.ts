@@ -36,12 +36,16 @@ export interface TransferDragPayload {
 }
 
 export function writeTransferDrag(dataTransfer: DataTransfer, payload: TransferDragPayload): void {
-  dataTransfer.setData(TRANSFER_DRAG_MIME, JSON.stringify(payload))
+  const encoded = JSON.stringify(payload)
+  dataTransfer.setData(TRANSFER_DRAG_MIME, encoded)
+  // Some WebViews do not expose custom MIME types during dragover. A plain
+  // text mirror keeps the drop target working; reads still validate the JSON.
+  dataTransfer.setData("text/plain", encoded)
   dataTransfer.effectAllowed = "copy"
 }
 
 export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayload | null {
-  const raw = dataTransfer.getData(TRANSFER_DRAG_MIME)
+  const raw = dataTransfer.getData(TRANSFER_DRAG_MIME) || dataTransfer.getData("text/plain")
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as Partial<TransferDragPayload>
@@ -51,6 +55,13 @@ export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayloa
   } catch {
     return null
   }
+}
+
+/** Whether a drag event may carry an in-app transfer payload. */
+export function isTransferDrag(dataTransfer: DataTransfer): boolean {
+  return (
+    dataTransfer.types.includes(TRANSFER_DRAG_MIME) || dataTransfer.types.includes("text/plain")
+  )
 }
 
 /** Transfers only run between the local pane and one remote pane. */

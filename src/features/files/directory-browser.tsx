@@ -69,8 +69,8 @@ import { useSettings } from "@/features/settings/settings-context"
 import { TransferConflictDialog } from "@/features/transfers/components/transfer-conflict-dialog"
 import {
   canDropTransfer,
+  isTransferDrag,
   readTransferDrag,
-  TRANSFER_DRAG_MIME,
   type TransferDragPayload,
 } from "@/features/transfers/model"
 import { useTransferActions } from "@/features/transfers/use-transfer-actions"
@@ -408,7 +408,7 @@ export function DirectoryBrowser({
   }
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
-    if (!event.dataTransfer.types.includes(TRANSFER_DRAG_MIME)) return
+    if (!isTransferDrag(event.dataTransfer)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
     setDropActive(true)
