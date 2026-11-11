@@ -6,8 +6,8 @@ use suppaftp::FtpError;
 use suppaftp::Mode as FtpMode;
 use suppaftp::list::{File as FtpFile, ListParser, PosixPexQuery};
 use suppaftp::tokio::{
-    AsyncFtpStream, AsyncRustlsConnector, AsyncRustlsFtpStream, AsyncRustlsStream,
-    ImplAsyncFtpStream,
+    AsyncFtpStream, AsyncNoTlsStream, AsyncRustlsConnector, AsyncRustlsFtpStream,
+    AsyncRustlsStream, ImplAsyncFtpStream, TransferStream,
 };
 use suppaftp::types::FileType as FtpFileType;
 
@@ -17,6 +17,7 @@ use crate::domain::remote_path::{
     join_remote, normalize_remote, remote_leaf, remote_parent, validate_remote_name,
 };
 use crate::error::{AppError, ErrorCode};
+use crate::fs::{FileReader, FileWriter};
 use crate::protocol::{RemoteFs, listing, protocol_error, sanitize_detail};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -35,6 +36,91 @@ macro_rules! on_client {
             FtpClient::Secure(stream) => stream.$method($($arg),*).await,
         }
     };
+}
+
+/// Data connection for a plain or TLS-wrapped FTP transfer. Both variants
+/// finalize through suppaftp's `TransferStream`, which checks the server's
+/// completion reply.
+enum FtpTransferStream {
+    Plain(TransferStream<AsyncNoTlsStream>),
+    Secure(TransferStream<AsyncRustlsStream>),
+}
+
+impl FtpTransferStream {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
+        use tokio::io::AsyncReadExt;
+        match self {
+            Self::Plain(stream) => stream.read(buf).await.map_err(map_transfer_io),
+            Self::Secure(stream) => stream.read(buf).await.map_err(map_transfer_io),
+        }
+    }
+
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
+        use tokio::io::AsyncWriteExt;
+        match self {
+            Self::Plain(stream) => stream.write(buf).await.map_err(map_transfer_io),
+            Self::Secure(stream) => stream.write(buf).await.map_err(map_transfer_io),
+        }
+    }
+
+    async fn finish(self) -> Result<(), AppError> {
+        match self {
+            Self::Plain(stream) => stream.finish().await.map_err(map_ftp_error),
+            Self::Secure(stream) => stream.finish().await.map_err(map_ftp_error),
+        }
+    }
+}
+
+struct FtpReader {
+    stream: Option<FtpTransferStream>,
+}
+
+#[async_trait]
+impl FileReader for FtpReader {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
+        self.stream
+            .as_mut()
+            .ok_or_else(|| AppError::internal("The transfer stream is closed.", "missing stream"))?
+            .read(buf)
+            .await
+    }
+
+    async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+        match self.stream.take() {
+            Some(stream) => stream.finish().await,
+            None => Ok(()),
+        }
+    }
+}
+
+struct FtpWriter {
+    stream: Option<FtpTransferStream>,
+}
+
+#[async_trait]
+impl FileWriter for FtpWriter {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
+        self.stream
+            .as_mut()
+            .ok_or_else(|| AppError::internal("The transfer stream is closed.", "missing stream"))?
+            .write(buf)
+            .await
+    }
+
+    async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+        match self.stream.take() {
+            Some(stream) => stream.finish().await,
+            None => Ok(()),
+        }
+    }
+
+    async fn abort(mut self: Box<Self>) -> Result<(), AppError> {
+        // Dropping the stream closes the data socket. suppaftp defers the
+        // server's completion reply to the next control command, so a
+        // best-effort cleanup command can drain it.
+        self.stream.take();
+        Ok(())
+    }
 }
 
 pub struct FtpRemote {
@@ -171,7 +257,6 @@ impl FtpRemote {
 
     async fn entries(&mut self, path: &str) -> Result<(Vec<FsEntry>, Vec<String>), AppError> {
         let path = normalize_remote(path)?;
-        let parent = remote_parent(&path)?.unwrap_or_else(|| "/".to_string());
         let mut warnings = Vec::new();
         let mut entries = Vec::new();
 
@@ -180,7 +265,7 @@ impl FtpRemote {
                 on_client!(&mut self.client, mlsd(Some(path.as_str()))).map_err(map_ftp_error)?;
             for line in lines {
                 match ListParser::parse_mlsd(&line) {
-                    Ok(file) => match map_file(&file, &parent) {
+                    Ok(file) => match map_file(&file, &path) {
                         Ok(Some(entry)) => entries.push(entry),
                         Ok(None) => {}
                         Err(message) => warnings.push(message),
@@ -197,7 +282,7 @@ impl FtpRemote {
                 let parsed =
                     ListParser::parse_posix(&line).or_else(|_| ListParser::parse_dos(&line));
                 match parsed {
-                    Ok(file) => match map_file(&file, &parent) {
+                    Ok(file) => match map_file(&file, &path) {
                         Ok(Some(entry)) => entries.push(entry),
                         Ok(None) => {}
                         Err(message) => warnings.push(message),
@@ -322,6 +407,64 @@ impl RemoteFs for FtpRemote {
         Ok(())
     }
 
+    async fn open_read(
+        &mut self,
+        path: &str,
+        offset: u64,
+    ) -> Result<Box<dyn FileReader>, AppError> {
+        let path = normalize_remote(path)?;
+        if offset > 0 {
+            on_client!(&mut self.client, resume_transfer(offset as usize))
+                .map_err(map_ftp_error)?;
+        }
+        let stream = match &mut self.client {
+            FtpClient::Plain(stream) => FtpTransferStream::Plain(
+                stream
+                    .retr_as_stream(path.as_str())
+                    .await
+                    .map_err(map_ftp_error)?,
+            ),
+            FtpClient::Secure(stream) => FtpTransferStream::Secure(
+                stream
+                    .retr_as_stream(path.as_str())
+                    .await
+                    .map_err(map_ftp_error)?,
+            ),
+        };
+        Ok(Box::new(FtpReader {
+            stream: Some(stream),
+        }))
+    }
+
+    async fn open_write(
+        &mut self,
+        path: &str,
+        offset: u64,
+    ) -> Result<Box<dyn FileWriter>, AppError> {
+        let path = normalize_remote(path)?;
+        if offset > 0 {
+            on_client!(&mut self.client, resume_transfer(offset as usize))
+                .map_err(map_ftp_error)?;
+        }
+        let stream = match &mut self.client {
+            FtpClient::Plain(stream) => FtpTransferStream::Plain(
+                stream
+                    .put_with_stream(path.as_str())
+                    .await
+                    .map_err(map_ftp_error)?,
+            ),
+            FtpClient::Secure(stream) => FtpTransferStream::Secure(
+                stream
+                    .put_with_stream(path.as_str())
+                    .await
+                    .map_err(map_ftp_error)?,
+            ),
+        };
+        Ok(Box::new(FtpWriter {
+            stream: Some(stream),
+        }))
+    }
+
     async fn disconnect(&mut self) -> Result<(), AppError> {
         let _ = on_client!(&mut self.client, quit());
         Ok(())
@@ -410,6 +553,16 @@ fn root_entry() -> FsEntry {
         link_target: None,
         hidden: false,
         metadata_complete: true,
+    }
+}
+
+fn map_transfer_io(error: std::io::Error) -> AppError {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        AppError::new(ErrorCode::Timeout, "The transfer timed out.").retryable()
+    } else {
+        AppError::new(ErrorCode::Network, "The transfer connection failed.")
+            .with_detail(error.to_string())
+            .retryable()
     }
 }
 
@@ -534,6 +687,24 @@ mod integration {
 
     const PASSWORD: &str = "sftply-test";
 
+    fn assert_streaming_payload(received: &[u8], expected: &[u8]) {
+        assert_eq!(
+            received.len(),
+            expected.len(),
+            "streamed byte count differs"
+        );
+        if let Some(index) = received
+            .iter()
+            .zip(expected.iter())
+            .position(|(left, right)| left != right)
+        {
+            panic!(
+                "streamed payload differs at byte {index}: received {:#04x}, expected {:#04x}",
+                received[index], expected[index]
+            );
+        }
+    }
+
     fn profile(protocol: ConnectionProtocol, port: u16) -> ConnectionProfile {
         ConnectionProfile::from_input(
             "integration".into(),
@@ -634,6 +805,84 @@ mod integration {
         );
 
         remote.disconnect().await.expect("disconnect");
+    }
+
+    async fn exercise_streaming(protocol: ConnectionProtocol, port: u16, secure: bool) {
+        let profile = profile(protocol, port);
+        let connector = secure.then(test_connector);
+        let mut remote = FtpRemote::connect_with(&profile, PASSWORD, connector)
+            .await
+            .unwrap_or_else(|error| panic!("connect to {protocol:?} on {port}: {error}"));
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("stream-{stamp}");
+        let folder_path = format!("/{folder}");
+        remote.mkdir("/", &folder).await.expect("mkdir");
+
+        let payload: Vec<u8> = (0..200_000u32).map(|value| (value % 251) as u8).collect();
+        let path = format!("{folder_path}/data.bin");
+
+        let mut writer = remote.open_write(&path, 0).await.expect("open write");
+        for chunk in payload.chunks(64 * 1024) {
+            let mut written = 0;
+            while written < chunk.len() {
+                let count = writer.write(&chunk[written..]).await.expect("write chunk");
+                assert!(count > 0, "writer made no progress");
+                written += count;
+            }
+        }
+        writer.finish().await.expect("finish upload");
+
+        let listing = remote.list(&folder_path).await.expect("list upload folder");
+        let uploaded = listing
+            .entries
+            .iter()
+            .find(|entry| entry.name == "data.bin")
+            .expect("uploaded file is listed");
+        assert_eq!(
+            uploaded.path, path,
+            "listed entries must be joined against the listed folder"
+        );
+
+        let mut reader = remote.open_read(&path, 0).await.expect("open read");
+        let mut received = Vec::new();
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let read = reader.read(&mut buffer).await.expect("read chunk");
+            if read == 0 {
+                break;
+            }
+            received.extend_from_slice(&buffer[..read]);
+        }
+        reader.finish().await.expect("finish download");
+        assert_streaming_payload(&received, &payload);
+
+        remote
+            .delete(&folder_path, true)
+            .await
+            .unwrap_or_else(|error| panic!("delete {folder_path}: {error}"));
+        remote.disconnect().await.expect("disconnect");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn plain_ftp_streaming_round_trip() {
+        exercise_streaming(ConnectionProtocol::Ftp, 2121, false).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn explicit_ftps_streaming_round_trip() {
+        exercise_streaming(ConnectionProtocol::FtpsExplicit, 2122, true).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn implicit_ftps_streaming_round_trip() {
+        exercise_streaming(ConnectionProtocol::FtpsImplicit, 2990, true).await;
     }
 
     #[tokio::test]

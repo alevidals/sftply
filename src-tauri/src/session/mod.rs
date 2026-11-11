@@ -10,10 +10,13 @@ use tokio_util::sync::CancellationToken;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::domain::activity::unix_millis;
-use crate::domain::connection::ConnectionProfile;
+use crate::domain::connection::{ConnectionProfile, ConnectionProtocol};
+use crate::domain::host_key::KnownHost;
 use crate::domain::session::{SessionInfo, SessionState, SessionStateEvent};
 use crate::error::{AppError, ErrorCode};
 use crate::protocol::RemoteFs;
+use crate::protocol::ftp::FtpRemote;
+use crate::protocol::sftp::{SftpCredentials, SftpRemote};
 
 /// Secret material retained for the lifetime of a live session so the session
 /// can reconnect without prompting the keychain again. It is never serialized,
@@ -96,6 +99,47 @@ impl Session {
             return;
         };
         let _ = tokio::time::timeout(Duration::from_secs(3), client.disconnect()).await;
+    }
+}
+
+/// Open a protocol client from retained session data. Transfers use this to
+/// open their own connection instead of holding the browsing session's stream
+/// for the duration of a file.
+pub async fn connect_client(
+    profile: &ConnectionProfile,
+    credentials: &SessionCredentials,
+    trusted: Vec<KnownHost>,
+) -> Result<Box<dyn RemoteFs>, AppError> {
+    match profile.protocol {
+        ConnectionProtocol::Sftp => {
+            let (password, passphrase) = match credentials {
+                SessionCredentials::Password(password) => (Some(password.clone()), None),
+                SessionCredentials::Key { passphrase } => (None, passphrase.clone()),
+            };
+            Ok(Box::new(
+                SftpRemote::connect(
+                    profile,
+                    SftpCredentials {
+                        password,
+                        passphrase,
+                    },
+                    trusted,
+                )
+                .await?,
+            ))
+        }
+        _ => {
+            let password = match credentials {
+                SessionCredentials::Password(password) => password,
+                SessionCredentials::Key { .. } => {
+                    return Err(AppError::new(
+                        ErrorCode::AuthFailed,
+                        "No password is saved for this connection.",
+                    ));
+                }
+            };
+            Ok(Box::new(FtpRemote::connect(profile, password).await?))
+        }
     }
 }
 
@@ -304,6 +348,22 @@ mod tests {
         }
 
         async fn chmod(&mut self, _path: &str, _mode: u32) -> Result<(), AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn open_read(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn crate::fs::FileReader>, AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn open_write(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn crate::fs::FileWriter>, AppError> {
             unimplemented!("not used by these tests")
         }
 

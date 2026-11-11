@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSettings } from "@/features/settings/settings-context"
+import { TransferList } from "@/features/transfers/components/transfer-list"
 import { formatClock } from "@/lib/format"
 import type { ActivityLevel } from "@/lib/ipc/bindings"
 import { useActivityStore } from "@/stores/activity-store"
+import { selectActiveTransferCount, useTransferStore } from "@/stores/transfer-store"
 import { useUiStore } from "@/stores/ui-store"
 
 const LEVEL_META: Record<ActivityLevel, { icon: LucideIcon; className: string }> = {
@@ -32,6 +34,8 @@ export function BottomPanel() {
   const setBottomTab = useUiStore((state) => state.setBottomTab)
   const entries = useActivityStore((state) => state.entries)
   const clear = useActivityStore((state) => state.clear)
+  const activeTransfers = useTransferStore(selectActiveTransferCount)
+  const transferCount = useTransferStore((state) => state.order.length)
 
   const collapse = () => {
     updateSettings({ bottomPanelOpen: false }).catch(() => {
@@ -47,7 +51,8 @@ export function BottomPanel() {
           onClick={() => setBottomTab("transfers")}
           icon={ArrowDownUpIcon}
           label="Transfers"
-          count={0}
+          count={activeTransfers}
+          title={transferCount > activeTransfers ? `${transferCount} total` : undefined}
         />
         <TabButton
           active={bottomTab === "activity"}
@@ -84,11 +89,15 @@ export function BottomPanel() {
       </div>
 
       {bottomTab === "transfers" ? (
-        <EmptyState
-          icon={ArrowDownUpIcon}
-          title="No transfers yet"
-          description="Uploads and downloads will appear here with live progress and history."
-        />
+        transferCount === 0 ? (
+          <EmptyState
+            icon={ArrowDownUpIcon}
+            title="No transfers yet"
+            description="Select files in one pane and send them to the other. Progress appears here."
+          />
+        ) : (
+          <TransferList />
+        )
       ) : entries.length === 0 ? (
         <EmptyState
           icon={ActivityIcon}
@@ -132,18 +141,21 @@ function TabButton({
   icon: Icon,
   label,
   count,
+  title,
 }: {
   active: boolean
   onClick: () => void
   icon: LucideIcon
   label: string
   count: number
+  title?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      title={title}
       className={cn(
         "relative flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active

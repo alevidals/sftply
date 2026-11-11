@@ -76,6 +76,9 @@ function renderTable(overrides: { selection?: SelectionState; renamingPath?: str
       canChmod
       allowOpen
       allowReveal
+      canTransfer
+      transferLabel="Download to local"
+      transferDirection="download"
       {...handlers}
     />,
   )

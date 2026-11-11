@@ -57,12 +57,18 @@ export const commands = {
 	/**  Cancel the remote operation currently running on a session, if any. */
 	sessionCancel: (sessionId: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("session_cancel", { sessionId })),
 	sessionsList: () => __TAURI_INVOKE<SessionInfo[]>("sessions_list"),
+	transferPreflight: (target: FsScope, targetPath: string) => typedError<TransferConflict_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("transfer_preflight", { target, targetPath })),
+	transferEnqueue: (source: FsScope, sourcePath: string, target: FsScope, targetPath: string, policy: ConflictPolicy) => typedError<TransferItem_Serialize, AppError_Serialize>(__TAURI_INVOKE("transfer_enqueue", { source, sourcePath, target, targetPath, policy })),
+	transfersList: () => __TAURI_INVOKE<TransferItem_Serialize[]>("transfers_list"),
+	transferCancel: (id: string) => __TAURI_INVOKE<boolean>("transfer_cancel", { id }),
+	transferClearFinished: () => __TAURI_INVOKE<number>("transfer_clear_finished"),
 };
 
 /** Events */
 export const events = {
 	activityEntry: makeEvent<ActivityEntry, ActivityEntry>("activity://entry"),
 	sessionState: makeEvent<SessionStateEvent_Serialize, SessionStateEvent_Deserialize>("session://state"),
+	transferDelta: makeEvent<TransferDeltaEvent_Serialize, TransferDeltaEvent_Deserialize>("transfer://delta"),
 };
 
 /* Types */
@@ -164,6 +170,12 @@ export type AppSettings_Serialize = {
 	paneSplit: number,
 	lastLocalPath: string | null,
 };
+
+/**
+ *  What to do when the target already exists. "Skip" is handled by the UI
+ *  before enqueuing, because no transfer row is created for a skipped file.
+ */
+export type ConflictPolicy = "overwrite" | "rename";
 
 /**
  *  How a connection authenticates. Secrets are never part of this model; they
@@ -509,6 +521,109 @@ export type TlsOptions_Serialize = {
 	/**  Explicitly accept certificates that fail chain or hostname checks. */
 	allowInvalidCertificates: boolean,
 };
+
+/**  Existing target reported by `transfer_preflight`. */
+export type TransferConflict = TransferConflict_Serialize | TransferConflict_Deserialize;
+
+/**  Existing target reported by `transfer_preflight`. */
+export type TransferConflict_Deserialize = {
+	targetPath: string,
+	kind: EntryKind,
+	size: number,
+	modifiedAt?: number | null,
+};
+
+/**  Existing target reported by `transfer_preflight`. */
+export type TransferConflict_Serialize = {
+	targetPath: string,
+	kind: EntryKind,
+	size: number,
+	modifiedAt: number | null,
+};
+
+/**
+ *  Batched transfer updates. The backend coalesces progress to a few events per
+ *  second so a large transfer cannot saturate the WebView IPC bridge.
+ */
+export type TransferDeltaEvent = TransferDeltaEvent_Serialize | TransferDeltaEvent_Deserialize;
+
+/**
+ *  Batched transfer updates. The backend coalesces progress to a few events per
+ *  second so a large transfer cannot saturate the WebView IPC bridge.
+ */
+export type TransferDeltaEvent_Deserialize = {
+	upserts: TransferItem_Deserialize[],
+	removed: string[],
+};
+
+/**
+ *  Batched transfer updates. The backend coalesces progress to a few events per
+ *  second so a large transfer cannot saturate the WebView IPC bridge.
+ */
+export type TransferDeltaEvent_Serialize = {
+	upserts: TransferItem_Serialize[],
+	removed: string[],
+};
+
+export type TransferDirection = "upload" | "download";
+
+/**
+ *  Public transfer row. It contains paths and counters only; credentials and
+ *  protocol handles never cross the IPC boundary.
+ */
+export type TransferItem = TransferItem_Serialize | TransferItem_Deserialize;
+
+/**
+ *  Public transfer row. It contains paths and counters only; credentials and
+ *  protocol handles never cross the IPC boundary.
+ */
+export type TransferItem_Deserialize = {
+	id: string,
+	direction: TransferDirection,
+	status: TransferStatus,
+	sourcePath: string,
+	targetPath: string,
+	/**  Display label for the local or remote side, for example a session name. */
+	sourceLabel: string,
+	targetLabel: string,
+	name: string,
+	size: number,
+	transferred: number,
+	bytesPerSec: number,
+	etaMs?: number | null,
+	/**  User-safe failure message. Technical detail stays in the logs. */
+	error?: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	startedAt: number,
+	finishedAt?: number | null,
+};
+
+/**
+ *  Public transfer row. It contains paths and counters only; credentials and
+ *  protocol handles never cross the IPC boundary.
+ */
+export type TransferItem_Serialize = {
+	id: string,
+	direction: TransferDirection,
+	status: TransferStatus,
+	sourcePath: string,
+	targetPath: string,
+	/**  Display label for the local or remote side, for example a session name. */
+	sourceLabel: string,
+	targetLabel: string,
+	name: string,
+	size: number,
+	transferred: number,
+	bytesPerSec: number,
+	etaMs: number | null,
+	/**  User-safe failure message. Technical detail stays in the logs. */
+	error: string | null,
+	/**  Unix epoch milliseconds, UTC. */
+	startedAt: number,
+	finishedAt: number | null,
+};
+
+export type TransferStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

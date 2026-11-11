@@ -2,6 +2,7 @@ import { normalizeError } from "@/lib/errors"
 import {
   type AppInfo,
   type AppSettings_Serialize,
+  type ConflictPolicy,
   type ConnectionInput_Deserialize,
   type ConnectionProfile_Serialize,
   commands,
@@ -13,6 +14,8 @@ import {
   type SecretStatus,
   type SessionInfo,
   type StartupReport,
+  type TransferConflict,
+  type TransferItem,
 } from "@/lib/ipc/bindings"
 
 type CommandResult<T, E> = { status: "ok"; data: T } | { status: "error"; error: E }
@@ -188,5 +191,33 @@ export const ipc = {
 
   sessionCancel(sessionId: string): Promise<boolean> {
     return invoke(commands.sessionCancel(sessionId)).then((result) => unwrap(result))
+  },
+
+  transferPreflight(target: FsScope, targetPath: string): Promise<TransferConflict | null> {
+    return invoke(commands.transferPreflight(target, targetPath)).then((result) => unwrap(result))
+  },
+
+  transferEnqueue(
+    source: FsScope,
+    sourcePath: string,
+    target: FsScope,
+    targetPath: string,
+    policy: ConflictPolicy,
+  ): Promise<TransferItem> {
+    return invoke(commands.transferEnqueue(source, sourcePath, target, targetPath, policy)).then(
+      (result) => unwrap(result),
+    )
+  },
+
+  transfersList(): Promise<TransferItem[]> {
+    return invoke(commands.transfersList())
+  },
+
+  transferCancel(id: string): Promise<boolean> {
+    return invoke(commands.transferCancel(id))
+  },
+
+  transferClearFinished(): Promise<number> {
+    return invoke(commands.transferClearFinished())
   },
 }

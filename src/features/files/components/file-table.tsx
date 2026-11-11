@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
 import {
   ArrowDownToLineIcon,
+  ArrowUpFromLineIcon,
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
@@ -26,7 +27,14 @@ import type { SelectionMode, SelectionState } from "@/features/files/model/selec
 import { formatBytes, formatMode, formatModified } from "@/lib/format"
 import type { FsEntry } from "@/lib/ipc/bindings"
 
-export type FileAction = "open" | "rename" | "delete" | "reveal" | "permissions" | "new-folder"
+export type FileAction =
+  | "open"
+  | "rename"
+  | "delete"
+  | "reveal"
+  | "permissions"
+  | "new-folder"
+  | "transfer"
 
 interface FileTableProps {
   entries: readonly FsEntry[]
@@ -39,6 +47,10 @@ interface FileTableProps {
   allowOpen: boolean
   /** Whether items can be revealed in the OS file manager (local only). */
   allowReveal: boolean
+  /** Whether selected files can be sent to the other pane. */
+  canTransfer: boolean
+  transferLabel: string
+  transferDirection: "upload" | "download"
   onSelect: (index: number, mode: SelectionMode) => void
   onSelectAll: () => void
   onClearSelection: () => void
@@ -60,6 +72,9 @@ export function FileTable({
   canChmod,
   allowOpen,
   allowReveal,
+  canTransfer,
+  transferLabel,
+  transferDirection,
   onSelect,
   onSelectAll,
   onClearSelection,
@@ -116,6 +131,8 @@ export function FileTable({
         return !activeEntry
       case "delete":
         return !hasSelection
+      case "transfer":
+        return !canTransfer || !hasSelection
       case "permissions":
         return !activeEntry || !canChmod || selection.selected.size !== 1
       case "new-folder":
@@ -325,6 +342,13 @@ export function FileTable({
           <ArrowDownToLineIcon />
           Open
           <ContextMenuShortcut>↩</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={actionDisabled("transfer")}
+          onSelect={() => onAction("transfer")}
+        >
+          {transferDirection === "upload" ? <ArrowUpFromLineIcon /> : <ArrowDownToLineIcon />}
+          {transferLabel}
         </ContextMenuItem>
         {allowReveal ? (
           <ContextMenuItem disabled={actionDisabled("reveal")} onSelect={() => onAction("reveal")}>

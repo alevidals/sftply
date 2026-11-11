@@ -1,4 +1,4 @@
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use tracing_appender::non_blocking::WorkerGuard;
 
@@ -7,6 +7,7 @@ use crate::config::known_hosts::KnownHostsStore;
 use crate::config::paths::AppPaths;
 use crate::config::settings_store::SettingsStore;
 use crate::session::SessionManager;
+use crate::transfer::TransferManager;
 
 pub struct AppState {
     pub paths: AppPaths,
@@ -14,6 +15,7 @@ pub struct AppState {
     pub connections: ConnectionStore,
     pub known_hosts: KnownHostsStore,
     pub sessions: SessionManager,
+    pub transfers: Arc<TransferManager>,
     /// Warnings produced before the webview existed, drained by
     /// `startup_report` once the frontend asks for them.
     startup_warnings: RwLock<Vec<String>>,
@@ -30,12 +32,14 @@ impl AppState {
         log_guard: WorkerGuard,
         startup_warnings: Vec<String>,
     ) -> Self {
+        let concurrency = settings.get().transfer_concurrency as usize;
         Self {
             paths,
             settings,
             connections,
             known_hosts,
             sessions: SessionManager::default(),
+            transfers: Arc::new(TransferManager::new(concurrency)),
             startup_warnings: RwLock::new(startup_warnings),
             _log_guard: Mutex::new(Some(log_guard)),
         }

@@ -8,6 +8,7 @@ mod fs;
 mod logging;
 mod protocol;
 mod session;
+mod transfer;
 
 use app_state::AppState;
 use config::connection_store::ConnectionStore;
@@ -16,6 +17,7 @@ use config::paths::AppPaths;
 use config::settings_store::SettingsStore;
 use domain::activity::ActivityEntry;
 use domain::session::SessionStateEvent;
+use domain::transfer::TransferDeltaEvent;
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::Builder;
@@ -56,10 +58,16 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::sessions::session_disconnect,
             commands::sessions::session_cancel,
             commands::sessions::sessions_list,
+            commands::transfer::transfer_preflight,
+            commands::transfer::transfer_enqueue,
+            commands::transfer::transfers_list,
+            commands::transfer::transfer_cancel,
+            commands::transfer::transfer_clear_finished,
         ])
         .events(tauri_specta::collect_events![
             ActivityEntry,
-            SessionStateEvent
+            SessionStateEvent,
+            TransferDeltaEvent
         ])
 }
 

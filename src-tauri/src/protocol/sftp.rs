@@ -8,7 +8,9 @@ use russh::client::{self, Handle};
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, load_secret_key};
 use russh_sftp::client::SftpSession;
 use russh_sftp::client::error::Error as SftpError;
-use russh_sftp::protocol::{FileAttributes, FileType, StatusCode};
+use russh_sftp::client::fs::File as SftpFile;
+use russh_sftp::protocol::{FileAttributes, FileType, OpenFlags, StatusCode};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use crate::config::known_hosts::verify_against;
 use crate::domain::connection::{ConnectionAuth, ConnectionProfile};
@@ -18,6 +20,7 @@ use crate::domain::remote_path::{
     join_remote, normalize_remote, remote_leaf, remote_parent, validate_remote_name,
 };
 use crate::error::{AppError, ErrorCode};
+use crate::fs::{FileReader, FileWriter};
 use crate::protocol::{RemoteFs, listing, ms_from_secs, protocol_error, sanitize_detail};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -26,6 +29,60 @@ const REQUEST_TIMEOUT_SECS: u64 = 30;
 pub struct SftpCredentials {
     pub password: Option<String>,
     pub passphrase: Option<String>,
+}
+
+struct SftpReader {
+    file: Option<SftpFile>,
+}
+
+#[async_trait]
+impl FileReader for SftpReader {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
+        self.file
+            .as_mut()
+            .ok_or_else(|| AppError::internal("The SFTP handle is closed.", "missing handle"))?
+            .read(buf)
+            .await
+            .map_err(map_transfer_io)
+    }
+
+    async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+        match self.file.take() {
+            Some(file) => file.close().await.map_err(map_transfer_io),
+            None => Ok(()),
+        }
+    }
+}
+
+struct SftpWriter {
+    file: Option<SftpFile>,
+}
+
+#[async_trait]
+impl FileWriter for SftpWriter {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
+        self.file
+            .as_mut()
+            .ok_or_else(|| AppError::internal("The SFTP handle is closed.", "missing handle"))?
+            .write(buf)
+            .await
+            .map_err(map_transfer_io)
+    }
+
+    async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+        match self.file.take() {
+            Some(mut file) => {
+                file.flush().await.map_err(map_transfer_io)?;
+                file.close().await.map_err(map_transfer_io)
+            }
+            None => Ok(()),
+        }
+    }
+
+    async fn abort(mut self: Box<Self>) -> Result<(), AppError> {
+        self.file.take();
+        Ok(())
+    }
 }
 
 pub struct SftpRemote {
@@ -362,6 +419,44 @@ impl RemoteFs for SftpRemote {
             .map_err(map_sftp_error)
     }
 
+    async fn open_read(
+        &mut self,
+        path: &str,
+        offset: u64,
+    ) -> Result<Box<dyn FileReader>, AppError> {
+        let path = normalize_remote(path)?;
+        let mut file = self.sftp.open(&path).await.map_err(map_sftp_error)?;
+        if offset > 0 {
+            file.seek(SeekFrom::Start(offset))
+                .await
+                .map_err(map_transfer_io)?;
+        }
+        Ok(Box::new(SftpReader { file: Some(file) }))
+    }
+
+    async fn open_write(
+        &mut self,
+        path: &str,
+        offset: u64,
+    ) -> Result<Box<dyn FileWriter>, AppError> {
+        let path = normalize_remote(path)?;
+        let mut flags = OpenFlags::WRITE | OpenFlags::CREATE;
+        if offset == 0 {
+            flags |= OpenFlags::TRUNCATE;
+        }
+        let mut file = self
+            .sftp
+            .open_with_flags(&path, flags)
+            .await
+            .map_err(map_sftp_error)?;
+        if offset > 0 {
+            file.seek(SeekFrom::Start(offset))
+                .await
+                .map_err(map_transfer_io)?;
+        }
+        Ok(Box::new(SftpWriter { file: Some(file) }))
+    }
+
     async fn disconnect(&mut self) -> Result<(), AppError> {
         let _ = self.sftp.close().await;
         let _ = self
@@ -460,6 +555,16 @@ fn map_russh_error(error: russh::Error) -> AppError {
         other => AppError::new(ErrorCode::Network, "The SSH connection failed.")
             .with_detail(sanitize_detail(&other.to_string()))
             .retryable(),
+    }
+}
+
+fn map_transfer_io(error: std::io::Error) -> AppError {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        AppError::new(ErrorCode::Timeout, "The transfer timed out.").retryable()
+    } else {
+        AppError::new(ErrorCode::Network, "The transfer connection failed.")
+            .with_detail(error.to_string())
+            .retryable()
     }
 }
 
@@ -583,6 +688,24 @@ mod integration {
     /// `upload` folder is writable.
     const WRITABLE: &str = "/upload";
 
+    fn assert_streaming_payload(received: &[u8], expected: &[u8]) {
+        assert_eq!(
+            received.len(),
+            expected.len(),
+            "streamed byte count differs"
+        );
+        if let Some(index) = received
+            .iter()
+            .zip(expected.iter())
+            .position(|(left, right)| left != right)
+        {
+            panic!(
+                "streamed payload differs at byte {index}: received {:#04x}, expected {:#04x}",
+                received[index], expected[index]
+            );
+        }
+    }
+
     fn profile() -> ConnectionProfile {
         ConnectionProfile::from_input(
             "integration".into(),
@@ -631,6 +754,57 @@ mod integration {
             fingerprint: challenge.fingerprint,
             added_at: 0.0,
         }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn sftp_streaming_round_trip() {
+        let profile = profile();
+        let known = trusted_host(&profile).await;
+        let mut remote = SftpRemote::connect(&profile, credentials(), vec![known])
+            .await
+            .expect("connect with a trusted host key");
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("stream-{stamp}");
+        let folder_path = format!("{WRITABLE}/{folder}");
+        remote.mkdir(WRITABLE, &folder).await.expect("mkdir");
+
+        let payload: Vec<u8> = (0..200_000u32).map(|value| (value % 251) as u8).collect();
+        let path = format!("{folder_path}/data.bin");
+
+        let mut writer = remote.open_write(&path, 0).await.expect("open write");
+        for chunk in payload.chunks(64 * 1024) {
+            let mut written = 0;
+            while written < chunk.len() {
+                let count = writer.write(&chunk[written..]).await.expect("write chunk");
+                assert!(count > 0, "writer made no progress");
+                written += count;
+            }
+        }
+        writer.finish().await.expect("finish upload");
+
+        let mut reader = remote.open_read(&path, 0).await.expect("open read");
+        let mut received = Vec::new();
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let read = reader.read(&mut buffer).await.expect("read chunk");
+            if read == 0 {
+                break;
+            }
+            received.extend_from_slice(&buffer[..read]);
+        }
+        reader.finish().await.expect("finish download");
+        assert_streaming_payload(&received, &payload);
+
+        remote
+            .delete(&folder_path, true)
+            .await
+            .unwrap_or_else(|error| panic!("delete {folder_path}: {error}"));
+        remote.disconnect().await.expect("disconnect");
     }
 
     #[tokio::test]

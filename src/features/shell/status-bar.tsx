@@ -13,15 +13,22 @@ import { pathLeaf } from "@/features/files/model/path"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
-import { formatCount } from "@/lib/format"
+import { formatBytes, formatCount } from "@/lib/format"
 import { useActivityStore } from "@/stores/activity-store"
 import { useSessionStore } from "@/stores/session-store"
+import {
+  selectActiveTransferCount,
+  selectTransferSpeed,
+  useTransferStore,
+} from "@/stores/transfer-store"
 import { useUiStore } from "@/stores/ui-store"
 
 export function StatusBar() {
   const { settings, updateSettings } = useSettings()
   const appInfo = useAppInfo()
   const activityCount = useActivityStore((state) => state.entries.length)
+  const activeTransfers = useTransferStore(selectActiveTransferCount)
+  const transferSpeed = useTransferStore(selectTransferSpeed)
   const localSummary = useUiStore((state) => state.localSummary)
   const remoteSummary = useUiStore((state) => state.remoteSummary)
   const sessions = useSessionStore((state) => state.sessions)
@@ -97,7 +104,10 @@ export function StatusBar() {
       <div className="ml-auto flex items-center gap-0.5">
         <StatusButton label="Transfers" onClick={() => openPanel("transfers")}>
           <ArrowDownUpIcon className="size-3" />
-          <span className="tabular">0</span>
+          <span className="tabular">{activeTransfers}</span>
+          {transferSpeed > 0 ? (
+            <span className="tabular text-muted-foreground/70">{formatBytes(transferSpeed)}/s</span>
+          ) : null}
         </StatusButton>
 
         <StatusButton label="Activity" onClick={() => openPanel("activity")}>

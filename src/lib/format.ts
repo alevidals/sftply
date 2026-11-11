@@ -37,6 +37,16 @@ export function formatPercent(value: number): string {
   return `${Math.round(value)}%`
 }
 
+/** Format a remaining-time estimate compactly. */
+export function formatEta(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—"
+  const seconds = Math.ceil(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
 const fileDateFormatter = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
   month: "short",

@@ -2,11 +2,14 @@ use std::io::ErrorKind;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use async_trait::async_trait;
 use futures_util::stream::{self, StreamExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use crate::domain::fs::{EntryKind, FsCapabilities, FsEntry, Listing};
 use crate::error::{AppError, ErrorCode};
 use crate::fs::path::{join_child, normalize_absolute, validate_mode};
+use crate::fs::{FileReader, FileWriter};
 
 const METADATA_CONCURRENCY: usize = 64;
 
@@ -318,6 +321,78 @@ fn now_ms() -> f64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as f64)
         .unwrap_or(0.0)
+}
+
+/// Streaming local reader used by downloads/uploads. The file handle is kept
+/// open for the lifetime of the transfer and closed when the value is dropped.
+pub struct LocalReader {
+    file: tokio::fs::File,
+}
+
+impl LocalReader {
+    pub async fn open(path: &str, offset: u64) -> Result<Self, AppError> {
+        let path = normalize_absolute(path)?;
+        let mut file = tokio::fs::File::open(&path)
+            .await
+            .map_err(|error| io_error(error, "open", &path))?;
+        if offset > 0 {
+            file.seek(SeekFrom::Start(offset))
+                .await
+                .map_err(|error| io_error(error, "seek", &path))?;
+        }
+        Ok(Self { file })
+    }
+}
+
+#[async_trait]
+impl FileReader for LocalReader {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
+        self.file.read(buf).await.map_err(AppError::from)
+    }
+
+    async fn finish(self: Box<Self>) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
+/// Streaming local writer. Offset zero truncates the file; a non-zero offset
+/// resumes without truncating.
+pub struct LocalWriter {
+    file: tokio::fs::File,
+}
+
+impl LocalWriter {
+    pub async fn open(path: &str, offset: u64) -> Result<Self, AppError> {
+        let path = normalize_absolute(path)?;
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(offset == 0)
+            .open(&path)
+            .await
+            .map_err(|error| io_error(error, "open", &path))?;
+        if offset > 0 {
+            file.seek(SeekFrom::Start(offset))
+                .await
+                .map_err(|error| io_error(error, "seek", &path))?;
+        }
+        Ok(Self { file })
+    }
+}
+
+#[async_trait]
+impl FileWriter for LocalWriter {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
+        self.file.write(buf).await.map_err(AppError::from)
+    }
+
+    async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+        self.file.flush().await.map_err(AppError::from)
+    }
+
+    async fn abort(self: Box<Self>) -> Result<(), AppError> {
+        Ok(())
+    }
 }
 
 fn io_error(error: std::io::Error, action: &str, path: &Path) -> AppError {

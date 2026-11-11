@@ -3,6 +3,7 @@ import { cn } from "cn"
 import {
   AlertTriangleIcon,
   ArrowDownToLineIcon,
+  ArrowUpFromLineIcon,
   Columns3Icon,
   EyeIcon,
   EyeOffIcon,
@@ -65,6 +66,8 @@ import {
 } from "@/features/files/model/selection"
 import { DEFAULT_SORT, nextSort, type SortState, sortEntries } from "@/features/files/model/sort"
 import { useSettings } from "@/features/settings/settings-context"
+import { TransferConflictDialog } from "@/features/transfers/components/transfer-conflict-dialog"
+import { useTransferActions } from "@/features/transfers/use-transfer-actions"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
 import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
@@ -120,6 +123,7 @@ export function DirectoryBrowser({
   const listingQuery = useFsListing(scope, path, settings.showHiddenFiles)
   const listing = listingQuery.data ?? null
   const isActive = activePane === pane
+  const { canTransfer, transferLabel, transfer, conflictPrompt } = useTransferActions(pane, scope)
 
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
   const [columns, setColumns] = useState<ColumnOptions>({ permissions: true })
@@ -254,6 +258,9 @@ export function DirectoryBrowser({
         case "new-folder":
           setNewFolderOpen(true)
           break
+        case "transfer":
+          if (selectedEntries.length > 0) transfer(selectedEntries)
+          break
       }
     },
     [
@@ -262,8 +269,9 @@ export function DirectoryBrowser({
       canChmod,
       openEntry,
       revealEntry,
-      selectedEntries.length,
+      selectedEntries,
       selection.selected.size,
+      transfer,
     ],
   )
 
@@ -427,6 +435,9 @@ export function DirectoryBrowser({
             canDelete={selectedEntries.length > 0 && canRemove}
             canPermissions={Boolean(activeEntry) && canChmod && selection.selected.size === 1}
             canReveal={allowReveal}
+            canTransfer={canTransfer && selectedEntries.length > 0}
+            transferLabel={transferLabel}
+            transferDirection={pane === "local" ? "upload" : "download"}
             onAction={handleAction}
           />
         </div>
@@ -563,6 +574,9 @@ export function DirectoryBrowser({
           canChmod={canChmod}
           allowOpen={allowOpenFile}
           allowReveal={allowReveal}
+          canTransfer={canTransfer}
+          transferLabel={transferLabel}
+          transferDirection={pane === "local" ? "upload" : "download"}
           onSelect={select}
           onSelectAll={() => setSelection(selectAll(entries))}
           onClearSelection={() => setSelection(clearSelection(entries))}
@@ -623,6 +637,15 @@ export function DirectoryBrowser({
         onOpenChange={setPermissionsOpen}
         onConfirm={applyPermissions}
       />
+      {conflictPrompt ? (
+        <TransferConflictDialog
+          open={conflictPrompt.open}
+          conflicts={conflictPrompt.conflicts}
+          direction={conflictPrompt.direction}
+          onOpenChange={conflictPrompt.onOpenChange}
+          onConfirm={conflictPrompt.onConfirm}
+        />
+      ) : null}
     </section>
   )
 }
@@ -670,6 +693,9 @@ function ActionsMenu({
   canDelete,
   canPermissions,
   canReveal,
+  canTransfer,
+  transferLabel,
+  transferDirection,
   onAction,
 }: {
   canOpen: boolean
@@ -677,8 +703,12 @@ function ActionsMenu({
   canDelete: boolean
   canPermissions: boolean
   canReveal: boolean
+  canTransfer: boolean
+  transferLabel: string
+  transferDirection: "upload" | "download"
   onAction: (action: FileAction) => void
 }) {
+  const TransferIcon = transferDirection === "upload" ? ArrowUpFromLineIcon : ArrowDownToLineIcon
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -693,6 +723,10 @@ function ActionsMenu({
           <ArrowDownToLineIcon />
           Open
           <DropdownMenuShortcut>↩</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!canTransfer} onSelect={() => onAction("transfer")}>
+          <TransferIcon />
+          {transferLabel}
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!canRename} onSelect={() => onAction("rename")}>
           <PencilIcon />

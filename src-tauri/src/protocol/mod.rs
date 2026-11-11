@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::fs::{FsCapabilities, FsEntry, Listing};
 use crate::error::AppError;
+use crate::fs::{FileReader, FileWriter};
 
 pub mod ftp;
 pub mod sftp;
@@ -17,6 +18,16 @@ pub trait RemoteFs: Send + Sync {
     async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError>;
     async fn delete(&mut self, path: &str, recursive: bool) -> Result<(), AppError>;
     async fn chmod(&mut self, path: &str, mode: u32) -> Result<(), AppError>;
+    /// Open a streaming reader. `offset` resumes a partial download.
+    async fn open_read(&mut self, path: &str, offset: u64)
+    -> Result<Box<dyn FileReader>, AppError>;
+    /// Open a streaming writer. Offset zero truncates; a non-zero offset
+    /// resumes a partial upload without truncating.
+    async fn open_write(
+        &mut self,
+        path: &str,
+        offset: u64,
+    ) -> Result<Box<dyn FileWriter>, AppError>;
     async fn disconnect(&mut self) -> Result<(), AppError>;
     fn capabilities(&self) -> FsCapabilities;
 }

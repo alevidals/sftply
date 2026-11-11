@@ -2,9 +2,9 @@
 
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
-**Last updated:** 2026-11-10  
-**Current phase:** Phase 3 in progress — FTP/FTPS/SFTP adapters, session lifecycle, remote browsing, host-key trust, connection status, Quick Connect, TLS verification options, FTP data-channel policy, reconnect/cancellation/timeouts and a real-server Docker integration suite are implemented. Remaining: visual QA and rendered component tests.
-**Overall status:** Phase 1 shell, Phase 2 local browser and the Phase 3 connection/remote-browsing slice are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA and certificate pinning. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect and the lost-session pane; real-window visual QA remains pending.
+**Last updated:** 2026-11-11  
+**Current phase:** Phase 4 in progress — Phase 4a single-file transfers are implemented end to end: streaming upload/download, progress events, cancellation, conflict preflight, temp-file downloads and a transfer panel. Phase 4b (recursive jobs, queue control, pause/resume, retry, history, drag-and-drop) is next.
+**Overall status:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD and binary streaming round trips. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table, dialogs and the transfer list; real-window visual QA remains pending.
 
 ---
 
@@ -174,12 +174,12 @@ These were recommended in the architecture package. Implementation proceeds with
 
 ## Phase 4 — Transfers
 
-- [ ] 4a: single-file pipeline, progress, cancellation, conflicts, temp download
+- [x] 4a: single-file pipeline, progress, cancellation, conflicts, temp download
 - [ ] 4b: recursive jobs, queue control, pause/resume where supported, retry, history, drag-and-drop
 - [ ] 4c: hardening (large files, broken connections, 1000-item queue, server matrix)
-- [ ] Transfer panel UI + status bar aggregation
-- [ ] Integration tests across protocols
-- [ ] Honest capability gating verified
+- [x] Transfer panel UI + status bar aggregation
+- [x] Integration tests across protocols (single-file binary streaming + CRUD)
+- [ ] Honest capability gating verified (resume/pause stay hidden until 4b)
 
 ### Phase 4 exit criteria
 
@@ -596,4 +596,41 @@ cargo test
 
 - Run real-window visual QA for local/remote panes, the lost-session state, and the Connections settings tab.
 - Start Phase 4 transfers (single-file pipeline, progress, cancellation, conflicts).
+- Push the repository to a remote and confirm the first CI run is green.
+
+### 2026-11-11 — Session 12: Phase 4a single-file transfers
+
+**Done**
+
+- Added the unified streaming filesystem surface: `FileReader` / `FileWriter` traits with `finish` and `abort`, implemented for local files, FTP/FTPS data streams and SFTP handles.
+- Added `RemoteFs::open_read` / `open_write` and `session::connect_client`, so a transfer worker can open its own protocol connection from the retained session profile and credentials instead of borrowing the browsing stream.
+- Added the Rust transfer manager: per-transfer cancellation tokens, a global semaphore from `transferConcurrency`, 64 KiB chunks, progress throttling, `transfer://delta` / `transfer://removed` events, and honest terminal states. A `Cancelled`, `Timeout` or `Network` failure marks the session unusable.
+- Downloads stream into a hidden `.name.sftply-part-<id>` file and atomically rename it on success; uploads write directly and best-effort delete partial remote files on failure.
+- Added `transfer_preflight`, `transfer_enqueue`, `transfers_list`, `transfer_cancel` and `transfer_clear_finished` commands. `transfer_enqueue` rejects folders, symlinks and special files for 4a.
+- Added the frontend transfer stack: Zustand transfer store, event bridge, TanStack Query API/actions, per-file preflight, one conflict prompt per batch (Skip / Keep both / Replace), transfer panel rows with progress/speed/ETA, and status-bar aggregation.
+- Added transfer actions to the file table actions menu and context menu for both panes.
+- Added unit tests for the local streaming helpers, transfer store/model, transfer list rendering, and integration streaming round trips for FTP, explicit FTPS, implicit FTPS and SFTP.
+
+**Fixed**
+
+- FTP directory listings joined entry paths against the *parent* of the listed directory, so listing `/folder` returned `/child` instead of `/folder/child`. Navigation into non-root folders and recursive deletes were therefore wrong. `entries` now joins against the listed path; the streaming integration test asserts the uploaded file's listed path.
+- The streaming integration tests ignored short writes. SFTP writes are packet-limited, so the 200 KB payload was silently truncated to roughly half. Tests now loop until each chunk is fully written, and payload assertions report the first differing byte instead of dumping 200 KB arrays.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (66 passed, 12 ignored).
+- `bun run check` (Biome, 112 Vitest tests in 19 files, strict TypeScript, production build) and `bun run bindings` (no diff).
+- `tests/integration/run.sh` → 12 integration tests passed: FTP/FTPS/SFTP CRUD, binary streaming round trips, custom CA, certificate pinning, wrong password and changed host key.
+- Docker teardown leaves no containers, images, volumes, networks or build cache; generated `tests/integration/certs` removed.
+
+**Notes**
+
+- Pause/resume is intentionally absent: the backend has no protocol-level pause, so the UI must not pretend it exists. Resume plumbing (`offset`) is present for the future but not exposed.
+- "Skip existing" is a frontend preflight decision; the backend only knows `Overwrite` and `Rename`.
+- A transfer failure does not abort the rest of the queue.
+
+**Next**
+
+- Phase 4b: recursive folder jobs, queue-level controls, retry/history and drag-and-drop.
+- Real-window visual QA for the transfer panel, conflict dialog and status bar.
 - Push the repository to a remote and confirm the first CI run is green.

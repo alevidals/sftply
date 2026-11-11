@@ -16,6 +16,7 @@ import { useAppInfo } from "@/hooks/use-app-info"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
 import { useStartupReport } from "@/hooks/use-startup-report"
+import { useTransferBridge } from "@/hooks/use-transfer-bridge"
 import { recordActivity } from "@/stores/activity-store"
 
 export function AppShell() {
@@ -29,6 +30,7 @@ export function AppShell() {
 
   useActivityBridge()
   useSessionBridge()
+  useTransferBridge()
   useGlobalShortcuts()
 
   useEffect(() => {

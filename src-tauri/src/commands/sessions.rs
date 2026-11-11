@@ -12,9 +12,7 @@ use crate::domain::fs::{EntryKind, FsCapabilities};
 use crate::domain::session::{SessionInfo, SessionState};
 use crate::error::{AppError, ErrorCode};
 use crate::protocol::RemoteFs;
-use crate::protocol::ftp::FtpRemote;
-use crate::protocol::sftp::{SftpCredentials, SftpRemote};
-use crate::session::{Session, SessionCredentials, emit_state, timeout_error};
+use crate::session::{Session, SessionCredentials, connect_client, emit_state, timeout_error};
 
 /// Open a real protocol session for a saved connection.
 ///
@@ -338,37 +336,7 @@ async fn establish(
     profile: &ConnectionProfile,
     credentials: &SessionCredentials,
 ) -> Result<(Box<dyn RemoteFs>, FsCapabilities), AppError> {
-    let mut client: Box<dyn RemoteFs> = match profile.protocol {
-        crate::domain::connection::ConnectionProtocol::Sftp => {
-            let (password, passphrase) = match credentials {
-                SessionCredentials::Password(password) => (Some(password.clone()), None),
-                SessionCredentials::Key { passphrase } => (None, passphrase.clone()),
-            };
-            Box::new(
-                SftpRemote::connect(
-                    profile,
-                    SftpCredentials {
-                        password,
-                        passphrase,
-                    },
-                    state.known_hosts.list(),
-                )
-                .await?,
-            )
-        }
-        _ => {
-            let password = match credentials {
-                SessionCredentials::Password(password) => password,
-                SessionCredentials::Key { .. } => {
-                    return Err(AppError::new(
-                        ErrorCode::AuthFailed,
-                        "No password is saved for this connection.",
-                    ));
-                }
-            };
-            Box::new(FtpRemote::connect(profile, password).await?)
-        }
-    };
+    let mut client = connect_client(profile, credentials, state.known_hosts.list()).await?;
 
     // Fail fast when the saved start folder no longer exists or is not a
     // folder, instead of opening a session that cannot browse anything.
