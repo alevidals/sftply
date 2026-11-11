@@ -7,6 +7,9 @@ import {
   ClockIcon,
   LoaderCircleIcon,
   OctagonXIcon,
+  PauseIcon,
+  PlayIcon,
+  RotateCcwIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -41,12 +44,26 @@ export function TransferList() {
   const order = useTransferStore((state) => state.order)
   const activeCount = useTransferStore(selectActiveTransferCount)
   const speed = useTransferStore(selectTransferSpeed)
+  const paused = useTransferStore((state) => state.paused)
+  const setPaused = useTransferStore((state) => state.setPaused)
   const hasFinished = order.some((id) => {
     const item = items[id]
     return item ? !["queued", "running"].includes(item.status) : false
   })
 
   if (order.length === 0) return null
+
+  const toggleQueue = () => {
+    const action = paused ? transfersApi.resumeQueue() : transfersApi.pauseQueue()
+    action
+      .then((next) => {
+        setPaused(next)
+        recordActivity("info", next ? "Paused the transfer queue" : "Resumed the transfer queue")
+      })
+      .catch((error) => {
+        toast.error("Could not change the transfer queue", { description: errorMessage(error) })
+      })
+  }
 
   const clearFinished = () => {
     transfersApi
@@ -83,6 +100,18 @@ export function TransferList() {
           {speed > 0 ? ` · ${formatBytes(speed)}/s` : ""}
         </span>
         <span className="ml-auto flex items-center gap-1">
+          {paused ? <span className="mr-1 text-warning">Queue paused</span> : null}
+          {paused || activeCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-5 gap-1 px-1.5 text-2xs text-muted-foreground"
+              onClick={toggleQueue}
+            >
+              {paused ? <PlayIcon className="size-3" /> : <PauseIcon className="size-3" />}
+              {paused ? "Resume queue" : "Pause queue"}
+            </Button>
+          ) : null}
           {hasFinished ? (
             <Button
               variant="ghost"
@@ -111,6 +140,7 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
         ? 100
         : 0
   const cancellable = item.status === "queued" || item.status === "running"
+  const retryable = item.status === "failed" || item.status === "cancelled"
 
   const cancel = () => {
     transfersApi
@@ -120,6 +150,15 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
       })
       .catch((error) => {
         toast.error(`Could not cancel “${item.name}”`, { description: errorMessage(error) })
+      })
+  }
+
+  const retry = () => {
+    transfersApi
+      .retry(item.id)
+      .then(() => recordActivity("info", `Retried “${item.name}”`))
+      .catch((error) => {
+        toast.error(`Could not retry “${item.name}”`, { description: errorMessage(error) })
       })
   }
 
@@ -162,6 +201,23 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6}>
               Cancel transfer
+            </TooltipContent>
+          </Tooltip>
+        ) : retryable ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Retry ${item.name}`}
+                className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                onClick={retry}
+              >
+                <RotateCcwIcon className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              Retry transfer
             </TooltipContent>
           </Tooltip>
         ) : (

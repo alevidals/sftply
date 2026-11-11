@@ -58,11 +58,17 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::sessions::session_disconnect,
             commands::sessions::session_cancel,
             commands::sessions::sessions_list,
+            commands::transfer::transfer_plan,
             commands::transfer::transfer_preflight,
             commands::transfer::transfer_enqueue,
+            commands::transfer::transfer_enqueue_tree,
             commands::transfer::transfers_list,
             commands::transfer::transfer_cancel,
+            commands::transfer::transfer_retry,
             commands::transfer::transfer_clear_finished,
+            commands::transfer::transfer_pause_queue,
+            commands::transfer::transfer_resume_queue,
+            commands::transfer::transfer_queue_paused,
         ])
         .events(tauri_specta::collect_events![
             ActivityEntry,

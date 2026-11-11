@@ -16,6 +16,8 @@ import {
   type StartupReport,
   type TransferConflict,
   type TransferItem,
+  type TransferItem_Serialize,
+  type TransferPlan_Serialize,
 } from "@/lib/ipc/bindings"
 
 type CommandResult<T, E> = { status: "ok"; data: T } | { status: "error"; error: E }
@@ -193,6 +195,17 @@ export const ipc = {
     return invoke(commands.sessionCancel(sessionId)).then((result) => unwrap(result))
   },
 
+  transferPlan(
+    source: FsScope,
+    sourcePaths: string[],
+    target: FsScope,
+    targetPath: string,
+  ): Promise<TransferPlan_Serialize> {
+    return invoke(commands.transferPlan(source, sourcePaths, target, targetPath)).then((result) =>
+      unwrap(result),
+    )
+  },
+
   transferPreflight(target: FsScope, targetPath: string): Promise<TransferConflict | null> {
     return invoke(commands.transferPreflight(target, targetPath)).then((result) => unwrap(result))
   },
@@ -209,6 +222,18 @@ export const ipc = {
     )
   },
 
+  transferEnqueueTree(
+    source: FsScope,
+    target: FsScope,
+    policy: ConflictPolicy,
+    entries: Parameters<typeof commands.transferEnqueueTree>[3],
+    skipTargets: string[],
+  ): Promise<TransferItem_Serialize[]> {
+    return invoke(commands.transferEnqueueTree(source, target, policy, entries, skipTargets)).then(
+      (result) => unwrap(result),
+    )
+  },
+
   transfersList(): Promise<TransferItem[]> {
     return invoke(commands.transfersList())
   },
@@ -217,7 +242,23 @@ export const ipc = {
     return invoke(commands.transferCancel(id))
   },
 
+  transferRetry(id: string): Promise<TransferItem_Serialize> {
+    return invoke(commands.transferRetry(id)).then((result) => unwrap(result))
+  },
+
   transferClearFinished(): Promise<number> {
     return invoke(commands.transferClearFinished())
+  },
+
+  transferPauseQueue(): Promise<boolean> {
+    return invoke(commands.transferPauseQueue())
+  },
+
+  transferResumeQueue(): Promise<boolean> {
+    return invoke(commands.transferResumeQueue())
+  },
+
+  transferQueuePaused(): Promise<boolean> {
+    return invoke(commands.transferQueuePaused())
   },
 }

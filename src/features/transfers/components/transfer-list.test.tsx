@@ -7,12 +7,18 @@ import type { TransferItem_Serialize } from "@/lib/ipc/bindings"
 import { useTransferStore } from "@/stores/transfer-store"
 
 const cancel = vi.fn().mockResolvedValue(true)
+const retry = vi.fn().mockResolvedValue(undefined)
 const clearFinished = vi.fn().mockResolvedValue(1)
+const pauseQueue = vi.fn().mockResolvedValue(true)
+const resumeQueue = vi.fn().mockResolvedValue(false)
 
 vi.mock("@/features/transfers/api", () => ({
   transfersApi: {
     cancel: (...args: unknown[]) => cancel(...args),
+    retry: (...args: unknown[]) => retry(...args),
     clearFinished: (...args: unknown[]) => clearFinished(...args),
+    pauseQueue: (...args: unknown[]) => pauseQueue(...args),
+    resumeQueue: (...args: unknown[]) => resumeQueue(...args),
   },
 }))
 
@@ -48,7 +54,10 @@ function renderList() {
 beforeEach(() => {
   useTransferStore.getState().clear()
   cancel.mockClear()
+  retry.mockClear()
   clearFinished.mockClear()
+  pauseQueue.mockClear()
+  resumeQueue.mockClear()
 })
 
 describe("TransferList", () => {
@@ -99,5 +108,27 @@ describe("TransferList", () => {
 
     expect(screen.getByText("The server refused the file.")).toBeInTheDocument()
     expect(screen.getByText("Failed")).toBeInTheDocument()
+  })
+
+  it("retries a failed transfer", async () => {
+    useTransferStore.getState().setAll([item({ status: "failed", error: "No route" })])
+    renderList()
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry report.pdf" }))
+    expect(retry).toHaveBeenCalledWith("t1")
+  })
+
+  it("pauses and resumes the queue", async () => {
+    useTransferStore.getState().setAll([item()])
+    renderList()
+
+    await userEvent.click(screen.getByRole("button", { name: "Pause queue" }))
+    expect(pauseQueue).toHaveBeenCalled()
+    expect(useTransferStore.getState().paused).toBe(true)
+    expect(screen.getByText("Queue paused")).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole("button", { name: "Resume queue" }))
+    expect(resumeQueue).toHaveBeenCalled()
+    expect(useTransferStore.getState().paused).toBe(false)
   })
 })

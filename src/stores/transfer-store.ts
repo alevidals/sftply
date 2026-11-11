@@ -11,9 +11,12 @@ interface TransferState {
   items: Record<string, TransferItem_Serialize>
   /** Transfer ids, newest first. */
   order: string[]
+  /** True while the backend queue refuses to start new transfers. */
+  paused: boolean
   setAll: (items: TransferItem[]) => void
   applyDelta: (event: TransferDeltaEvent) => void
   remove: (ids: string[]) => void
+  setPaused: (paused: boolean) => void
   clear: () => void
 }
 
@@ -23,6 +26,7 @@ const UNFINISHED: TransferStatus[] = ["queued", "running"]
 export const useTransferStore = create<TransferState>((set) => ({
   items: {},
   order: [],
+  paused: false,
 
   setAll: (items) =>
     set(() => {
@@ -53,7 +57,9 @@ export const useTransferStore = create<TransferState>((set) => ({
       return { items, order: sortIds(Object.values(items)) }
     }),
 
-  clear: () => set({ items: {}, order: [] }),
+  setPaused: (paused) => set({ paused }),
+
+  clear: () => set({ items: {}, order: [], paused: false }),
 }))
 
 function sortIds(items: TransferItem_Serialize[]): string[] {

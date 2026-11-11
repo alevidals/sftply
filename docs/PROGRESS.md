@@ -3,8 +3,8 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-11  
-**Current phase:** Phase 4 in progress — Phase 4a single-file transfers are implemented end to end: streaming upload/download, progress events, cancellation, conflict preflight, temp-file downloads and a transfer panel. Phase 4b (recursive jobs, queue control, pause/resume, retry, history, drag-and-drop) is next.
-**Overall status:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD and binary streaming round trips. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table, dialogs and the transfer list; real-window visual QA remains pending.
+**Current phase:** Phase 4 in progress — Phase 4a (single-file) and Phase 4b (recursive jobs, queue control, retry, in-app drag-and-drop) are implemented. Phase 4c hardening (large files, broken connections, 1000-item queue, server matrix) and transfer history persistence remain.
+**Overall status:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a/4b transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD, binary streaming round trips and nested-folder creation. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table (including drag/drop), dialogs and the transfer list; real-window visual QA remains pending. A minimal Docker FTP server for manual connection testing lives in `docker/dev-ftp/` and is documented below.
 
 ---
 
@@ -175,11 +175,13 @@ These were recommended in the architecture package. Implementation proceeds with
 ## Phase 4 — Transfers
 
 - [x] 4a: single-file pipeline, progress, cancellation, conflicts, temp download
-- [ ] 4b: recursive jobs, queue control, pause/resume where supported, retry, history, drag-and-drop
+- [x] 4b: recursive jobs, queue control, retry, in-app drag-and-drop (pause is queue-level only)
 - [ ] 4c: hardening (large files, broken connections, 1000-item queue, server matrix)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
-- [ ] Honest capability gating verified (resume/pause stay hidden until 4b)
+- [x] Honest capability gating verified (per-transfer pause/resume stays hidden; queue pause only)
+- [ ] Transfer history persistence across restarts
+- [ ] OS file drag-and-drop (Finder → pane) and drag-out
 
 ### Phase 4 exit criteria
 
@@ -250,20 +252,47 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-**Last verification run:** 2026-11-06 — all gates green.
+**Last verification run:** 2026-11-11 — all gates green.
 
-| Gate                 | Result                                                         |
-| -------------------- | -------------------------------------------------------------- |
-| `bun run typecheck`  | pass                                                           |
-| `bunx biome check .` | pass                                                           |
-| `bun run test`       | 49 tests pass in 8 files (includes 10k sort/filter smoke test) |
-| `bun run build`      | pass (single JS chunk warning, see known issues)               |
-| `cargo fmt --check`  | pass                                                           |
-| `cargo clippy`       | pass with `-D warnings`                                        |
-| `cargo test`         | 29 tests pass (includes 10k listing budget test)               |
-| `bun run bindings`   | regenerates `src/lib/ipc/bindings.ts` deterministically        |
+| Gate                 | Result                                                              |
+| -------------------- | ------------------------------------------------------------------- |
+| `bun run typecheck`  | pass                                                                |
+| `bunx biome check .` | pass                                                                |
+| `bun run test`       | 117 tests pass in 19 files                                          |
+| `bun run build`      | pass (single JS chunk warning, see known issues)                    |
+| `cargo fmt --check`  | pass                                                                |
+| `cargo clippy`       | pass with `-D warnings`                                             |
+| `cargo test`         | 68 tests pass, 14 ignored (Docker integration tests)                |
+| `bun run bindings`   | regenerates `src/lib/ipc/bindings.ts` deterministically             |
+| `tests/integration`  | 14 tests pass (FTP, explicit FTPS, implicit FTPS, SFTP + streaming) |
 
 **Performance:** listing 10,000 local entries took **71.9 ms**; the automated test fails above 5 s to tolerate slow CI hardware.
+
+### Manual dev FTP server
+
+`docker/dev-ftp/` runs a minimal plain-FTP server (Alpine + Pure-FTPd) for trying
+the app by hand. It is separate from the automated integration matrix and keeps
+its data in the named volume `sftply-dev-ftp_ftp-data`.
+
+```bash
+bun run dev:ftp        # docker compose up -d --build
+bun run dev:ftp:logs   # follow the container log
+bun run dev:ftp:down   # stop (add -v to remove the data volume)
+```
+
+| Field    | Value        |
+| -------- | ------------ |
+| Protocol | FTP          |
+| Host     | `127.0.0.1`  |
+| Port     | `2121`       |
+| User     | `sftply`     |
+| Password | `sftply-dev` |
+| Start    | `/`          |
+
+The home folder contains `welcome.txt` and a writable `upload/` folder. Passive
+data connections use ports `30000-30009`; the server advertises `127.0.0.1`,
+which is only correct for local client connections. See
+`docker/dev-ftp/README.md` for details.
 
 ---
 
@@ -613,7 +642,7 @@ cargo test
 
 **Fixed**
 
-- FTP directory listings joined entry paths against the *parent* of the listed directory, so listing `/folder` returned `/child` instead of `/folder/child`. Navigation into non-root folders and recursive deletes were therefore wrong. `entries` now joins against the listed path; the streaming integration test asserts the uploaded file's listed path.
+- FTP directory listings joined entry paths against the _parent_ of the listed directory, so listing `/folder` returned `/child` instead of `/folder/child`. Navigation into non-root folders and recursive deletes were therefore wrong. `entries` now joins against the listed path; the streaming integration test asserts the uploaded file's listed path.
 - The streaming integration tests ignored short writes. SFTP writes are packet-limited, so the 200 KB payload was silently truncated to roughly half. Tests now loop until each chunk is fully written, and payload assertions report the first differing byte instead of dumping 200 KB arrays.
 
 **Verified**
@@ -633,4 +662,45 @@ cargo test
 
 - Phase 4b: recursive folder jobs, queue-level controls, retry/history and drag-and-drop.
 - Real-window visual QA for the transfer panel, conflict dialog and status bar.
+- Push the repository to a remote and confirm the first CI run is green.
+
+### 2026-11-11 — Session 13: Phase 4b recursive transfers and dev FTP server
+
+**Done**
+
+- Added recursive transfer planning in Rust: `transfer_plan` walks one or more selected items, includes directories so empty folders are recreated, probes conflicts per file, and reports total bytes plus skipped symlinks/special files. Guards: 50,000 entries and 64 levels of depth.
+- Added `transfer_enqueue_tree`: it creates every planned remote/local directory first, then spawns file jobs from the plan. Folders and files both transfer; the target keeps the source root's leaf name.
+- Extended `TransferManager` with retained job snapshots, `transfer_retry` (fresh id, only failed/cancelled jobs), queue-level `transfer_pause_queue` / `transfer_resume_queue` / `transfer_queue_paused` via a `watch` channel, and `ensure_local_parent` / `ensure_remote_dir`. Uploads use a dedicated remote connection per job.
+- Added the frontend recursive flow: plan → one conflict prompt for the whole batch (Skip / Keep both / Replace) → enqueue from the plan. Skip is a frontend preflight decision; the backend only knows `Overwrite` and `Rename`.
+- Added in-app drag-and-drop between panes and onto folder rows using an HTML5 `application/x-sftply-entries` payload. Dropping into the same scope is rejected with an explanation.
+- Added queue pause/resume and per-row retry to the transfer panel, with paused state in the transfer store and event bridge. Per-transfer pause/resume stays hidden because the protocols do not support it honestly.
+- Added `docker/dev-ftp/`: a minimal Alpine + Pure-FTPd plain-FTP server for manual testing, with compose file, entrypoint, README and `bun run dev:ftp` / `dev:ftp:down` / `dev:ftp:logs` scripts. It uses port `2121`, passive `30000-30009`, user `sftply` / `sftply-dev`, and a persistent named volume.
+- Added tests: model drag payload and path-join helpers, `FileTable` drag/drop rendering, transfer-list retry/pause, backend path/direction unit tests, and FTP/SFTP `creates_nested_remote_folders` integration tests.
+
+**Fixed**
+
+- Clippy rejected the recursive walker's nine arguments; it is now a `PlanWalker` struct with a `walk` method.
+- The frontend drop handler could pass a null destination path; it now refuses with "Choose a destination folder first" instead of sending an invalid IPC call.
+- The pane drop overlay stayed visible after a drop; `dropInto` now clears it first.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (68 passed, 14 ignored).
+- `bun run check` (Biome, 117 Vitest tests in 19 files, strict TypeScript, production build) and `bun run bindings` (no diff).
+- `tests/integration/run.sh` → 14 integration tests passed, including nested-folder creation for FTP and SFTP.
+- Manual dev server check via `curl`: root listing, upload, download and delete all succeed against `127.0.0.1:2121`.
+- Docker teardown after integration leaves no containers, images, volumes or networks; generated `tests/integration/certs` removed. The dev FTP container is intentionally left running.
+
+**Notes**
+
+- Queue pause stops new jobs from starting; running transfers finish. There is no per-transfer pause.
+- Transfer history is still in memory only; it does not survive an app restart.
+- Drag-and-drop is in-app only. Dropping files from Finder or dragging out to the OS is not implemented yet.
+- The dev FTP server is plain FTP and advertises `127.0.0.1` as its passive address, so it is for local manual testing only. The automated matrix in `tests/integration` remains the TLS/SFTP coverage.
+
+**Next**
+
+- Phase 4c: large-file and broken-connection hardening, a 1,000-item queue test, and a wider server matrix.
+- Persist transfer history and add OS file drag-and-drop (Finder → pane, drag-out).
+- Real-window visual QA for the transfer panel, conflict dialog, drag overlay and status bar.
 - Push the repository to a remote and confirm the first CI run is green.

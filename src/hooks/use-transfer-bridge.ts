@@ -19,6 +19,15 @@ export function useTransferBridge(): void {
         recordActivity("warning", "Could not read the transfer queue.")
       })
 
+    transfersApi
+      .queuePaused()
+      .then((paused) => {
+        if (!disposed) useTransferStore.getState().setPaused(paused)
+      })
+      .catch(() => {
+        recordActivity("warning", "Could not read the transfer queue state.")
+      })
+
     onTransferDelta((event) => {
       useTransferStore.getState().applyDelta(event)
     })

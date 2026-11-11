@@ -24,8 +24,15 @@ import { FileEntryIcon } from "@/features/files/components/file-entry-icon"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
 import { entryNameError } from "@/features/files/model/names"
 import type { SelectionMode, SelectionState } from "@/features/files/model/selection"
+import {
+  readTransferDrag,
+  TRANSFER_DRAG_MIME,
+  type TransferDragPayload,
+  transferableEntries,
+  writeTransferDrag,
+} from "@/features/transfers/model"
 import { formatBytes, formatMode, formatModified } from "@/lib/format"
-import type { FsEntry } from "@/lib/ipc/bindings"
+import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
 
 export type FileAction =
   | "open"
@@ -51,6 +58,10 @@ interface FileTableProps {
   canTransfer: boolean
   transferLabel: string
   transferDirection: "upload" | "download"
+  /** Scope that drag payloads from this table belong to. */
+  dragScope: FsScope
+  /** Drop entries onto a folder row. */
+  onDropPayload: (payload: TransferDragPayload, directory: FsEntry) => void
   onSelect: (index: number, mode: SelectionMode) => void
   onSelectAll: () => void
   onClearSelection: () => void
@@ -75,6 +86,8 @@ export function FileTable({
   canTransfer,
   transferLabel,
   transferDirection,
+  dragScope,
+  onDropPayload,
   onSelect,
   onSelectAll,
   onClearSelection,
@@ -92,6 +105,7 @@ export function FileTable({
     timer: null,
   })
   const [contextIndex, setContextIndex] = useState<number | null>(null)
+  const [dropPath, setDropPath] = useState<string | null>(null)
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -270,6 +284,41 @@ export function FileTable({
                     setContextIndex(index)
                     if (!selected) onSelect(index, "replace")
                   }}
+                  draggable={!renaming}
+                  onDragStart={(event) => {
+                    const dragged = selected
+                      ? entries.filter((item) => selection.selected.has(item.path))
+                      : [entry]
+                    const supported = transferableEntries(dragged)
+                    if (supported.length === 0) {
+                      event.preventDefault()
+                      return
+                    }
+                    writeTransferDrag(event.dataTransfer, { scope: dragScope, entries: supported })
+                  }}
+                  onDragOver={(event) => {
+                    if (entry.kind !== "directory") return
+                    if (!event.dataTransfer.types.includes(TRANSFER_DRAG_MIME)) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    event.dataTransfer.dropEffect = "copy"
+                    if (dropPath !== entry.path) setDropPath(entry.path)
+                  }}
+                  onDragLeave={(event) => {
+                    if (entry.kind !== "directory") return
+                    const related = event.relatedTarget
+                    if (related instanceof Node && event.currentTarget.contains(related)) return
+                    setDropPath((current) => (current === entry.path ? null : current))
+                  }}
+                  onDrop={(event) => {
+                    if (entry.kind !== "directory") return
+                    const payload = readTransferDrag(event.dataTransfer)
+                    setDropPath(null)
+                    if (!payload) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onDropPayload(payload, entry)
+                  }}
                   style={{
                     height: `${rowHeight}px`,
                     transform: `translateY(${virtualRow.start}px)`,
@@ -280,6 +329,7 @@ export function FileTable({
                     "text-foreground transition-colors",
                     selected ? "bg-row-selected" : "hover:bg-row-hover",
                     active && "ring-1 ring-primary/25 ring-inset",
+                    dropPath === entry.path && "bg-primary/10 ring-1 ring-primary/40 ring-inset",
                   )}
                 >
                   <div role="gridcell" className="flex min-w-0 items-center gap-2">

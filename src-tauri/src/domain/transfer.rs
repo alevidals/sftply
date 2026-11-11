@@ -72,6 +72,33 @@ pub struct TransferConflict {
     pub modified_at: Option<f64>,
 }
 
+/// One item discovered by a recursive transfer plan. Directories are included
+/// so empty folders are recreated and the tree keeps its shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferPlanEntry {
+    pub source_path: String,
+    pub target_path: String,
+    /// Path relative to the selected root, e.g. `photos/2024/a.jpg`.
+    pub relative_path: String,
+    pub kind: EntryKind,
+    #[specta(type = specta_typescript::Number)]
+    pub size: f64,
+    /// Set when a file would replace an existing target.
+    pub conflict: Option<TransferConflict>,
+}
+
+/// Result of walking one or more selected items before enqueuing them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferPlan {
+    pub entries: Vec<TransferPlanEntry>,
+    /// Symlinks and special files are never followed or copied silently.
+    pub skipped: u32,
+    #[specta(type = specta_typescript::Number)]
+    pub total_bytes: f64,
+}
+
 /// Batched transfer updates. The backend coalesces progress to a few events per
 /// second so a large transfer cannot saturate the WebView IPC bridge.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, tauri_specta::Event)]

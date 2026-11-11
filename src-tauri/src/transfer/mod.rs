@@ -5,12 +5,13 @@ use std::time::{Duration, Instant};
 
 use tauri::AppHandle;
 use tauri_specta::Event;
-use tokio::sync::Semaphore;
+use tokio::sync::{Semaphore, watch};
 use tokio_util::sync::CancellationToken;
 
 use crate::domain::connection::ConnectionProfile;
+use crate::domain::fs::EntryKind;
 use crate::domain::host_key::KnownHost;
-use crate::domain::remote_path::{join_remote, remote_leaf, remote_parent};
+use crate::domain::remote_path::{join_remote, normalize_remote, remote_leaf, remote_parent};
 use crate::domain::transfer::{
     ConflictPolicy, TransferDeltaEvent, TransferDirection, TransferItem, TransferStatus,
 };
@@ -33,6 +34,7 @@ pub struct RemoteAccess {
     pub trusted: Vec<KnownHost>,
 }
 
+#[derive(Clone)]
 pub struct TransferJob {
     pub item: TransferItem,
     pub source_remote: Option<RemoteAccess>,
@@ -40,20 +42,102 @@ pub struct TransferJob {
     pub policy: ConflictPolicy,
 }
 
-/// In-memory transfer queue. Completed rows stay until the user clears them.
+/// In-memory transfer queue. Completed rows stay until the user clears them,
+/// and their jobs are kept so a failed or cancelled transfer can be retried
+/// without asking the frontend to rebuild it.
 pub struct TransferManager {
     items: RwLock<HashMap<String, TransferItem>>,
     tasks: Mutex<HashMap<String, CancellationToken>>,
+    jobs: Mutex<HashMap<String, TransferJob>>,
     semaphore: Arc<Semaphore>,
+    /// True while the queue is paused. Running transfers are allowed to finish;
+    /// no new transfer starts until the queue is resumed.
+    paused: watch::Sender<bool>,
 }
 
 impl TransferManager {
     pub fn new(concurrency: usize) -> Self {
+        let (paused, _) = watch::channel(false);
         Self {
             items: RwLock::new(HashMap::new()),
             tasks: Mutex::new(HashMap::new()),
+            jobs: Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(concurrency.clamp(1, 8))),
+            paused,
         }
+    }
+
+    pub fn remember_job(&self, job: TransferJob) {
+        self.jobs
+            .lock()
+            .expect("transfer job lock poisoned")
+            .insert(job.item.id.clone(), job);
+    }
+
+    pub fn is_paused(&self) -> bool {
+        *self.paused.borrow()
+    }
+
+    pub fn pause_queue(&self) -> bool {
+        self.paused.send_replace(true);
+        true
+    }
+
+    pub fn resume_queue(&self) -> bool {
+        self.paused.send_replace(false);
+        false
+    }
+
+    /// Requeue a failed or cancelled transfer with a fresh id. The original job
+    /// snapshot is reused, so credentials never round-trip through the UI.
+    pub fn retry(self: &Arc<Self>, app: &AppHandle, id: &str) -> Result<TransferItem, AppError> {
+        let (status, mut job) = {
+            let items = self.items.read().expect("transfer lock poisoned");
+            let item = items.get(id).ok_or_else(|| {
+                AppError::new(
+                    ErrorCode::NotFound,
+                    "That transfer is no longer in the queue.",
+                )
+            })?;
+            let status = item.status;
+            let job = self
+                .jobs
+                .lock()
+                .expect("transfer job lock poisoned")
+                .get(id)
+                .cloned()
+                .ok_or_else(|| {
+                    AppError::new(
+                        ErrorCode::NotFound,
+                        "That transfer can no longer be retried. Queue it again.",
+                    )
+                })?;
+            (status, job)
+        };
+
+        if !matches!(status, TransferStatus::Failed | TransferStatus::Cancelled) {
+            return Err(AppError::new(
+                ErrorCode::Conflict,
+                "Only failed or cancelled transfers can be retried.",
+            ));
+        }
+
+        let mut item = job.item.clone();
+        item.id = uuid::Uuid::new_v4().to_string();
+        item.status = TransferStatus::Queued;
+        item.transferred = 0.0;
+        item.bytes_per_sec = 0.0;
+        item.eta_ms = None;
+        item.error = None;
+        item.finished_at = None;
+        item.started_at = crate::domain::activity::unix_millis();
+        job.item = item.clone();
+
+        self.insert(item.clone());
+        self.remember_job(job.clone());
+        emit_delta(app, vec![item.clone()], Vec::new());
+        spawn_transfer(app.clone(), self.clone(), job);
+        Ok(item)
     }
 
     pub fn insert(&self, item: TransferItem) {
@@ -115,6 +199,10 @@ impl TransferManager {
             finished
         };
         if !removed.is_empty() {
+            let mut jobs = self.jobs.lock().expect("transfer job lock poisoned");
+            for id in &removed {
+                jobs.remove(id);
+            }
             emit_delta(app, Vec::new(), removed.clone());
         }
         removed
@@ -155,24 +243,49 @@ pub fn spawn_transfer(
     let semaphore = manager.semaphore.clone();
 
     tokio::spawn(async move {
-        let permit = tokio::select! {
-            biased;
-            _ = token.cancelled() => {
-                finish_cancelled(&app, &manager, &mut job.item);
+        let mut paused = manager.paused.subscribe();
+        let permit = loop {
+            while *paused.borrow() {
+                tokio::select! {
+                    biased;
+                    _ = token.cancelled() => {
+                        finish_cancelled(&app, &manager, &mut job.item);
+                        manager.finish_task(&job.item.id);
+                        return;
+                    }
+                    changed = paused.changed() => {
+                        if changed.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let permit = tokio::select! {
+                biased;
+                _ = token.cancelled() => {
+                    finish_cancelled(&app, &manager, &mut job.item);
+                    manager.finish_task(&job.item.id);
+                    return;
+                }
+                permit = semaphore.clone().acquire_owned() => permit.ok(),
+            };
+            let Some(permit) = permit else {
+                fail(
+                    &app,
+                    &manager,
+                    &mut job.item,
+                    AppError::internal("The transfer queue is closed.", "semaphore closed"),
+                );
                 manager.finish_task(&job.item.id);
                 return;
+            };
+            // A pause can arrive while this task was waiting for a permit. Give
+            // the slot back and wait instead of starting work after the pause.
+            if !manager.is_paused() {
+                break permit;
             }
-            permit = semaphore.acquire_owned() => permit.ok(),
-        };
-        let Some(permit) = permit else {
-            fail(
-                &app,
-                &manager,
-                &mut job.item,
-                AppError::internal("The transfer queue is closed.", "semaphore closed"),
-            );
-            manager.finish_task(&job.item.id);
-            return;
+            drop(permit);
         };
 
         let mut item = job.item.clone();
@@ -258,6 +371,52 @@ async fn connect_remote(access: &RemoteAccess) -> Result<Box<dyn RemoteFs>, AppE
     connect_client(&access.profile, &access.credentials, access.trusted.clone()).await
 }
 
+async fn ensure_local_parent(target: &str) -> Result<(), AppError> {
+    let Some(parent) = Path::new(target).parent() else {
+        return Ok(());
+    };
+    tokio::fs::create_dir_all(parent).await.map_err(|error| {
+        AppError::new(
+            ErrorCode::PermissionDenied,
+            "Could not create the destination folder.",
+        )
+        .with_detail(format!("create {}: {error}", parent.display()))
+    })
+}
+
+/// Create a remote directory tree segment by segment. This is used before an
+/// upload starts, so a recursive transfer recreates empty folders as well.
+pub(crate) async fn ensure_remote_dir(
+    client: &mut Box<dyn RemoteFs>,
+    dir: &str,
+) -> Result<(), AppError> {
+    let dir = normalize_remote(dir)?;
+    if dir == "/" {
+        return Ok(());
+    }
+
+    let mut current = "/".to_string();
+    for segment in dir.trim_start_matches('/').split('/') {
+        let next = join_remote(&current, segment)?;
+        match client.stat(&next).await {
+            Ok(entry) if entry.kind == EntryKind::Directory => {}
+            Ok(_) => {
+                return Err(AppError::new(
+                    ErrorCode::Conflict,
+                    "A file is in the way of a folder that must be created.",
+                )
+                .with_detail(next));
+            }
+            Err(error) if error.code == ErrorCode::NotFound => {
+                client.mkdir(&current, segment).await?;
+            }
+            Err(error) => return Err(error),
+        }
+        current = next;
+    }
+    Ok(())
+}
+
 async fn download(
     app: &AppHandle,
     manager: &TransferManager,
@@ -275,6 +434,7 @@ async fn download(
         item.target_path = target.clone();
         manager.publish(app, item);
     }
+    ensure_local_parent(&target).await?;
     let temp = temp_download_path(&target, &item.id);
     let mut reader = client.open_read(&item.source_path, 0).await?;
     let mut writer: Box<dyn FileWriter> = Box::new(LocalWriter::open(&temp, 0).await?);
@@ -313,6 +473,9 @@ async fn upload(
         manager.publish(app, item);
     }
 
+    if let Some(parent) = remote_parent(&target)? {
+        ensure_remote_dir(client, &parent).await?;
+    }
     let mut reader: Box<dyn FileReader> = Box::new(LocalReader::open(&item.source_path, 0).await?);
     let mut writer = client.open_write(&target, 0).await?;
 

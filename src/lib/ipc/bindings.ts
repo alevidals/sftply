@@ -57,11 +57,17 @@ export const commands = {
 	/**  Cancel the remote operation currently running on a session, if any. */
 	sessionCancel: (sessionId: string) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("session_cancel", { sessionId })),
 	sessionsList: () => __TAURI_INVOKE<SessionInfo[]>("sessions_list"),
+	transferPlan: (source: FsScope, sourcePaths: string[], target: FsScope, targetPath: string) => typedError<TransferPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("transfer_plan", { source, sourcePaths, target, targetPath })),
 	transferPreflight: (target: FsScope, targetPath: string) => typedError<TransferConflict_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("transfer_preflight", { target, targetPath })),
 	transferEnqueue: (source: FsScope, sourcePath: string, target: FsScope, targetPath: string, policy: ConflictPolicy) => typedError<TransferItem_Serialize, AppError_Serialize>(__TAURI_INVOKE("transfer_enqueue", { source, sourcePath, target, targetPath, policy })),
+	transferEnqueueTree: (source: FsScope, target: FsScope, policy: ConflictPolicy, entries: TransferPlanEntry_Deserialize[], skipTargets: string[]) => typedError<TransferItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("transfer_enqueue_tree", { source, target, policy, entries, skipTargets })),
 	transfersList: () => __TAURI_INVOKE<TransferItem_Serialize[]>("transfers_list"),
 	transferCancel: (id: string) => __TAURI_INVOKE<boolean>("transfer_cancel", { id }),
+	transferRetry: (id: string) => typedError<TransferItem_Serialize, AppError_Serialize>(__TAURI_INVOKE("transfer_retry", { id })),
 	transferClearFinished: () => __TAURI_INVOKE<number>("transfer_clear_finished"),
+	transferPauseQueue: () => __TAURI_INVOKE<boolean>("transfer_pause_queue"),
+	transferResumeQueue: () => __TAURI_INVOKE<boolean>("transfer_resume_queue"),
+	transferQueuePaused: () => __TAURI_INVOKE<boolean>("transfer_queue_paused"),
 };
 
 /** Events */
@@ -621,6 +627,61 @@ export type TransferItem_Serialize = {
 	/**  Unix epoch milliseconds, UTC. */
 	startedAt: number,
 	finishedAt: number | null,
+};
+
+/**  Result of walking one or more selected items before enqueuing them. */
+export type TransferPlan = TransferPlan_Serialize | TransferPlan_Deserialize;
+
+/**
+ *  One item discovered by a recursive transfer plan. Directories are included
+ *  so empty folders are recreated and the tree keeps its shape.
+ */
+export type TransferPlanEntry = TransferPlanEntry_Serialize | TransferPlanEntry_Deserialize;
+
+/**
+ *  One item discovered by a recursive transfer plan. Directories are included
+ *  so empty folders are recreated and the tree keeps its shape.
+ */
+export type TransferPlanEntry_Deserialize = {
+	sourcePath: string,
+	targetPath: string,
+	/**  Path relative to the selected root, e.g. `photos/2024/a.jpg`. */
+	relativePath: string,
+	kind: EntryKind,
+	size: number,
+	/**  Set when a file would replace an existing target. */
+	conflict?: TransferConflict_Deserialize | null,
+};
+
+/**
+ *  One item discovered by a recursive transfer plan. Directories are included
+ *  so empty folders are recreated and the tree keeps its shape.
+ */
+export type TransferPlanEntry_Serialize = {
+	sourcePath: string,
+	targetPath: string,
+	/**  Path relative to the selected root, e.g. `photos/2024/a.jpg`. */
+	relativePath: string,
+	kind: EntryKind,
+	size: number,
+	/**  Set when a file would replace an existing target. */
+	conflict: TransferConflict_Serialize | null,
+};
+
+/**  Result of walking one or more selected items before enqueuing them. */
+export type TransferPlan_Deserialize = {
+	entries: TransferPlanEntry_Deserialize[],
+	/**  Symlinks and special files are never followed or copied silently. */
+	skipped: number,
+	totalBytes: number,
+};
+
+/**  Result of walking one or more selected items before enqueuing them. */
+export type TransferPlan_Serialize = {
+	entries: TransferPlanEntry_Serialize[],
+	/**  Symlinks and special files are never followed or copied silently. */
+	skipped: number,
+	totalBytes: number,
 };
 
 export type TransferStatus = "queued" | "running" | "completed" | "failed" | "cancelled";

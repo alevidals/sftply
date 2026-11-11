@@ -809,6 +809,41 @@ mod integration {
 
     #[tokio::test]
     #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn creates_nested_remote_folders() {
+        let profile = profile();
+        let trusted = trusted_host(&profile).await;
+        let mut remote: Box<dyn RemoteFs> = Box::new(
+            SftpRemote::connect(&profile, credentials(), vec![trusted])
+                .await
+                .expect("connect"),
+        );
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("tree-{stamp}");
+        let nested = format!("{WRITABLE}/{folder}/photos/2024");
+
+        crate::transfer::ensure_remote_dir(&mut remote, &nested)
+            .await
+            .expect("create nested folders");
+        let stat = remote.stat(&nested).await.expect("stat nested folder");
+        assert_eq!(stat.kind, EntryKind::Directory);
+
+        crate::transfer::ensure_remote_dir(&mut remote, &nested)
+            .await
+            .expect("reuse nested folders");
+
+        remote
+            .delete(&format!("{WRITABLE}/{folder}"), true)
+            .await
+            .expect("delete tree");
+        remote.disconnect().await.expect("disconnect");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
     async fn rejects_changed_host_key() {
         let profile = profile();
         let mut known = trusted_host(&profile).await;

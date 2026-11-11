@@ -1,0 +1,21 @@
+name: sftply-dev-ftp
+
+services:
+  ftp:
+    build:
+      context: .
+    image: sftply/dev-ftp:latest
+    restart: unless-stopped
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
+    environment:
+      FTP_USER: sftply
+      FTP_PASSWORD: sftply-dev
+      FTP_HOME: /home/ftpuser
+      FTP_PASSIVE: 30000:30009
+    volumes:
+      - ftp-data:/home/ftpuser
+
+volumes:
+  ftp-data:

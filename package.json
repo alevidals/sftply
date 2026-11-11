@@ -18,6 +18,9 @@
     "rust:check": "cd src-tauri && cargo check --all-targets",
     "rust:test": "cd src-tauri && cargo test",
     "rust:lint": "cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings",
+    "dev:ftp": "docker compose -f docker/dev-ftp/docker-compose.yml up -d --build",
+    "dev:ftp:down": "docker compose -f docker/dev-ftp/docker-compose.yml down",
+    "dev:ftp:logs": "docker compose -f docker/dev-ftp/docker-compose.yml logs -f ftp",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build"
   },
   "dependencies": {

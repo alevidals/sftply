@@ -67,6 +67,12 @@ import {
 import { DEFAULT_SORT, nextSort, type SortState, sortEntries } from "@/features/files/model/sort"
 import { useSettings } from "@/features/settings/settings-context"
 import { TransferConflictDialog } from "@/features/transfers/components/transfer-conflict-dialog"
+import {
+  canDropTransfer,
+  readTransferDrag,
+  TRANSFER_DRAG_MIME,
+  type TransferDragPayload,
+} from "@/features/transfers/model"
 import { useTransferActions } from "@/features/transfers/use-transfer-actions"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
@@ -123,7 +129,10 @@ export function DirectoryBrowser({
   const listingQuery = useFsListing(scope, path, settings.showHiddenFiles)
   const listing = listingQuery.data ?? null
   const isActive = activePane === pane
-  const { canTransfer, transferLabel, transfer, conflictPrompt } = useTransferActions(pane, scope)
+  const { canTransfer, transferLabel, transfer, transferFrom, conflictPrompt } = useTransferActions(
+    pane,
+    scope,
+  )
 
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
   const [columns, setColumns] = useState<ColumnOptions>({ permissions: true })
@@ -135,6 +144,7 @@ export function DirectoryBrowser({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [permissionsOpen, setPermissionsOpen] = useState(false)
   const [permissionsTarget, setPermissionsTarget] = useState<FsEntry | null>(null)
+  const [dropActive, setDropActive] = useState(false)
 
   const rowHeight = settings.density === "comfortable" ? 38 : 30
   const canChmod = listing?.capabilities.chmod ?? false
@@ -388,6 +398,40 @@ export function DirectoryBrowser({
     setSelection((current) => selectRow(entries, current, index, mode))
   }
 
+  const dropInto = (payload: TransferDragPayload, directory: string) => {
+    setDropActive(false)
+    if (!canDropTransfer(payload, scope)) {
+      toast.info("Drop files into the other pane to transfer them.")
+      return
+    }
+    transferFrom(payload.scope, payload.entries, directory)
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
+    if (!event.dataTransfer.types.includes(TRANSFER_DRAG_MIME)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "copy"
+    setDropActive(true)
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    const related = event.relatedTarget
+    if (related instanceof Node && event.currentTarget.contains(related)) return
+    setDropActive(false)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
+    const payload = readTransferDrag(event.dataTransfer)
+    setDropActive(false)
+    if (!payload) return
+    event.preventDefault()
+    if (!canDropTransfer(payload, scope)) {
+      toast.info("Drop files into the other pane to transfer them.")
+      return
+    }
+    transferFrom(payload.scope, payload.entries, path || undefined)
+  }
+
   return (
     <section
       id={`pane-${pane}`}
@@ -395,11 +439,21 @@ export function DirectoryBrowser({
       tabIndex={-1}
       onFocus={() => setActivePane(pane)}
       data-active={isActive}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={cn(
-        "flex h-full min-h-0 flex-col bg-background outline-none",
+        "relative flex h-full min-h-0 flex-col bg-background outline-none",
         "data-[active=true]:ring-1 data-[active=true]:ring-primary/15 data-[active=true]:ring-inset",
       )}
     >
+      {dropActive ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-primary/5 ring-2 ring-primary/40 ring-inset">
+          <span className="rounded-md border border-primary/40 bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+            Drop to {pane === "local" ? "download" : "upload"}
+          </span>
+        </div>
+      ) : null}
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/70 bg-panel-header px-3">
         <PaneIcon className={cn("size-3.5", isActive ? "text-primary" : "text-muted-foreground")} />
         <span className="min-w-0 truncate text-xs font-semibold text-foreground">{title}</span>
@@ -577,6 +631,8 @@ export function DirectoryBrowser({
           canTransfer={canTransfer}
           transferLabel={transferLabel}
           transferDirection={pane === "local" ? "upload" : "download"}
+          dragScope={scope}
+          onDropPayload={(payload, directory) => dropInto(payload, directory.path)}
           onSelect={select}
           onSelectAll={() => setSelection(selectAll(entries))}
           onClearSelection={() => setSelection(clearSelection(entries))}

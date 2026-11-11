@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
+  canDropTransfer,
   joinLocalPath,
   joinRemotePath,
+  readTransferDrag,
   transferableEntries,
   unsupportedEntryCount,
+  writeTransferDrag,
 } from "@/features/transfers/model"
 import type { FsEntry } from "@/lib/ipc/bindings"
 
@@ -41,9 +44,43 @@ describe("transfer paths", () => {
     expect(joinRemotePath("/home/ada/", "report.pdf")).toBe("/home/ada/report.pdf")
   })
 
-  it("separates files from folders and special entries", () => {
+  it("keeps files and folders and skips special entries", () => {
     const entries = [entry("a.txt"), entry("folder", "directory"), entry("link", "symlink")]
-    expect(transferableEntries(entries).map((item) => item.name)).toEqual(["a.txt"])
-    expect(unsupportedEntryCount(entries)).toBe(2)
+    expect(transferableEntries(entries).map((item) => item.name)).toEqual(["a.txt", "folder"])
+    expect(unsupportedEntryCount(entries)).toBe(1)
+  })
+})
+
+describe("transfer drag payloads", () => {
+  function dataTransfer(): DataTransfer {
+    const store = new Map<string, string>()
+    return {
+      effectAllowed: "all",
+      dropEffect: "none",
+      types: [],
+      setData: (type: string, value: string) => {
+        store.set(type, value)
+      },
+      getData: (type: string) => store.get(type) ?? "",
+    } as unknown as DataTransfer
+  }
+
+  it("round-trips a payload and accepts cross-pane drops only", () => {
+    const transfer = dataTransfer()
+    const payload = {
+      scope: { kind: "local" as const },
+      entries: [entry("a.txt")],
+    }
+    writeTransferDrag(transfer, payload)
+
+    expect(readTransferDrag(transfer)).toEqual(payload)
+    expect(canDropTransfer(payload, { kind: "remote", sessionId: "s1" })).toBe(true)
+    expect(canDropTransfer(payload, { kind: "local" })).toBe(false)
+  })
+
+  it("ignores malformed payloads", () => {
+    const transfer = dataTransfer()
+    transfer.setData("application/x-sftply-entries", "{not json")
+    expect(readTransferDrag(transfer)).toBeNull()
   })
 })

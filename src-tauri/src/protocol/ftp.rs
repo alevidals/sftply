@@ -887,6 +887,41 @@ mod integration {
 
     #[tokio::test]
     #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn creates_nested_remote_folders() {
+        let profile = profile(ConnectionProtocol::Ftp, 2121);
+        let mut remote: Box<dyn RemoteFs> = Box::new(
+            FtpRemote::connect(&profile, PASSWORD)
+                .await
+                .expect("connect"),
+        );
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("tree-{stamp}");
+        let nested = format!("/{folder}/photos/2024");
+
+        crate::transfer::ensure_remote_dir(&mut remote, &nested)
+            .await
+            .expect("create nested folders");
+        let stat = remote.stat(&nested).await.expect("stat nested folder");
+        assert_eq!(stat.kind, EntryKind::Directory);
+
+        // Calling it again must be idempotent.
+        crate::transfer::ensure_remote_dir(&mut remote, &nested)
+            .await
+            .expect("reuse nested folders");
+
+        remote
+            .delete(&format!("/{folder}"), true)
+            .await
+            .expect("delete tree");
+        remote.disconnect().await.expect("disconnect");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
     async fn plain_ftp_crud() {
         exercise_crud(ConnectionProtocol::Ftp, 2121, false).await;
     }

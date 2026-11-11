@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -6,12 +7,20 @@ use tauri::{AppHandle, State};
 
 use crate::app_state::AppState;
 use crate::domain::fs::{EntryKind, FsEntry, FsScope};
-use crate::domain::remote_path::{normalize_remote, remote_leaf};
-use crate::domain::transfer::{ConflictPolicy, TransferConflict, TransferDirection, TransferItem};
+use crate::domain::remote_path::{join_remote, normalize_remote, remote_leaf};
+use crate::domain::transfer::{
+    ConflictPolicy, TransferConflict, TransferDirection, TransferItem, TransferPlan,
+    TransferPlanEntry,
+};
 use crate::error::{AppError, ErrorCode};
 use crate::fs::local;
 use crate::session::{Session, report_operation_failure, run_operation};
-use crate::transfer::{RemoteAccess, TransferJob, spawn_transfer};
+use crate::transfer::{RemoteAccess, TransferJob, ensure_remote_dir, spawn_transfer};
+
+/// Guard against accidentally walking an enormous tree. The user can still
+/// transfer large folders, but the plan is bounded so the UI cannot freeze.
+const MAX_PLAN_ENTRIES: usize = 50_000;
+const MAX_PLAN_DEPTH: usize = 64;
 
 fn operation_timeout(state: &AppState) -> Duration {
     Duration::from_secs(state.settings.get().operation_timeout_seconds.into())
@@ -58,6 +67,357 @@ fn local_leaf(path: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::invalid_input("The file name is not valid UTF-8."))
 }
 
+fn normalize_scope_path(scope: &FsScope, path: &str) -> Result<String, AppError> {
+    match scope {
+        FsScope::Local => local_path(path),
+        FsScope::Remote { .. } => normalize_remote(path),
+    }
+}
+
+fn scope_leaf(scope: &FsScope, path: &str) -> Result<String, AppError> {
+    match scope {
+        FsScope::Local => local_leaf(path),
+        FsScope::Remote { .. } => remote_leaf(path),
+    }
+}
+
+fn join_scope_path(scope: &FsScope, parent: &str, name: &str) -> Result<String, AppError> {
+    match scope {
+        FsScope::Local => {
+            let parent = crate::fs::path::normalize_absolute(parent)?;
+            let joined = crate::fs::path::join_child(&parent, name)?;
+            joined
+                .to_str()
+                .map(str::to_string)
+                .ok_or_else(|| AppError::invalid_input("The path is not valid UTF-8."))
+        }
+        FsScope::Remote { .. } => join_remote(parent, name),
+    }
+}
+
+fn transfer_direction(source: &FsScope, target: &FsScope) -> Result<TransferDirection, AppError> {
+    match (source, target) {
+        (FsScope::Local, FsScope::Remote { .. }) => Ok(TransferDirection::Upload),
+        (FsScope::Remote { .. }, FsScope::Local) => Ok(TransferDirection::Download),
+        _ => Err(AppError::new(
+            ErrorCode::Unsupported,
+            "Transfers must be between the local filesystem and one remote session.",
+        )),
+    }
+}
+
+async fn scope_stat(
+    app: &AppHandle,
+    state: &AppState,
+    scope: &FsScope,
+    path: &str,
+) -> Result<FsEntry, AppError> {
+    match scope {
+        FsScope::Local => local::stat(path).await,
+        FsScope::Remote { session_id } => {
+            let session = remote_session(state, session_id)?;
+            let path = normalize_remote(path)?;
+            let result = run_operation(&session, operation_timeout(state), |client| {
+                Box::pin(async move { client.stat(&path).await })
+            })
+            .await;
+            if let Err(error) = &result {
+                report_operation_failure(app, &session, error);
+            }
+            result
+        }
+    }
+}
+
+async fn scope_list(
+    app: &AppHandle,
+    state: &AppState,
+    scope: &FsScope,
+    path: &str,
+) -> Result<crate::domain::fs::Listing, AppError> {
+    match scope {
+        FsScope::Local => local::list(path, true).await,
+        FsScope::Remote { session_id } => {
+            let session = remote_session(state, session_id)?;
+            let path = normalize_remote(path)?;
+            let result = run_operation(&session, operation_timeout(state), |client| {
+                Box::pin(async move { client.list(&path).await })
+            })
+            .await;
+            if let Err(error) = &result {
+                report_operation_failure(app, &session, error);
+            }
+            result
+        }
+    }
+}
+
+async fn probe_conflict(
+    app: &AppHandle,
+    state: &AppState,
+    target: &FsScope,
+    target_path: &str,
+) -> Result<Option<TransferConflict>, AppError> {
+    match scope_stat(app, state, target, target_path).await {
+        Ok(entry) => Ok(Some(conflict(entry))),
+        Err(error) if error.code == ErrorCode::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+struct PlanWalker<'a> {
+    app: &'a AppHandle,
+    state: &'a AppState,
+    source: &'a FsScope,
+    target: &'a FsScope,
+}
+
+impl PlanWalker<'_> {
+    /// Walk one selected item and append every file and folder to the plan. The
+    /// target keeps the source root's leaf name, matching the usual "copy this
+    /// folder into that folder" behaviour.
+    async fn walk(
+        &self,
+        source_path: &str,
+        target_path: &str,
+        relative_path: &str,
+        depth: usize,
+        plan: &mut TransferPlan,
+    ) -> Result<(), AppError> {
+        if depth > MAX_PLAN_DEPTH {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "That folder is nested too deeply to transfer.",
+            ));
+        }
+        if plan.entries.len() >= MAX_PLAN_ENTRIES {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "That selection contains too many items. Transfer a smaller folder.",
+            ));
+        }
+
+        let entry = scope_stat(self.app, self.state, self.source, source_path).await?;
+        match entry.kind {
+            EntryKind::File => {
+                let conflict =
+                    probe_conflict(self.app, self.state, self.target, target_path).await?;
+                plan.total_bytes += entry.size;
+                plan.entries.push(TransferPlanEntry {
+                    source_path: entry.path,
+                    target_path: target_path.to_string(),
+                    relative_path: relative_path.to_string(),
+                    kind: EntryKind::File,
+                    size: entry.size,
+                    conflict,
+                });
+            }
+            EntryKind::Directory => {
+                plan.entries.push(TransferPlanEntry {
+                    source_path: entry.path.clone(),
+                    target_path: target_path.to_string(),
+                    relative_path: relative_path.to_string(),
+                    kind: EntryKind::Directory,
+                    size: 0.0,
+                    conflict: None,
+                });
+
+                let listing = scope_list(self.app, self.state, self.source, &entry.path).await?;
+                for child in listing.entries {
+                    if plan.entries.len() >= MAX_PLAN_ENTRIES {
+                        return Err(AppError::new(
+                            ErrorCode::Unsupported,
+                            "That selection contains too many items. Transfer a smaller folder.",
+                        ));
+                    }
+                    let child_target = join_scope_path(self.target, target_path, &child.name)?;
+                    let child_relative = if relative_path.is_empty() {
+                        child.name.clone()
+                    } else {
+                        format!("{relative_path}/{}", child.name)
+                    };
+                    Box::pin(self.walk(
+                        &child.path,
+                        &child_target,
+                        &child_relative,
+                        depth + 1,
+                        plan,
+                    ))
+                    .await?;
+                }
+            }
+            EntryKind::Symlink | EntryKind::Other => {
+                plan.skipped += 1;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn transfer_plan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    source: FsScope,
+    source_paths: Vec<String>,
+    target: FsScope,
+    target_path: String,
+) -> Result<TransferPlan, AppError> {
+    transfer_direction(&source, &target)?;
+    if source_paths.is_empty() {
+        return Err(AppError::invalid_input(
+            "Select at least one item to transfer.",
+        ));
+    }
+
+    let target_root = normalize_scope_path(&target, &target_path)?;
+    let mut plan = TransferPlan {
+        entries: Vec::new(),
+        skipped: 0,
+        total_bytes: 0.0,
+    };
+    let walker = PlanWalker {
+        app: &app,
+        state: &state,
+        source: &source,
+        target: &target,
+    };
+
+    for raw in source_paths {
+        let source_root = normalize_scope_path(&source, &raw)?;
+        let leaf = scope_leaf(&source, &source_root)?;
+        let target_root_entry = join_scope_path(&target, &target_root, &leaf)?;
+        Box::pin(walker.walk(&source_root, &target_root_entry, "", 0, &mut plan)).await?;
+    }
+
+    Ok(plan)
+}
+
+/// Recreate every planned folder before files start. Uploads use one dedicated
+/// remote connection, so the browsing session is never blocked.
+async fn create_plan_dirs(
+    state: &AppState,
+    target: &FsScope,
+    entries: &[TransferPlanEntry],
+) -> Result<(), AppError> {
+    let directories: Vec<&TransferPlanEntry> = entries
+        .iter()
+        .filter(|entry| entry.kind == EntryKind::Directory)
+        .collect();
+    if directories.is_empty() {
+        return Ok(());
+    }
+
+    match target {
+        FsScope::Local => {
+            for entry in directories {
+                tokio::fs::create_dir_all(&entry.target_path)
+                    .await
+                    .map_err(|error| {
+                        AppError::new(
+                            ErrorCode::PermissionDenied,
+                            "Could not create a destination folder.",
+                        )
+                        .with_detail(format!("create {}: {error}", entry.target_path))
+                    })?;
+            }
+            Ok(())
+        }
+        FsScope::Remote { session_id } => {
+            let session = remote_session(state, session_id)?;
+            let access = remote_access(state, &session);
+            let mut client = crate::session::connect_client(
+                &access.profile,
+                &access.credentials,
+                access.trusted,
+            )
+            .await?;
+            let result = async {
+                for entry in directories {
+                    ensure_remote_dir(&mut client, &entry.target_path).await?;
+                }
+                Ok(())
+            }
+            .await;
+            let _ = client.disconnect().await;
+            result
+        }
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn transfer_enqueue_tree(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    source: FsScope,
+    target: FsScope,
+    policy: ConflictPolicy,
+    entries: Vec<TransferPlanEntry>,
+    skip_targets: Vec<String>,
+) -> Result<Vec<TransferItem>, AppError> {
+    let direction = transfer_direction(&source, &target)?;
+    if entries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let remote = match direction {
+        TransferDirection::Upload => &target,
+        TransferDirection::Download => &source,
+    };
+    let session = match remote {
+        FsScope::Remote { session_id } => remote_session(&state, session_id)?,
+        FsScope::Local => unreachable!("the remote side is always a session"),
+    };
+
+    let (source_label, target_label) = match direction {
+        TransferDirection::Upload => ("Local".to_string(), session.info.name.clone()),
+        TransferDirection::Download => (session.info.name.clone(), "Local".to_string()),
+    };
+    let access = remote_access(&state, &session);
+    let (source_remote, target_remote) = match direction {
+        TransferDirection::Upload => (None, Some(access)),
+        TransferDirection::Download => (Some(access), None),
+    };
+
+    create_plan_dirs(&state, &target, &entries).await?;
+
+    let skip: HashSet<&str> = skip_targets.iter().map(String::as_str).collect();
+    let mut items = Vec::new();
+    for entry in entries {
+        if entry.kind != EntryKind::File || skip.contains(entry.target_path.as_str()) {
+            continue;
+        }
+        let name = if entry.relative_path.is_empty() {
+            scope_leaf(&source, &entry.source_path)?
+        } else {
+            entry.relative_path.clone()
+        };
+        let item = TransferItem::new(
+            direction,
+            entry.source_path,
+            entry.target_path,
+            source_label.clone(),
+            target_label.clone(),
+            name,
+            entry.size,
+        );
+        let job = TransferJob {
+            item: item.clone(),
+            source_remote: source_remote.clone(),
+            target_remote: target_remote.clone(),
+            policy,
+        };
+        state.transfers.insert(item.clone());
+        state.transfers.remember_job(job.clone());
+        crate::transfer::emit_delta(&app, vec![item.clone()], Vec::new());
+        spawn_transfer(app.clone(), state.transfers.clone(), job);
+        items.push(item);
+    }
+    Ok(items)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn transfer_preflight(
@@ -66,29 +426,7 @@ pub async fn transfer_preflight(
     target: FsScope,
     target_path: String,
 ) -> Result<Option<TransferConflict>, AppError> {
-    match target {
-        FsScope::Local => match local::stat(&target_path).await {
-            Ok(entry) => Ok(Some(conflict(entry))),
-            Err(error) if error.code == ErrorCode::NotFound => Ok(None),
-            Err(error) => Err(error),
-        },
-        FsScope::Remote { session_id } => {
-            let session = remote_session(&state, &session_id)?;
-            let path = normalize_remote(&target_path)?;
-            let result = run_operation(&session, operation_timeout(&state), |client| {
-                Box::pin(async move { client.stat(&path).await })
-            })
-            .await;
-            match result {
-                Ok(entry) => Ok(Some(conflict(entry))),
-                Err(error) if error.code == ErrorCode::NotFound => Ok(None),
-                Err(error) => {
-                    report_operation_failure(&app, &session, &error);
-                    Err(error)
-                }
-            }
-        }
-    }
+    probe_conflict(&app, &state, &target, &target_path).await
 }
 
 #[tauri::command]
@@ -102,8 +440,8 @@ pub async fn transfer_enqueue(
     target_path: String,
     policy: ConflictPolicy,
 ) -> Result<TransferItem, AppError> {
+    let direction = transfer_direction(&source, &target)?;
     let (
-        direction,
         source_remote,
         target_remote,
         source_label,
@@ -112,16 +450,18 @@ pub async fn transfer_enqueue(
         size,
         source_path,
         target_path,
-    ) = match (&source, &target) {
-        (FsScope::Local, FsScope::Remote { session_id }) => {
+    ) = match direction {
+        TransferDirection::Upload => {
             let source_path = local_path(&source_path)?;
             let target_path = normalize_remote(&target_path)?;
             let name = local_leaf(&source_path)?;
             let entry = local::stat(&source_path).await?;
-            validate_source(&entry)?;
-            let session = remote_session(&state, session_id)?;
+            validate_file_source(&entry)?;
+            let session = match &target {
+                FsScope::Remote { session_id } => remote_session(&state, session_id)?,
+                FsScope::Local => unreachable!("upload target is remote"),
+            };
             (
-                TransferDirection::Upload,
                 None,
                 Some(remote_access(&state, &session)),
                 "Local".to_string(),
@@ -132,11 +472,14 @@ pub async fn transfer_enqueue(
                 target_path,
             )
         }
-        (FsScope::Remote { session_id }, FsScope::Local) => {
+        TransferDirection::Download => {
             let source_path = normalize_remote(&source_path)?;
             let target_path = local_path(&target_path)?;
             let name = remote_leaf(&source_path)?;
-            let session = remote_session(&state, session_id)?;
+            let session = match &source {
+                FsScope::Remote { session_id } => remote_session(&state, session_id)?,
+                FsScope::Local => unreachable!("download source is remote"),
+            };
             let stat_path = source_path.clone();
             let result = run_operation(&session, operation_timeout(&state), |client| {
                 Box::pin(async move { client.stat(&stat_path).await })
@@ -149,9 +492,8 @@ pub async fn transfer_enqueue(
                     return Err(error);
                 }
             };
-            validate_source(&entry)?;
+            validate_file_source(&entry)?;
             (
-                TransferDirection::Download,
                 Some(remote_access(&state, &session)),
                 None,
                 session.info.name.clone(),
@@ -161,12 +503,6 @@ pub async fn transfer_enqueue(
                 source_path,
                 target_path,
             )
-        }
-        _ => {
-            return Err(AppError::new(
-                ErrorCode::Unsupported,
-                "Transfers must be between the local filesystem and one remote session.",
-            ));
         }
     };
 
@@ -187,21 +523,22 @@ pub async fn transfer_enqueue(
     };
 
     state.transfers.insert(item.clone());
+    state.transfers.remember_job(job.clone());
     crate::transfer::emit_delta(&app, vec![item.clone()], Vec::new());
     spawn_transfer(app, state.transfers.clone(), job);
     Ok(item)
 }
 
-fn validate_source(entry: &FsEntry) -> Result<(), AppError> {
+fn validate_file_source(entry: &FsEntry) -> Result<(), AppError> {
     match entry.kind {
         EntryKind::File => Ok(()),
         EntryKind::Directory => Err(AppError::new(
             ErrorCode::Unsupported,
-            "Folder transfers are not available yet. Select individual files.",
+            "Use the folder transfer action for folders.",
         )),
         EntryKind::Symlink | EntryKind::Other => Err(AppError::new(
             ErrorCode::Unsupported,
-            "Symlink and special-file transfers are not available yet.",
+            "Symlink and special-file transfers are not supported.",
         )),
     }
 }
@@ -220,6 +557,93 @@ pub fn transfer_cancel(state: State<'_, AppState>, id: String) -> bool {
 
 #[tauri::command]
 #[specta::specta]
+pub fn transfer_retry(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<TransferItem, AppError> {
+    state.transfers.retry(&app, &id)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn transfer_clear_finished(app: AppHandle, state: State<'_, AppState>) -> u32 {
     state.transfers.clear_finished(&app).len() as u32
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn transfer_pause_queue(state: State<'_, AppState>) -> bool {
+    state.transfers.pause_queue()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn transfer_resume_queue(state: State<'_, AppState>) -> bool {
+    state.transfers.resume_queue()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn transfer_queue_paused(state: State<'_, AppState>) -> bool {
+    state.transfers.is_paused()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn joins_target_paths_per_scope() {
+        assert_eq!(
+            join_scope_path(&FsScope::Local, "/tmp", "report.pdf").unwrap(),
+            "/tmp/report.pdf"
+        );
+        assert_eq!(
+            join_scope_path(
+                &FsScope::Remote {
+                    session_id: "s1".into()
+                },
+                "/upload",
+                "report.pdf"
+            )
+            .unwrap(),
+            "/upload/report.pdf"
+        );
+        assert_eq!(
+            join_scope_path(
+                &FsScope::Remote {
+                    session_id: "s1".into()
+                },
+                "/",
+                "report.pdf"
+            )
+            .unwrap(),
+            "/report.pdf"
+        );
+    }
+
+    #[test]
+    fn only_cross_scope_transfers_are_allowed() {
+        let local = FsScope::Local;
+        let remote = FsScope::Remote {
+            session_id: "s1".into(),
+        };
+
+        assert_eq!(
+            transfer_direction(&local, &remote).unwrap(),
+            TransferDirection::Upload
+        );
+        assert_eq!(
+            transfer_direction(&remote, &local).unwrap(),
+            TransferDirection::Download
+        );
+        assert_eq!(
+            transfer_direction(&local, &local)
+                .expect_err("local to local is rejected")
+                .code,
+            ErrorCode::Unsupported
+        );
+        assert!(transfer_direction(&remote, &remote).is_err());
+    }
 }

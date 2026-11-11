@@ -3,7 +3,7 @@ import { toast } from "sonner"
 import { LOCAL_SCOPE, remoteScope } from "@/features/files/api"
 import { useSettings } from "@/features/settings/settings-context"
 import { transfersApi } from "@/features/transfers/api"
-import { joinLocalPath, joinRemotePath, transferableEntries } from "@/features/transfers/model"
+import { transferableEntries, unsupportedEntryCount } from "@/features/transfers/model"
 import { normalizeError } from "@/lib/errors"
 import type {
   ConflictPolicy,
@@ -11,6 +11,7 @@ import type {
   FsScope,
   TransferConflict,
   TransferDirection,
+  TransferPlan_Serialize,
 } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
 import { useSessionStore } from "@/stores/session-store"
@@ -18,16 +19,20 @@ import { useUiStore } from "@/stores/ui-store"
 
 export type ConflictChoice = ConflictPolicy | "skip"
 
-interface PlannedTransfer {
-  entry: FsEntry
-  targetPath: string
-  conflict: TransferConflict | null
+interface PendingBatch {
+  sourceScope: FsScope
+  targetScope: FsScope
+  targetDirectory: string
+  direction: TransferDirection
+  plan: TransferPlan_Serialize
 }
 
 interface TransferActions {
   canTransfer: boolean
   transferLabel: string
   transfer: (entries: readonly FsEntry[]) => void
+  /** Used by drag-and-drop, where the source is the other pane. */
+  transferFrom: (source: FsScope, entries: readonly FsEntry[], directory?: string) => void
   /** Dialog state, or null when no conflict prompt is open. */
   conflictPrompt: {
     open: boolean
@@ -50,12 +55,11 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const sessions = useSessionStore((state) => state.sessions)
 
-  const [plans, setPlans] = useState<PlannedTransfer[]>([])
+  const [batch, setBatch] = useState<PendingBatch | null>(null)
   const [conflicts, setConflicts] = useState<TransferConflict[]>([])
   const [open, setOpen] = useState(false)
 
   const upload = pane === "local"
-  const direction: TransferDirection = upload ? "upload" : "download"
   const activeSession = activeSessionId ? sessions[activeSessionId] : undefined
   const targetScope: FsScope | null = upload
     ? activeSessionId
@@ -65,6 +69,14 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
   const targetDirectory = upload ? remotePath : localPath
   const canTransfer = Boolean(targetScope && targetDirectory && (upload ? activeSession : true))
   const transferLabel = upload ? "Upload to remote" : "Download to local"
+
+  const scopeLabel = useCallback(
+    (target: FsScope) =>
+      target.kind === "local"
+        ? "local"
+        : (sessions[target.sessionId]?.name ?? activeSession?.name ?? "remote"),
+    [activeSession?.name, sessions],
+  )
 
   const reportError = useCallback((title: string, error: unknown) => {
     const normalized = normalizeError(error)
@@ -82,41 +94,129 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
     }
   }, [setBottomTab, settings.bottomPanelOpen, updateSettings])
 
-  const enqueue = useCallback(
-    async (queue: PlannedTransfer[], policy: ConflictPolicy, skipConflicts: boolean) => {
-      if (!targetScope) return
-      let started = 0
-      let failed = 0
+  const enqueueBatch = useCallback(
+    async (pending: PendingBatch, policy: ConflictPolicy, skipConflicts: boolean) => {
+      const skipTargets = skipConflicts
+        ? pending.plan.entries.flatMap((entry) => (entry.conflict ? [entry.targetPath] : []))
+        : []
 
-      for (const plan of queue) {
-        if (skipConflicts && plan.conflict) continue
-        try {
-          await transfersApi.enqueue(scope, plan.entry.path, targetScope, plan.targetPath, policy)
-          started += 1
-        } catch (error) {
-          failed += 1
-          reportError(`Could not queue “${plan.entry.name}”`, error)
-        }
-      }
-
-      if (started > 0) {
-        const noun = started === 1 ? "transfer" : "transfers"
-        toast.success(`Queued ${started} ${noun}`)
-        recordActivity(
-          "info",
-          upload
-            ? `Queued ${started} upload${started === 1 ? "" : "s"} to ${activeSession?.name ?? "remote"}`
-            : `Queued ${started} download${started === 1 ? "" : "s"} to ${targetDirectory ?? "local"}`,
+      try {
+        const items = await transfersApi.enqueueTree(
+          pending.sourceScope,
+          pending.targetScope,
+          policy,
+          pending.plan.entries,
+          skipTargets,
         )
-        openTransfers()
-      }
-      if (failed === 0 && started === 0) {
-        toast.info("Nothing to transfer", {
-          description: "Every selected file already exists and was skipped.",
-        })
+        const directories = pending.plan.entries.filter(
+          (entry) => entry.kind === "directory",
+        ).length
+
+        if (items.length > 0) {
+          const noun = items.length === 1 ? "transfer" : "transfers"
+          toast.success(`Queued ${items.length} ${noun}`)
+          recordActivity(
+            "info",
+            pending.direction === "upload"
+              ? `Queued ${items.length} upload${items.length === 1 ? "" : "s"} to ${scopeLabel(pending.targetScope)}`
+              : `Queued ${items.length} download${items.length === 1 ? "" : "s"} to ${pending.targetDirectory}`,
+          )
+          openTransfers()
+        } else if (directories > 0) {
+          toast.success(`Created ${directories} folder${directories === 1 ? "" : "s"}`)
+          recordActivity(
+            "info",
+            `Created ${directories} folder${directories === 1 ? "" : "s"} in ${scopeLabel(pending.targetScope)}`,
+          )
+        } else {
+          toast.info("Nothing to transfer", {
+            description: "Every selected file already exists and was skipped.",
+          })
+        }
+
+        if (pending.plan.skipped > 0) {
+          toast.info(
+            `${pending.plan.skipped} item${pending.plan.skipped === 1 ? "" : "s"} skipped`,
+            {
+              description: "Symlinks and special files are not transferred.",
+            },
+          )
+        }
+      } catch (error) {
+        reportError("Could not queue the transfer", error)
       }
     },
-    [activeSession?.name, openTransfers, reportError, scope, targetDirectory, targetScope, upload],
+    [openTransfers, reportError, scopeLabel],
+  )
+
+  const transferBetween = useCallback(
+    (sourceScope: FsScope, target: FsScope, directory: string, entries: readonly FsEntry[]) => {
+      if (!directory) {
+        toast.info("Choose a destination folder first.")
+        return
+      }
+      if (sourceScope.kind === target.kind) {
+        toast.info("Drop files into the other pane to transfer them.")
+        return
+      }
+
+      const supported = transferableEntries(entries)
+      if (supported.length === 0) {
+        toast.info("Nothing to transfer", {
+          description: "Symlinks and special files are not transferred.",
+        })
+        return
+      }
+      const unsupported = unsupportedEntryCount(entries)
+
+      void (async () => {
+        let plan: TransferPlan_Serialize
+        try {
+          plan = await transfersApi.plan(
+            sourceScope,
+            supported.map((entry) => entry.path),
+            target,
+            directory,
+          )
+        } catch (error) {
+          reportError("Could not prepare the transfer", error)
+          return
+        }
+
+        if (plan.entries.length === 0) {
+          toast.info("Nothing to transfer", {
+            description: "The selected items are empty or unavailable.",
+          })
+          return
+        }
+
+        if (unsupported > 0) {
+          toast.info(`${unsupported} item${unsupported === 1 ? "" : "s"} skipped`, {
+            description: "Symlinks and special files are not transferred.",
+          })
+        }
+
+        const pending: PendingBatch = {
+          sourceScope,
+          targetScope: target,
+          targetDirectory: directory,
+          direction: target.kind === "local" ? "download" : "upload",
+          plan,
+        }
+        const found = plan.entries.flatMap((entry) =>
+          entry.kind === "file" && entry.conflict ? [entry.conflict] : [],
+        )
+
+        if (found.length > 0) {
+          setBatch(pending)
+          setConflicts(found)
+          setOpen(true)
+          return
+        }
+        await enqueueBatch(pending, "overwrite", false)
+      })()
+    },
+    [enqueueBatch, reportError],
   )
 
   const transfer = useCallback(
@@ -125,70 +225,57 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
         toast.info("Choose a destination folder first.")
         return
       }
-      const files = transferableEntries(entries)
-      if (files.length === 0) {
-        toast.info("Folders cannot be transferred yet.", {
-          description: "Select individual files. Folder transfers arrive in a later update.",
-        })
+      transferBetween(scope, targetScope, targetDirectory, entries)
+    },
+    [scope, targetDirectory, targetScope, transferBetween],
+  )
+
+  const transferFrom = useCallback(
+    (sourceScope: FsScope, entries: readonly FsEntry[], directory?: string) => {
+      if (!targetScope) {
+        toast.info("Connect to a remote server first.")
         return
       }
-
-      void (async () => {
-        const planned: PlannedTransfer[] = []
-        for (const entry of files) {
-          const targetPath = upload
-            ? joinRemotePath(targetDirectory, entry.name)
-            : joinLocalPath(targetDirectory, entry.name)
-          try {
-            const conflict = await transfersApi.preflight(targetScope, targetPath)
-            planned.push({ entry, targetPath, conflict })
-          } catch (error) {
-            reportError(`Could not check “${entry.name}”`, error)
-            return
-          }
-        }
-
-        const found = planned.flatMap((plan) => (plan.conflict ? [plan.conflict] : []))
-        if (found.length > 0) {
-          setPlans(planned)
-          setConflicts(found)
-          setOpen(true)
-          return
-        }
-        await enqueue(planned, "overwrite", false)
-      })()
+      const destination = directory ?? targetDirectory
+      if (!destination) {
+        toast.info("Choose a destination folder first.")
+        return
+      }
+      transferBetween(sourceScope, targetScope, destination, entries)
     },
-    [enqueue, reportError, targetDirectory, targetScope, upload],
+    [targetDirectory, targetScope, transferBetween],
   )
 
   const onConfirm = useCallback(
     async (choice: ConflictChoice) => {
+      if (!batch) return
       if (choice === "skip") {
-        await enqueue(plans, "overwrite", true)
+        await enqueueBatch(batch, "overwrite", true)
       } else {
-        await enqueue(plans, choice, false)
+        await enqueueBatch(batch, choice, false)
       }
       setOpen(false)
-      setPlans([])
+      setBatch(null)
       setConflicts([])
     },
-    [enqueue, plans],
+    [batch, enqueueBatch],
   )
 
   return {
     canTransfer,
     transferLabel,
     transfer,
+    transferFrom,
     conflictPrompt:
-      conflicts.length > 0
+      conflicts.length > 0 && batch
         ? {
             open,
             conflicts,
-            direction,
+            direction: batch.direction,
             onOpenChange: (next) => {
               setOpen(next)
               if (!next) {
-                setPlans([])
+                setBatch(null)
                 setConflicts([])
               }
             },

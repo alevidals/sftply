@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { FileTable } from "@/features/files/components/file-table"
 import type { SelectionState } from "@/features/files/model/selection"
+import type { TransferDragPayload } from "@/features/transfers/model"
 import type { FsEntry } from "@/lib/ipc/bindings"
 
 vi.mock("@tanstack/react-virtual", () => ({
@@ -53,7 +54,13 @@ function selection(active: number | null = 0, selected: string[] = []): Selectio
   return { active, anchor: active, selected: new Set(selected) }
 }
 
-function renderTable(overrides: { selection?: SelectionState; renamingPath?: string | null } = {}) {
+function renderTable(
+  overrides: {
+    selection?: SelectionState
+    renamingPath?: string | null
+    onDropPayload?: (payload: TransferDragPayload, directory: FsEntry) => void
+  } = {},
+) {
   const handlers = {
     onSelect: vi.fn(),
     onSelectAll: vi.fn(),
@@ -65,6 +72,7 @@ function renderTable(overrides: { selection?: SelectionState; renamingPath?: str
     onUp: vi.fn(),
     onRenameSubmit: vi.fn(),
     onRenameCancel: vi.fn(),
+    onDropPayload: overrides.onDropPayload ?? vi.fn(),
   }
   render(
     <FileTable
@@ -79,6 +87,7 @@ function renderTable(overrides: { selection?: SelectionState; renamingPath?: str
       canTransfer
       transferLabel="Download to local"
       transferDirection="download"
+      dragScope={{ kind: "remote", sessionId: "s1" }}
       {...handlers}
     />,
   )
@@ -151,6 +160,37 @@ describe("FileTable keyboard model", () => {
 
     await user.dblClick(row)
     expect(handlers.onAction).toHaveBeenCalledWith("open")
+  })
+})
+
+function dataTransfer(): DataTransfer {
+  const store = new Map<string, string>()
+  return {
+    effectAllowed: "all",
+    dropEffect: "none",
+    types: [],
+    setData: (type: string, value: string) => {
+      store.set(type, value)
+    },
+    getData: (type: string) => store.get(type) ?? "",
+  } as unknown as DataTransfer
+}
+
+describe("FileTable drag and drop", () => {
+  it("drags the selection and drops it on a folder row", () => {
+    const onDropPayload = vi.fn()
+    const transfer = dataTransfer()
+    renderTable({ selection: selection(0, ["/tmp/alpha.txt"]), onDropPayload })
+
+    fireEvent.dragStart(screen.getByTitle("/tmp/alpha.txt"), { dataTransfer: transfer })
+    expect(transfer.getData("application/x-sftply-entries")).toContain("alpha.txt")
+
+    fireEvent.drop(screen.getByTitle("/tmp/beta"), { dataTransfer: transfer })
+
+    expect(onDropPayload).toHaveBeenCalledTimes(1)
+    const [payload, directory] = onDropPayload.mock.calls[0] as [TransferDragPayload, FsEntry]
+    expect(payload.entries.map((entry) => entry.name)).toEqual(["alpha.txt"])
+    expect(directory.name).toBe("beta")
   })
 })
 
