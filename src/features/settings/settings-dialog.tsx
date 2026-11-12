@@ -418,13 +418,23 @@ export function SettingsDialog() {
             </div>
           </Tabs>
 
-          <DialogFooter className="mx-0 mb-0 rounded-b-xl border-t border-border/70 bg-muted/20 px-5 py-3">
+          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-b-xl border-t border-border/70 bg-muted/20 px-5 py-3">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Spinner className="size-3.5" /> : null}
-              Save changes
+            <Button type="submit" disabled={saving} aria-busy={saving} className="relative">
+              {/* The label stays in the layout while saving (just transparent),
+                  so the button keeps its exact width. The spinner overlays it
+                  instead of being inserted, which would widen the right-aligned
+                  button and shift both footer buttons. */}
+              <span data-slot="submit-label" className={saving ? "opacity-0" : undefined}>
+                Save changes
+              </span>
+              {saving ? (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <Spinner aria-hidden className="size-3.5" />
+                </span>
+              ) : null}
             </Button>
           </DialogFooter>
         </form>

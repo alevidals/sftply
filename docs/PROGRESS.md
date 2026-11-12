@@ -864,11 +864,12 @@ which is only correct for local client connections. See
 **Fixed**
 
 - Changing **Simultaneous transfers** used to require a restart: the semaphore was built once at startup. The queue now uses an atomic active-slot gate, so raising or lowering the limit affects transfers that are already waiting, and running transfers are left alone.
+- The Settings footer no longer shifts while saving. The submit button used to insert the spinner only while saving, which widened the right-aligned button by the icon plus gap and visibly dragged **Cancel** with it for a frame. The label now stays in the layout (transparent while saving) and the spinner overlays it, so the footer geometry stays fixed without adding empty space.
 
 **Verified**
 
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (80 passed, 14 ignored). New Rust tests cover kbps→bytes conversion, slot spacing, resetting the schedule when the limit is removed, and growing concurrency while tasks wait.
-- `bun run check` (Biome, 146 Vitest tests in 24 files, strict TypeScript, production build). New tests cover saving a bandwidth limit, opening Settings on the Shortcuts tab, and virtualizing a 1,000-item queue.
+- `bun run check` (Biome, 147 Vitest tests in 24 files, strict TypeScript, production build). New tests cover saving a bandwidth limit, opening Settings on the Shortcuts tab, virtualizing a 1,000-item queue, and keeping the submit button geometry stable while saving.
 
 **Next**
 

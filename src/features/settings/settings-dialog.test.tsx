@@ -114,6 +114,24 @@ describe("SettingsDialog", () => {
     )
   })
 
+  it("keeps the submit button width stable while saving", () => {
+    const { rerender } = render(<SettingsDialog />)
+    const button = screen.getByRole("button", { name: "Save changes" })
+    const label = button.querySelector('[data-slot="submit-label"]')
+
+    expect(label).toHaveTextContent("Save changes")
+    expect(label).not.toHaveClass("opacity-0")
+    expect(button.querySelector('[data-slot="spinner"]')).not.toBeInTheDocument()
+
+    // The label stays in the layout (only transparent) so the right-aligned
+    // button cannot change width when the spinner appears.
+    state.saving = true
+    rerender(<SettingsDialog />)
+    expect(label).toHaveClass("opacity-0")
+    expect(button.querySelector('[data-slot="spinner"]')).toBeInTheDocument()
+    expect(button).toHaveAttribute("aria-busy", "true")
+  })
+
   it("saves the edited values and closes", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     render(<SettingsDialog />)
