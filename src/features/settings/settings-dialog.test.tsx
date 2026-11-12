@@ -78,6 +78,18 @@ describe("SettingsDialog", () => {
     expect(state.updateSettings).not.toHaveBeenCalled()
   })
 
+  it("lists the keyboard shortcuts with platform labels", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("tab", { name: "Shortcuts" }))
+
+    expect(screen.getByText("Command palette")).toBeInTheDocument()
+    expect(screen.getByText("⌘K")).toBeInTheDocument()
+    expect(screen.getByText("Files and selection")).toBeInTheDocument()
+    expect(screen.queryByText("Row density")).not.toBeInTheDocument()
+  })
+
   it("saves the edited values and closes", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     render(<SettingsDialog />)

@@ -21,9 +21,11 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSettings } from "@/features/settings/settings-context"
+import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
+import { isMacPlatform } from "@/lib/shortcuts"
 import { THEME_OPTIONS, THEME_VALUES } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
@@ -58,6 +60,7 @@ export function SettingsDialog() {
   const appInfo = useAppInfo()
   const [tab, setTab] = useState("appearance")
   const wasOpen = useRef(false)
+  const isMac = isMacPlatform(appInfo.data?.platform)
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
@@ -110,6 +113,9 @@ export function SettingsDialog() {
               </TabsTrigger>
               <TabsTrigger value="transfers" className="h-8 justify-start px-2.5 text-xs">
                 Transfers
+              </TabsTrigger>
+              <TabsTrigger value="shortcuts" className="h-8 justify-start px-2.5 text-xs">
+                Shortcuts
               </TabsTrigger>
               <TabsTrigger value="about" className="h-8 justify-start px-2.5 text-xs">
                 About
@@ -331,6 +337,10 @@ export function SettingsDialog() {
                   />
                   <FieldError errors={[formState.errors.transferConcurrency]} />
                 </Field>
+              </TabsContent>
+
+              <TabsContent value="shortcuts">
+                <ShortcutsPanel isMac={isMac} />
               </TabsContent>
 
               <TabsContent value="about" className="space-y-5">

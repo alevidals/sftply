@@ -380,39 +380,59 @@ export function DirectoryBrowser({
 
   const shortcutActions = useRef({
     refresh,
+    back,
+    forward,
+    up: () => parent && navigate(parent),
     openFilter: () => setFilterOpen(true),
     openNewFolder: () => setNewFolderOpen(true),
   })
   shortcutActions.current = {
     refresh,
+    back,
+    forward,
+    up: () => parent && navigate(parent),
     openFilter: () => setFilterOpen(true),
     openNewFolder: () => setNewFolderOpen(true),
   }
 
-  useEffect(
-    () =>
-      tinykeys(window, {
-        "$mod+KeyR": (event) => {
-          const ui = useUiStore.getState()
-          if (ui.activePane !== pane || ui.paletteOpen || ui.settingsOpen) return
-          event.preventDefault()
-          shortcutActions.current.refresh()
-        },
-        "$mod+KeyF": (event) => {
-          const ui = useUiStore.getState()
-          if (ui.activePane !== pane || ui.paletteOpen || ui.settingsOpen) return
-          event.preventDefault()
-          shortcutActions.current.openFilter()
-        },
-        "$mod+Shift+KeyN": (event) => {
-          const ui = useUiStore.getState()
-          if (ui.activePane !== pane || ui.paletteOpen || ui.settingsOpen) return
-          event.preventDefault()
-          shortcutActions.current.openNewFolder()
-        },
-      }),
-    [pane],
-  )
+  useEffect(() => {
+    const isActive = () => {
+      const ui = useUiStore.getState()
+      return ui.activePane === pane && !ui.paletteOpen && !ui.settingsOpen
+    }
+    return tinykeys(window, {
+      "$mod+KeyR": (event) => {
+        if (!isActive()) return
+        event.preventDefault()
+        shortcutActions.current.refresh()
+      },
+      "$mod+KeyF": (event) => {
+        if (!isActive()) return
+        event.preventDefault()
+        shortcutActions.current.openFilter()
+      },
+      "$mod+Shift+KeyN": (event) => {
+        if (!isActive()) return
+        event.preventDefault()
+        shortcutActions.current.openNewFolder()
+      },
+      "$mod+BracketLeft": (event) => {
+        if (!isActive() || event.defaultPrevented) return
+        event.preventDefault()
+        shortcutActions.current.back()
+      },
+      "$mod+BracketRight": (event) => {
+        if (!isActive() || event.defaultPrevented) return
+        event.preventDefault()
+        shortcutActions.current.forward()
+      },
+      "$mod+ArrowUp": (event) => {
+        if (!isActive() || event.defaultPrevented) return
+        event.preventDefault()
+        shortcutActions.current.up()
+      },
+    })
+  }, [pane])
 
   const select = (index: number, mode: SelectionMode) => {
     setSelection((current) => selectRow(entries, current, index, mode))

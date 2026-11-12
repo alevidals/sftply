@@ -193,7 +193,8 @@ These were recommended in the architecture package. Implementation proceeds with
 
 ## Phase 5 — Polish and productivity
 
-- [ ] Full command palette + shortcut sheet
+- [x] Shortcuts reference in Settings
+- [ ] Full command palette + `?` shortcut sheet
 - [ ] Complete keyboard map and scopes
 - [ ] Context menus everywhere + disabled reasons
 - [ ] Tabs polish (overflow, reorder, close behavior)
@@ -827,3 +828,24 @@ which is only correct for local client connections. See
 
 - Restart `bun run tauri -- dev` to pick up the new bundle icon, then verify Dock icon, title bar, boot screen, About tab and favicon.
 - Phase 4b remainder: bandwidth limiter and external OS file drops.
+
+### 2026-11-12 — Session 19: shortcuts reference in Settings
+
+**Added**
+
+- Settings gained a **Shortcuts** tab that lists every binding by scope: Application, Browsing, Files and selection, and Dialogs and menus.
+- `src/lib/shortcuts.ts` is the single catalogue. It stores platform-neutral chords (`mod+Shift+KeyN`) and formats them as `⌘⇧N` on macOS or `Ctrl+Shift+N` on Windows/Linux, including the platform-specific delete binding (`⌘⌫` vs `Delete`).
+- The tab uses the existing `Kbd` component, so the reference looks like the rest of the chrome.
+
+**Fixed**
+
+- The path bar already advertised `⌘[`, `⌘]` and `⌘↑` in its tooltips, but no handler existed. They now go back, forward and to the enclosing folder for the active pane. `⌘↑` defers to the file table's own handler when a row has focus, so navigation never runs twice.
+- The architecture keyboard map now reflects what the app actually binds instead of the initial aspirational list.
+
+**Verified**
+
+- `bun run check` (Biome, 143 Vitest tests in 24 files, strict TypeScript, production build). New tests cover chord formatting on both platforms, the delete override, and the Settings tab rendering `⌘K`.
+
+**Next**
+
+- Add a global `?` shortcut that opens Settings directly on the Shortcuts tab.

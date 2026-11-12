@@ -685,26 +685,33 @@ Query key: `["fs", scopeKey, path]` where `scopeKey` is `"local"` or `"remote:<s
 
 `cmdk`, opened with Cmd/Ctrl+K. Sections: Navigate, Connections, File actions, Transfers, View, Settings. Commands declare `when` predicates (e.g. requires connected session, requires selection, requires writable capability). Shortcut hints are rendered from a single registry so the palette, menus, and shortcut sheet never disagree.
 
-### Keyboard map (initial)
+### Keyboard map
 
-| Shortcut                      | Action                                            |
-| ----------------------------- | ------------------------------------------------- |
-| Cmd/Ctrl+N                    | New connection                                    |
-| Cmd/Ctrl+K                    | Command palette                                   |
-| Cmd/Ctrl+R                    | Refresh active pane                               |
-| Cmd/Ctrl+U                    | Upload selection                                  |
-| Cmd/Ctrl+D                    | Download selection                                |
-| Cmd/Ctrl+T                    | New tab                                           |
-| Cmd/Ctrl+W                    | Close tab (with confirmation if transfers active) |
-| Cmd/Ctrl+1..9                 | Switch tab                                        |
-| Cmd/Ctrl+Shift+L / R          | Focus local / remote pane                         |
-| Enter                         | Open folder or file                               |
-| F2                            | Rename                                            |
-| Delete (macOS: Cmd+Backspace) | Delete selection                                  |
-| Cmd/Ctrl+Shift+N              | New folder                                        |
-| Cmd/Ctrl+C / V                | Copy path / paste path                            |
-| Escape                        | Close dialog, cancel inline edit, clear selection |
-| ?                             | Shortcut sheet (Phase 5)                          |
+The Settings → Shortcuts tab renders this same list, with Command labels on macOS and Ctrl labels elsewhere.
+
+| Shortcut                       | Action                                   |
+| ------------------------------ | ---------------------------------------- |
+| Cmd/Ctrl+K                     | Command palette                          |
+| Cmd/Ctrl+,                     | Open settings                            |
+| Cmd/Ctrl+J                     | Toggle transfers and activity panel      |
+| Cmd/Ctrl+1 / 2                 | Focus local / remote pane                |
+| Cmd/Ctrl+R                     | Refresh the active pane                  |
+| Cmd/Ctrl+F                     | Filter the active folder                 |
+| Cmd/Ctrl+L                     | Edit the path                            |
+| Cmd/Ctrl+[ / ]                 | Go back / forward                        |
+| Cmd/Ctrl+↑                     | Go to the enclosing folder               |
+| Cmd/Ctrl+Shift+N               | New folder                               |
+| ↑ / ↓                          | Move the cursor                          |
+| Shift+↑ / ↓                    | Extend the selection                     |
+| Home / End                     | First / last item                        |
+| Space                          | Select or deselect the active item       |
+| Cmd/Ctrl+A                     | Select all                               |
+| Enter                          | Open folder or file                      |
+| F2                             | Rename                                   |
+| Cmd+Backspace / Delete         | Delete the selection (macOS / elsewhere) |
+| Backspace                      | Go to the enclosing folder               |
+| Escape                         | Close dialog/menu, clear the selection   |
+| A–Z                            | Type-ahead                               |
 
 A scope stack prevents shortcuts from firing inside text inputs or when a modal owns focus. Platform-aware labels use `⌘` vs `Ctrl`.
 
