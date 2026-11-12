@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
-import { transfersApi } from "@/features/transfers/api"
+import { TRANSFER_HISTORY_QUERY_KEY, transfersApi } from "@/features/transfers/api"
 import type { TransferStatus } from "@/lib/ipc/bindings"
 import { onTransferDelta } from "@/lib/ipc/events"
 import { recordActivity } from "@/stores/activity-store"
@@ -17,14 +17,16 @@ export function useTransferBridge(): void {
     let unlisten: (() => void) | undefined
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
-    // A completed transfer changes the destination folder on disk. Coalesce
-    // terminal events from a whole batch into one listing refresh instead of
-    // refetching once per file.
+    // A completed transfer changes the destination folder on disk and appends a
+    // history entry. Coalesce terminal events from a whole batch into one
+    // refresh instead of refetching once per file.
     const scheduleListingRefresh = () => {
       if (refreshTimer) return
       refreshTimer = setTimeout(() => {
         refreshTimer = null
-        if (!disposed) void queryClient.invalidateQueries({ queryKey: ["fs"] })
+        if (disposed) return
+        void queryClient.invalidateQueries({ queryKey: ["fs"] })
+        void queryClient.invalidateQueries({ queryKey: TRANSFER_HISTORY_QUERY_KEY })
       }, 250)
     }
 

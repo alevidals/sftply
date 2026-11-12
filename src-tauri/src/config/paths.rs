@@ -14,6 +14,7 @@ pub struct AppPaths {
     pub settings_file: PathBuf,
     pub connections_file: PathBuf,
     pub known_hosts_file: PathBuf,
+    pub transfer_history_file: PathBuf,
 }
 
 impl AppPaths {
@@ -39,6 +40,7 @@ impl AppPaths {
             settings_file: config_dir.join("settings.json"),
             connections_file: config_dir.join("connections.json"),
             known_hosts_file: config_dir.join("known_hosts.json"),
+            transfer_history_file: config_dir.join("transfer-history.jsonl"),
             config_dir,
             data_dir,
             log_dir,

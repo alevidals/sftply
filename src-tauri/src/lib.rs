@@ -21,6 +21,7 @@ use domain::transfer::TransferDeltaEvent;
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::Builder;
+use transfer::history::TransferHistoryStore;
 
 /// Build the typed IPC surface once so runtime and binding generation stay in
 /// sync.
@@ -69,6 +70,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::transfer::transfer_pause_queue,
             commands::transfer::transfer_resume_queue,
             commands::transfer::transfer_queue_paused,
+            commands::transfer::transfer_history,
+            commands::transfer::transfer_clear_history,
         ])
         .events(tauri_specta::collect_events![
             ActivityEntry,
@@ -110,10 +113,13 @@ pub fn run() {
                 ConnectionStore::load(paths.connections_file.clone());
             let (known_hosts, known_hosts_warning) =
                 KnownHostsStore::load(paths.known_hosts_file.clone());
+            let (history, history_warning) =
+                TransferHistoryStore::load(paths.transfer_history_file.clone());
             let warnings = settings_warning
                 .into_iter()
                 .chain(connections_warning)
                 .chain(known_hosts_warning)
+                .chain(history_warning)
                 .collect();
 
             app.manage(AppState::new(
@@ -121,6 +127,7 @@ pub fn run() {
                 settings,
                 connections,
                 known_hosts,
+                std::sync::Arc::new(history),
                 log_guard,
                 warnings,
             ));

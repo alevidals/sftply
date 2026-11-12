@@ -93,8 +93,8 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <form onSubmit={onSubmit} className="flex min-h-[540px] flex-col">
+      <DialogContent className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <form onSubmit={onSubmit} className="flex h-[min(600px,calc(100vh-3rem))] min-h-0 flex-col">
           <DialogHeader className="border-b border-border/70 px-5 py-4">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
@@ -127,7 +127,7 @@ export function SettingsDialog() {
             </TabsList>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <TabsContent value="appearance" forceMount className="space-y-6">
+              <TabsContent value="appearance" className="space-y-6">
                 <section className="space-y-3">
                   <div>
                     <h3 className="text-sm font-medium">Theme</h3>
@@ -233,7 +233,7 @@ export function SettingsDialog() {
                 </section>
               </TabsContent>
 
-              <TabsContent value="behavior" forceMount className="space-y-3">
+              <TabsContent value="behavior" className="space-y-3">
                 <Controller
                   control={control}
                   name="showHiddenFiles"
@@ -260,7 +260,7 @@ export function SettingsDialog() {
                 />
               </TabsContent>
 
-              <TabsContent value="connections" forceMount className="space-y-4">
+              <TabsContent value="connections" className="space-y-4">
                 <Field data-invalid={Boolean(formState.errors.connectTimeoutSeconds)}>
                   <FieldLabel htmlFor="connect-timeout">Connection timeout</FieldLabel>
                   <FieldDescription>
@@ -306,7 +306,7 @@ export function SettingsDialog() {
                 </p>
               </TabsContent>
 
-              <TabsContent value="transfers" forceMount className="space-y-4">
+              <TabsContent value="transfers" className="space-y-4">
                 <Field data-invalid={Boolean(formState.errors.transferConcurrency)}>
                   <FieldLabel htmlFor="transfer-concurrency">Simultaneous transfers</FieldLabel>
                   <FieldDescription>
@@ -325,7 +325,7 @@ export function SettingsDialog() {
                 </Field>
               </TabsContent>
 
-              <TabsContent value="about" forceMount className="space-y-5">
+              <TabsContent value="about" className="space-y-5">
                 <div>
                   <h3 className="text-sm font-medium">sftply</h3>
                   <p className="text-xs text-muted-foreground">

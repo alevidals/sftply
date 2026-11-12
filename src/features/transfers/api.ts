@@ -2,12 +2,15 @@ import type {
   ConflictPolicy,
   FsScope,
   TransferConflict,
+  TransferHistoryEntry_Serialize,
   TransferItem,
   TransferItem_Serialize,
   TransferPlan_Serialize,
   TransferPlanEntry_Deserialize,
 } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
+
+export const TRANSFER_HISTORY_QUERY_KEY = ["transfer-history"] as const
 
 /** Transfer commands. Components never call `ipc` directly. */
 export const transfersApi = {
@@ -70,5 +73,13 @@ export const transfersApi = {
 
   queuePaused(): Promise<boolean> {
     return ipc.transferQueuePaused()
+  },
+
+  history(): Promise<TransferHistoryEntry_Serialize[]> {
+    return ipc.transferHistory()
+  },
+
+  clearHistory(): Promise<number> {
+    return ipc.transferClearHistory()
   },
 }

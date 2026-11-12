@@ -21,6 +21,10 @@ use crate::fs::{FileReader, FileWriter};
 use crate::protocol::RemoteFs;
 use crate::session::{SessionCredentials, connect_client};
 
+pub mod history;
+
+use history::TransferHistoryStore;
+
 const CHUNK_SIZE: usize = 64 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -53,10 +57,11 @@ pub struct TransferManager {
     /// True while the queue is paused. Running transfers are allowed to finish;
     /// no new transfer starts until the queue is resumed.
     paused: watch::Sender<bool>,
+    history: Arc<TransferHistoryStore>,
 }
 
 impl TransferManager {
-    pub fn new(concurrency: usize) -> Self {
+    pub fn new(concurrency: usize, history: Arc<TransferHistoryStore>) -> Self {
         let (paused, _) = watch::channel(false);
         Self {
             items: RwLock::new(HashMap::new()),
@@ -64,7 +69,12 @@ impl TransferManager {
             jobs: Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(concurrency.clamp(1, 8))),
             paused,
+            history,
         }
+    }
+
+    pub fn history(&self) -> Arc<TransferHistoryStore> {
+        self.history.clone()
     }
 
     pub fn remember_job(&self, job: TransferJob) {
@@ -164,6 +174,9 @@ impl TransferManager {
             .write()
             .expect("transfer lock poisoned")
             .insert(item.id.clone(), item.clone());
+        // `record` ignores queued and running rows, so only the terminal state
+        // reaches the persisted history.
+        self.history.record(item);
         emit_delta(app, vec![item.clone()], Vec::new());
     }
 

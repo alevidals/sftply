@@ -68,6 +68,8 @@ export const commands = {
 	transferPauseQueue: () => __TAURI_INVOKE<boolean>("transfer_pause_queue"),
 	transferResumeQueue: () => __TAURI_INVOKE<boolean>("transfer_resume_queue"),
 	transferQueuePaused: () => __TAURI_INVOKE<boolean>("transfer_queue_paused"),
+	transferHistory: () => __TAURI_INVOKE<TransferHistoryEntry_Serialize[]>("transfer_history"),
+	transferClearHistory: () => __TAURI_INVOKE<number>("transfer_clear_history"),
 };
 
 /** Events */
@@ -572,6 +574,48 @@ export type TransferDeltaEvent_Serialize = {
 };
 
 export type TransferDirection = "upload" | "download";
+
+/**
+ *  One finished transfer, safe to persist and show in the UI. Paths are reduced
+ *  to the pane labels; credentials never reach this store.
+ */
+export type TransferHistoryEntry = TransferHistoryEntry_Serialize | TransferHistoryEntry_Deserialize;
+
+/**
+ *  One finished transfer, safe to persist and show in the UI. Paths are reduced
+ *  to the pane labels; credentials never reach this store.
+ */
+export type TransferHistoryEntry_Deserialize = {
+	id: string,
+	name: string,
+	direction: TransferDirection,
+	status: TransferStatus,
+	sourceLabel: string,
+	targetLabel: string,
+	size: number,
+	transferred: number,
+	error?: string | null,
+	startedAt: number,
+	finishedAt?: number | null,
+};
+
+/**
+ *  One finished transfer, safe to persist and show in the UI. Paths are reduced
+ *  to the pane labels; credentials never reach this store.
+ */
+export type TransferHistoryEntry_Serialize = {
+	id: string,
+	name: string,
+	direction: TransferDirection,
+	status: TransferStatus,
+	sourceLabel: string,
+	targetLabel: string,
+	size: number,
+	transferred: number,
+	error: string | null,
+	startedAt: number,
+	finishedAt: number | null,
+};
 
 /**
  *  Public transfer row. It contains paths and counters only; credentials and

@@ -66,10 +66,14 @@ describe("SettingsDialog", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument()
     expect(screen.getByText("Row density")).toBeInTheDocument()
+    // Inactive panels must not render: mounting them all made the dialog
+    // taller than the window.
+    expect(screen.queryByLabelText("Simultaneous transfers")).not.toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: "Transfers" }))
 
     expect(screen.getByLabelText("Simultaneous transfers")).toBeInTheDocument()
+    expect(screen.queryByText("Row density")).not.toBeInTheDocument()
     expect(useUiStore.getState().settingsOpen).toBe(true)
     expect(state.updateSettings).not.toHaveBeenCalled()
   })

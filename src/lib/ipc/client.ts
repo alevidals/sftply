@@ -15,6 +15,7 @@ import {
   type SessionInfo,
   type StartupReport,
   type TransferConflict,
+  type TransferHistoryEntry_Serialize,
   type TransferItem,
   type TransferItem_Serialize,
   type TransferPlan_Serialize,
@@ -260,5 +261,13 @@ export const ipc = {
 
   transferQueuePaused(): Promise<boolean> {
     return invoke(commands.transferQueuePaused())
+  },
+
+  transferHistory(): Promise<TransferHistoryEntry_Serialize[]> {
+    return invoke(commands.transferHistory())
+  },
+
+  transferClearHistory(): Promise<number> {
+    return invoke(commands.transferClearHistory())
   },
 }

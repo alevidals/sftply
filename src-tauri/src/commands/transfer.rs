@@ -15,6 +15,7 @@ use crate::domain::transfer::{
 use crate::error::{AppError, ErrorCode};
 use crate::fs::local;
 use crate::session::{Session, report_operation_failure, run_operation};
+use crate::transfer::history::TransferHistoryEntry;
 use crate::transfer::{RemoteAccess, TransferJob, ensure_remote_dir, spawn_transfer};
 
 /// Guard against accidentally walking an enormous tree. The user can still
@@ -587,6 +588,18 @@ pub fn transfer_resume_queue(state: State<'_, AppState>) -> bool {
 #[specta::specta]
 pub fn transfer_queue_paused(state: State<'_, AppState>) -> bool {
     state.transfers.is_paused()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn transfer_history(state: State<'_, AppState>) -> Vec<TransferHistoryEntry> {
+    state.transfers.history().list()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn transfer_clear_history(state: State<'_, AppState>) -> u32 {
+    state.transfers.history().clear()
 }
 
 #[cfg(test)]

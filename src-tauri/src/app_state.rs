@@ -8,6 +8,7 @@ use crate::config::paths::AppPaths;
 use crate::config::settings_store::SettingsStore;
 use crate::session::SessionManager;
 use crate::transfer::TransferManager;
+use crate::transfer::history::TransferHistoryStore;
 
 pub struct AppState {
     pub paths: AppPaths,
@@ -29,6 +30,7 @@ impl AppState {
         settings: SettingsStore,
         connections: ConnectionStore,
         known_hosts: KnownHostsStore,
+        history: Arc<TransferHistoryStore>,
         log_guard: WorkerGuard,
         startup_warnings: Vec<String>,
     ) -> Self {
@@ -39,7 +41,7 @@ impl AppState {
             connections,
             known_hosts,
             sessions: SessionManager::default(),
-            transfers: Arc::new(TransferManager::new(concurrency)),
+            transfers: Arc::new(TransferManager::new(concurrency, history)),
             startup_warnings: RwLock::new(startup_warnings),
             _log_guard: Mutex::new(Some(log_guard)),
         }

@@ -5,6 +5,7 @@ import {
   ArrowDownUpIcon,
   ChevronDownIcon,
   CircleCheckIcon,
+  HistoryIcon,
   InfoIcon,
   OctagonXIcon,
   Trash2Icon,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSettings } from "@/features/settings/settings-context"
+import { TransferHistoryList } from "@/features/transfers/components/transfer-history"
 import { TransferList } from "@/features/transfers/components/transfer-list"
 import { formatClock } from "@/lib/format"
 import type { ActivityLevel } from "@/lib/ipc/bindings"
@@ -61,6 +63,12 @@ export function BottomPanel() {
           label="Activity"
           count={entries.length}
         />
+        <TabButton
+          active={bottomTab === "history"}
+          onClick={() => setBottomTab("history")}
+          icon={HistoryIcon}
+          label="History"
+        />
 
         <div className="ml-auto flex items-center gap-0.5 pr-0.5">
           {bottomTab === "activity" && entries.length > 0 ? (
@@ -98,6 +106,8 @@ export function BottomPanel() {
         ) : (
           <TransferList />
         )
+      ) : bottomTab === "history" ? (
+        <TransferHistoryList />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={ActivityIcon}
@@ -147,7 +157,7 @@ function TabButton({
   onClick: () => void
   icon: LucideIcon
   label: string
-  count: number
+  count?: number
   title?: string
 }) {
   return (
@@ -165,14 +175,16 @@ function TabButton({
     >
       <Icon className="size-3.5" />
       <span>{label}</span>
-      <span
-        className={cn(
-          "min-w-4 rounded-full px-1 text-center font-mono text-[10px] leading-4 tabular",
-          active ? "bg-background/80 text-foreground/80" : "bg-muted/60 text-muted-foreground",
-        )}
-      >
-        {count}
-      </span>
+      {count === undefined ? null : (
+        <span
+          className={cn(
+            "min-w-4 rounded-full px-1 text-center font-mono text-[10px] leading-4 tabular",
+            active ? "bg-background/80 text-foreground/80" : "bg-muted/60 text-muted-foreground",
+          )}
+        >
+          {count}
+        </span>
+      )}
     </button>
   )
 }

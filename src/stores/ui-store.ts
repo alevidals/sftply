@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-export type BottomTab = "transfers" | "activity"
+export type BottomTab = "transfers" | "activity" | "history"
 export type PaneId = "local" | "remote"
 
 export interface PaneSummary {
