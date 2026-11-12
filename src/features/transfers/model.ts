@@ -35,7 +35,15 @@ export interface TransferDragPayload {
   entries: FsEntry[]
 }
 
+/**
+ * The payload of the drag currently in progress. WebKit on macOS can hide both
+ * custom MIME types and `text/plain` during `dragover`, so the drop targets
+ * fall back to this in-memory copy. It is cleared when the drag ends.
+ */
+let activeDrag: TransferDragPayload | null = null
+
 export function writeTransferDrag(dataTransfer: DataTransfer, payload: TransferDragPayload): void {
+  activeDrag = payload
   const encoded = JSON.stringify(payload)
   dataTransfer.setData(TRANSFER_DRAG_MIME, encoded)
   // Some WebViews do not expose custom MIME types during dragover. A plain
@@ -44,9 +52,19 @@ export function writeTransferDrag(dataTransfer: DataTransfer, payload: TransferD
   dataTransfer.effectAllowed = "copy"
 }
 
+/** Forget the in-flight payload once the drag ends or is dropped. */
+export function clearTransferDrag(): void {
+  activeDrag = null
+}
+
+/** Payload of the in-app drag in progress, if any. */
+export function currentTransferDrag(): TransferDragPayload | null {
+  return activeDrag
+}
+
 export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayload | null {
   const raw = dataTransfer.getData(TRANSFER_DRAG_MIME) || dataTransfer.getData("text/plain")
-  if (!raw) return null
+  if (!raw) return activeDrag
   try {
     const parsed = JSON.parse(raw) as Partial<TransferDragPayload>
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.entries)) return null
@@ -60,7 +78,9 @@ export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayloa
 /** Whether a drag event may carry an in-app transfer payload. */
 export function isTransferDrag(dataTransfer: DataTransfer): boolean {
   return (
-    dataTransfer.types.includes(TRANSFER_DRAG_MIME) || dataTransfer.types.includes("text/plain")
+    activeDrag !== null ||
+    dataTransfer.types.includes(TRANSFER_DRAG_MIME) ||
+    dataTransfer.types.includes("text/plain")
   )
 }
 

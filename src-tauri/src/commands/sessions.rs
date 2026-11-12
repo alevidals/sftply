@@ -274,10 +274,28 @@ async fn open_session(
             if mark_used && let Err(error) = state.connections.mark_used(&profile.id).await {
                 tracing::warn!(%error, "could not update connection last-used time");
             }
+            tracing::info!(
+                session = %session_id,
+                protocol = ?profile.protocol,
+                host = %profile.host,
+                port = profile.port,
+                latency_ms = info.latency_ms,
+                "session connected"
+            );
             emit_state(app, &session_id, &profile.id, SessionState::Connected, None);
             Ok(info)
         }
         Ok(Err(error)) => {
+            tracing::warn!(
+                session = %session_id,
+                protocol = ?profile.protocol,
+                host = %profile.host,
+                port = profile.port,
+                code = ?error.code,
+                message = %error.message,
+                detail = ?error.detail,
+                "session connection failed"
+            );
             emit_state(
                 app,
                 &session_id,
@@ -289,6 +307,13 @@ async fn open_session(
         }
         Err(_) => {
             let error = timeout_error();
+            tracing::warn!(
+                session = %session_id,
+                protocol = ?profile.protocol,
+                host = %profile.host,
+                port = profile.port,
+                "session connection timed out"
+            );
             emit_state(
                 app,
                 &session_id,

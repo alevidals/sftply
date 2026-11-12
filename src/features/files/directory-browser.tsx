@@ -69,6 +69,7 @@ import { useSettings } from "@/features/settings/settings-context"
 import { TransferConflictDialog } from "@/features/transfers/components/transfer-conflict-dialog"
 import {
   canDropTransfer,
+  clearTransferDrag,
   isTransferDrag,
   readTransferDrag,
   type TransferDragPayload,
@@ -400,6 +401,7 @@ export function DirectoryBrowser({
 
   const dropInto = (payload: TransferDragPayload, directory: string) => {
     setDropActive(false)
+    clearTransferDrag()
     if (!canDropTransfer(payload, scope)) {
       toast.info("Drop files into the other pane to transfer them.")
       return
@@ -422,6 +424,7 @@ export function DirectoryBrowser({
 
   const handleDrop = (event: React.DragEvent<HTMLElement>) => {
     const payload = readTransferDrag(event.dataTransfer)
+    clearTransferDrag()
     setDropActive(false)
     if (!payload) return
     event.preventDefault()

@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import {
   canDropTransfer,
+  clearTransferDrag,
   isTransferDrag,
   joinLocalPath,
   joinRemotePath,
@@ -53,6 +54,8 @@ describe("transfer paths", () => {
 })
 
 describe("transfer drag payloads", () => {
+  beforeEach(clearTransferDrag)
+
   function dataTransfer(): DataTransfer {
     const store = new Map<string, string>()
     const transfer = {
@@ -98,5 +101,32 @@ describe("transfer drag payloads", () => {
     const transfer = dataTransfer()
     transfer.setData("application/x-sftply-entries", "{not json")
     expect(readTransferDrag(transfer)).toBeNull()
+  })
+
+  it("falls back to the in-memory payload when the WebView hides the types", () => {
+    const transfer = dataTransfer()
+    const payload = {
+      scope: { kind: "local" as const },
+      entries: [entry("a.txt")],
+    }
+    writeTransferDrag(transfer, payload)
+
+    // WebKit on macOS can report no MIME types and no data during dragover.
+    const opaque = { ...transfer, types: [], getData: () => "" } as unknown as DataTransfer
+    expect(isTransferDrag(opaque)).toBe(true)
+    expect(readTransferDrag(opaque)).toEqual(payload)
+  })
+
+  it("stops recognising drags once the drag ends", () => {
+    const transfer = dataTransfer()
+    writeTransferDrag(transfer, {
+      scope: { kind: "local" as const },
+      entries: [entry("a.txt")],
+    })
+    clearTransferDrag()
+
+    const opaque = { ...transfer, types: [], getData: () => "" } as unknown as DataTransfer
+    expect(isTransferDrag(opaque)).toBe(false)
+    expect(readTransferDrag(opaque)).toBeNull()
   })
 })

@@ -164,6 +164,7 @@ impl FtpRemote {
         };
 
         let (client, features) = tokio::time::timeout(CONNECT_TIMEOUT, async move {
+            tracing::debug!("FTP connect: opening the control connection");
             let mut client = match protocol {
                 ConnectionProtocol::Ftp => FtpClient::Plain(
                     AsyncFtpStream::connect((host.as_str(), port))
@@ -198,9 +199,12 @@ impl FtpRemote {
                 ConnectionProtocol::Sftp => unreachable!("SFTP profiles are rejected above"),
             };
 
+            tracing::debug!("FTP connect: control channel ready; signing in");
             on_client!(&mut client, login(username.as_str(), password.as_str()))
-                .map_err(map_ftp_error)?;
-            on_client!(&mut client, transfer_type(FtpFileType::Binary)).map_err(map_ftp_error)?;
+                .map_err(|error| ftp_phase_error("sign-in", error))?;
+            tracing::debug!("FTP connect: signed in; requesting a binary transfer type");
+            on_client!(&mut client, transfer_type(FtpFileType::Binary))
+                .map_err(|error| ftp_phase_error("transfer type", error))?;
 
             let mode = match data_mode {
                 FtpDataMode::Passive => FtpMode::Passive,
@@ -216,7 +220,8 @@ impl FtpRemote {
                 Ok(features) => features,
                 Err(error) => {
                     // FEAT is optional. LIST still works, so this is not fatal.
-                    tracing::debug!(error = %error, "FTP server did not return FEAT");
+                    // ftpd on the 3DS sends a blank line that some parsers reject.
+                    tracing::debug!(error = %error, "FTP server did not return usable FEAT");
                     HashMap::new()
                 }
             };
@@ -225,11 +230,23 @@ impl FtpRemote {
         })
         .await
         .map_err(|_| {
+            tracing::warn!(
+                host = %profile.host,
+                port = profile.port,
+                "FTP connect: timed out during the handshake"
+            );
             AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
         })??;
 
         let mlsd = feature_present(&features, "MLSD");
         let chmod = feature_present(&features, "SITE CHMOD");
+        tracing::debug!(
+            host = %profile.host,
+            port = profile.port,
+            mlsd,
+            chmod,
+            "FTP connect: handshake complete"
+        );
         let capabilities = FsCapabilities {
             list: true,
             mkdir: true,
@@ -566,17 +583,23 @@ fn map_transfer_io(error: std::io::Error) -> AppError {
     }
 }
 
+/// Map a handshake failure and record which step failed. The log line never
+/// contains credentials: only the phase and the already-redacted error.
+fn ftp_phase_error(phase: &'static str, error: FtpError) -> AppError {
+    let mapped = map_ftp_error(error);
+    tracing::warn!(
+        phase,
+        code = ?mapped.code,
+        message = %mapped.message,
+        detail = ?mapped.detail,
+        "FTP handshake failed"
+    );
+    mapped
+}
+
 fn map_ftp_error(error: FtpError) -> AppError {
     match error {
-        FtpError::ConnectionError(error) => {
-            if error.kind() == std::io::ErrorKind::TimedOut {
-                AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
-            } else {
-                AppError::new(ErrorCode::Network, "Could not reach the FTP server.")
-                    .with_detail(error.to_string())
-                    .retryable()
-            }
-        }
+        FtpError::ConnectionError(error) => map_connection_error(error),
         FtpError::UnexpectedResponse(response) => map_status(response.status, &response.body),
         FtpError::SecureError(detail) => AppError::new(
             ErrorCode::TlsCertificate,
@@ -592,6 +615,60 @@ fn map_ftp_error(error: FtpError) -> AppError {
         }
         FtpError::DataConnectionAlreadyOpen => {
             AppError::new(ErrorCode::Protocol, "A data connection is already open.")
+        }
+    }
+}
+
+/// Turn a socket failure into a message that tells the user what to check.
+/// The raw OS text stays in `detail`; it contains no credentials.
+fn map_connection_error(error: std::io::Error) -> AppError {
+    use std::io::ErrorKind;
+
+    match error.kind() {
+        ErrorKind::TimedOut => {
+            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+        }
+        ErrorKind::ConnectionRefused => {
+            AppError::new(ErrorCode::Network, "The server refused the connection.")
+                .with_detail(
+                    "Nothing is listening on that host and port. Check the port number and that the server is running.",
+                )
+                .retryable()
+        }
+        ErrorKind::HostUnreachable | ErrorKind::NetworkUnreachable => {
+            AppError::new(
+                ErrorCode::Network,
+                "The server is not reachable from this computer.",
+            )
+            .with_detail(
+                "The network could not deliver packets to that address. Check that the device is powered on and on the same network, and that the router is not blocking it.",
+            )
+            .retryable()
+        }
+        ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted | ErrorKind::BrokenPipe => {
+            AppError::new(
+                ErrorCode::Network,
+                "The server closed the connection unexpectedly.",
+            )
+            .with_detail(error.to_string())
+            .retryable()
+        }
+        _ => {
+            let detail = error.to_string();
+            if detail.contains("lookup address") || detail.contains("nodename") {
+                AppError::new(
+                    ErrorCode::Network,
+                    "The server name could not be resolved.",
+                )
+                .with_detail(
+                    "Check the host name for typos, or enter the IP address instead.",
+                )
+                .retryable()
+            } else {
+                AppError::new(ErrorCode::Network, "Could not reach the FTP server.")
+                    .with_detail(detail)
+                    .retryable()
+            }
         }
     }
 }
@@ -675,6 +752,195 @@ mod tests {
         )));
         assert_eq!(error.code, ErrorCode::Network);
         assert!(error.retryable);
+    }
+
+    #[test]
+    fn explains_an_unreachable_host() {
+        let error = map_connection_error(std::io::Error::new(
+            std::io::ErrorKind::HostUnreachable,
+            "No route to host (os error 65)",
+        ));
+
+        assert_eq!(error.code, ErrorCode::Network);
+        assert!(error.retryable);
+        assert!(error.message.contains("not reachable"), "{error:?}");
+        assert!(
+            error
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("same network")),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn explains_a_refused_connection() {
+        let error = map_connection_error(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "Connection refused (os error 61)",
+        ));
+
+        assert_eq!(error.code, ErrorCode::Network);
+        assert!(error.message.contains("refused"), "{error:?}");
+        assert!(
+            error
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("port number")),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn explains_a_dns_failure() {
+        let error = map_connection_error(std::io::Error::other(
+            "failed to lookup address information: nodename nor servname provided",
+        ));
+
+        assert_eq!(error.code, ErrorCode::Network);
+        assert!(error.message.contains("resolved"), "{error:?}");
+    }
+}
+
+/// Reproduces the quirks of the 3DS homebrew `ftpd` server (mtheall/ftpd):
+/// a FEAT reply with an empty line before the terminator, no MLSD feature,
+/// POSIX listings, and a `150` reply that is only sent once the passive data
+/// connection has been accepted. Cyberduck and Finder connect to it, so the
+/// adapter must too.
+#[cfg(test)]
+mod three_ds_compat {
+    use super::*;
+    use crate::domain::connection::{ConnectionAuth, ConnectionInput, TlsOptions};
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::{TcpListener, TcpStream};
+
+    const FEAT_REPLY: &str = "211-\r\n MDTM\r\n MLST Type*;Size*;Modify*;Perm*;UNIX.mode*;\r\n MODE Z\r\n PASV\r\n REST STREAM\r\n SIZE\r\n TVFS\r\n UTF8\r\n\r\n211 End\r\n";
+
+    const LIST_REPLY: &str = "-rw-r--r-- 1 3DS 3DS 1225607362 Nov 11 11:49 GOPR4100.MP4\r\ndrwxr-sr-x 2 3DS 3DS 4096 Nov 11 11:38 upload\r\n-rw-r--r-- 1 3DS 3DS 36 Nov  1 2025 welcome.txt\r\n";
+
+    async fn session(control: TcpStream) {
+        let (read_half, mut out) = control.into_split();
+        let mut reader = BufReader::new(read_half);
+        let mut passive: Option<TcpListener> = None;
+
+        out.write_all(b"220 Hello!\r\n").await.expect("greeting");
+
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).await.expect("read command") == 0 {
+                break;
+            }
+            let line = line.trim_end_matches(['\r', '\n']);
+            let (verb, args) = match line.split_once(' ') {
+                Some((verb, args)) => (verb.to_ascii_uppercase(), args),
+                None => (line.to_ascii_uppercase(), ""),
+            };
+
+            match verb.as_str() {
+                "USER" => out.write_all(b"331 Need password\r\n").await.expect("user"),
+                "PASS" => out.write_all(b"230 OK\r\n").await.expect("pass"),
+                "TYPE" => out.write_all(b"200 OK\r\n").await.expect("type"),
+                "FEAT" => out.write_all(FEAT_REPLY.as_bytes()).await.expect("feat"),
+                "PASV" => {
+                    let listener = TcpListener::bind(("127.0.0.1", 0))
+                        .await
+                        .expect("bind passive listener");
+                    let port = listener.local_addr().expect("passive addr").port();
+                    passive = Some(listener);
+                    let reply = format!(
+                        "227 Entering Passive Mode (127,0,0,1,{},{})\r\n",
+                        port >> 8,
+                        port & 0xff
+                    );
+                    out.write_all(reply.as_bytes()).await.expect("pasv");
+                }
+                "LIST" => {
+                    // ftpd accepts the already-queued data connection and only
+                    // then sends the 150 reply.
+                    let listener = passive.take().expect("PASV must precede LIST");
+                    let (mut data, _) = listener.accept().await.expect("accept data");
+                    out.write_all(b"150 Ready\r\n").await.expect("150");
+                    data.write_all(LIST_REPLY.as_bytes())
+                        .await
+                        .expect("listing");
+                    data.shutdown().await.expect("close data");
+                    out.write_all(b"226 OK\r\n").await.expect("226");
+                }
+                "QUIT" => {
+                    out.write_all(b"221 Disconnecting\r\n").await.expect("quit");
+                    break;
+                }
+                _ => out
+                    .write_all(b"502 Invalid command\r\n")
+                    .await
+                    .expect("502"),
+            }
+            let _ = args;
+        }
+    }
+
+    async fn spawn_server() -> u16 {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        tokio::spawn(async move {
+            if let Ok((control, _)) = listener.accept().await {
+                session(control).await;
+            }
+        });
+        port
+    }
+
+    fn profile(port: u16) -> ConnectionProfile {
+        ConnectionProfile::from_input(
+            "3ds".into(),
+            ConnectionInput {
+                name: "3DS".into(),
+                protocol: ConnectionProtocol::Ftp,
+                host: "127.0.0.1".into(),
+                port,
+                username: "anonymous".into(),
+                auth: ConnectionAuth::Password,
+                initial_path: "/".into(),
+                favorite: false,
+                group: None,
+                tls: TlsOptions::default(),
+                ftp_data_mode: FtpDataMode::Passive,
+            },
+            0.0,
+        )
+    }
+
+    #[tokio::test]
+    async fn connects_and_lists_through_a_3ds_style_server() {
+        let port = spawn_server().await;
+        let mut remote = FtpRemote::connect(&profile(port), "")
+            .await
+            .expect("the 3DS FEAT reply must not break the handshake");
+
+        assert!(!remote.capabilities.detailed_listing);
+        assert!(!remote.capabilities.unix_permissions);
+
+        let listing = remote.list("/").await.expect("list the root");
+        let mut names: Vec<&str> = listing.entries.iter().map(|e| e.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, ["GOPR4100.MP4", "upload", "welcome.txt"]);
+        assert!(listing.warnings.is_empty(), "{:?}", listing.warnings);
+
+        let upload = listing
+            .entries
+            .iter()
+            .find(|entry| entry.name == "upload")
+            .expect("upload folder");
+        assert_eq!(upload.kind, EntryKind::Directory);
+        assert_eq!(upload.path, "/upload");
+
+        let video = listing
+            .entries
+            .iter()
+            .find(|entry| entry.name == "GOPR4100.MP4")
+            .expect("video file");
+        assert_eq!(video.kind, EntryKind::File);
+        assert_eq!(video.size, 1_225_607_362.0);
     }
 }
 

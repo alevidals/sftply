@@ -738,3 +738,28 @@ which is only correct for local client connections. See
 
 - Re-run manual QA of drag-and-drop and post-transfer refresh in the real Tauri window.
 - Phase 4c hardening and persistent transfer history.
+
+### 2026-11-12 — Session 15: native drag interception, settings layout and 3DS diagnostics
+
+**Fixed**
+
+- In-app drag-and-drop did nothing in the packaged window. Tauri installs a native drag-drop handler on the webview by default, and on macOS wry reports the drag as handled before WKWebView can dispatch `dragover`/`drop`; the HTML5 handlers never ran. The main window now sets `dragDropEnabled: false`, so HTML5 drag events reach the page. OS file drops were not implemented yet, so nothing regresses.
+- Drag targets also relied on `dataTransfer.types`, which WebKit can hide during `dragover`. The drag payload is now kept in memory between `dragstart` and `dragend`, and `isTransferDrag`/`readTransferDrag` fall back to it. The in-memory copy is cleared on drop and on `dragend`.
+- The settings dialog rendered at 384 px because the base `sm:max-w-sm` won over `max-w-2xl` in the generated stylesheet, clipping the two-column tab layout. It now uses `sm:max-w-2xl`.
+
+**Added**
+
+- `three_ds_compat` test: a mock server reproduces `ftpd` on the 3DS (FEAT with a blank line before `211 End`, no MLSD, POSIX listings, `150` only after the passive data connection is accepted). The FTP adapter connects and lists it, so the 3DS failure was environmental (console permissions), not the handshake.
+- Per-phase FTP handshake logs (`FTP connect: …`, `FTP handshake failed` with the failing phase) and session connect/failure/timeout logs. Credentials are never logged.
+- Actionable network errors for FTP: unreachable host, refused connection, reset connection and DNS failures each explain what to check instead of a generic "Could not reach the FTP server".
+- `SettingsDialog` tests: tabs switch without closing the dialog, and Save persists the edited value and closes.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (72 passed, 14 ignored).
+- `bun run check` (Biome, 129 Vitest tests in 22 files, strict TypeScript, production build).
+
+**Next**
+
+- Confirm drag-and-drop and the settings dialog in the real Tauri window.
+- Phase 4c hardening and persistent transfer history.

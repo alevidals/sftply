@@ -93,7 +93,7 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <form onSubmit={onSubmit} className="flex min-h-[540px] flex-col">
           <DialogHeader className="border-b border-border/70 px-5 py-4">
             <DialogTitle>Settings</DialogTitle>
