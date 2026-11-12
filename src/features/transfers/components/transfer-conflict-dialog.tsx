@@ -68,7 +68,7 @@ export function TransferConflictDialog({
         <div className="max-h-36 space-y-1 overflow-auto rounded-md border border-border bg-muted/30 p-2 text-2xs">
           {conflicts.slice(0, 10).map((conflict) => (
             <div key={conflict.targetPath} className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">
+              <span className="selectable min-w-0 flex-1 truncate font-mono text-muted-foreground">
                 {conflict.targetPath}
               </span>
               <span className="shrink-0 tabular text-muted-foreground/80">

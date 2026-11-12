@@ -176,6 +176,21 @@ function dataTransfer(): DataTransfer {
   } as unknown as DataTransfer
 }
 
+describe("FileTable context menu", () => {
+  it("copies the active path from the row menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const { handlers } = renderTable({ selection: selection(0, ["/tmp/alpha.txt"]) })
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("row", { name: /alpha/ }),
+    })
+    await user.click(await screen.findByRole("menuitem", { name: "Copy path" }))
+
+    expect(handlers.onAction).toHaveBeenCalledWith("copy-path")
+  })
+})
+
 describe("FileTable drag and drop", () => {
   it("drags the selection and drops it on a folder row", () => {
     const onDropPayload = vi.fn()

@@ -339,7 +339,7 @@ export function SettingsDialog() {
                     A modern FTP, FTPS and SFTP desktop client.
                   </p>
                 </div>
-                <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+                <dl className="selectable grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
                   <dt className="text-muted-foreground">Version</dt>
                   <dd className="font-mono text-[11px]">{appInfo.data?.version ?? "—"}</dd>
                   <dt className="text-muted-foreground">Platform</dt>

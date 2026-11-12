@@ -3,6 +3,7 @@ import { cn } from "cn"
 import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
+  CopyIcon,
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
@@ -42,6 +43,7 @@ export type FileAction =
   | "reveal"
   | "permissions"
   | "new-folder"
+  | "copy-path"
   | "transfer"
 
 interface FileTableProps {
@@ -151,6 +153,8 @@ export function FileTable({
       case "permissions":
         return !activeEntry || !canChmod || selection.selected.size !== 1
       case "new-folder":
+        return false
+      case "copy-path":
         return false
     }
   }
@@ -408,6 +412,10 @@ export function FileTable({
             Reveal in file manager
           </ContextMenuItem>
         ) : null}
+        <ContextMenuItem onSelect={() => onAction("copy-path")}>
+          <CopyIcon />
+          Copy path
+        </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={actionDisabled("rename")} onSelect={() => onAction("rename")}>
           <PencilIcon />

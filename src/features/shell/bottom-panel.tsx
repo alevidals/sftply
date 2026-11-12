@@ -126,7 +126,7 @@ export function BottomPanel() {
                   className="flex h-7 items-center gap-2 px-3 text-xs transition-colors hover:bg-row-hover"
                 >
                   <Icon className={cn("size-3.5 shrink-0", meta.className)} />
-                  <span className="min-w-0 flex-1 truncate text-foreground/90">
+                  <span className="selectable min-w-0 flex-1 truncate text-foreground/90">
                     {entry.message}
                   </span>
                   <time

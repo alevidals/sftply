@@ -793,3 +793,16 @@ which is only correct for local client connections. See
 
 - Confirm the theme gallery, sidebar limits and existing drag-and-drop/settings/History fixes in the real Tauri window.
 - Phase 4b remainder: bandwidth limiter and external OS file drops.
+
+### 2026-11-12 — Session 17: desktop text-selection policy
+
+**Changed**
+
+- The webview no longer behaves like a web page: `html` sets `user-select: none`, so labels, rows, chrome and dialogs cannot be dragged-selected by accident. Inputs, textareas, `contenteditable`, `pre` and `code` opt back in, and a `.selectable` utility marks the few read-only regions where copying is useful.
+- `.selectable` is applied to host-key fingerprints, the Settings About paths, the file-pane path, activity messages, transfer errors, conflict paths and permission previews. A text cursor signals the opt-in.
+- Images and links no longer drag out of the window (`-webkit-user-drag: none`).
+- Because rows are no longer selectable, file menus gained **Copy path** (context menu and the per-pane actions menu). It copies every selected path, or the folder path when the menu is opened on empty space, and reports success or failure.
+
+**Verified**
+
+- `bun run check` (Biome, 137 Vitest tests in 23 files, strict TypeScript, production build). New test: the file row context menu dispatches `copy-path`.

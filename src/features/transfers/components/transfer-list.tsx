@@ -241,7 +241,7 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
             style={{ width: `${percent}%` }}
           />
         </div>
-        <span className="w-28 shrink-0 truncate text-right text-2xs text-muted-foreground/80">
+        <span className="selectable w-28 shrink-0 truncate text-right text-2xs text-muted-foreground/80">
           {detail(item)}
         </span>
       </div>

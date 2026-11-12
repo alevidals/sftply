@@ -547,6 +547,24 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Desktop chrome is not selectable. Editable fields and explicit
+       `.selectable` regions opt back in below. */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  pre,
+  code {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  img,
+  a {
+    -webkit-user-drag: none;
   }
 
   body {
@@ -599,6 +617,13 @@
 
   .no-drag {
     -webkit-app-region: no-drag;
+  }
+
+  /* Opt a region back into text selection (paths, fingerprints, errors). */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: text;
   }
 
   .tabular {

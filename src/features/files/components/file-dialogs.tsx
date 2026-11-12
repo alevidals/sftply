@@ -80,7 +80,7 @@ export function NewFolderDialog({
               <FolderPlusIcon className="size-4 text-primary" />
               New folder
             </DialogTitle>
-            <DialogDescription className="truncate font-mono text-2xs">
+            <DialogDescription className="selectable truncate font-mono text-2xs">
               {parentPath}
             </DialogDescription>
           </DialogHeader>
@@ -177,7 +177,7 @@ export function DeleteDialog({ open, entries, onOpenChange, onConfirm }: DeleteD
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="max-h-32 space-y-0.5 overflow-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-2xs text-muted-foreground">
+        <div className="selectable max-h-32 space-y-0.5 overflow-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-2xs text-muted-foreground">
           {entries.slice(0, 12).map((entry) => (
             <div key={entry.path} className="truncate">
               {entry.name}
@@ -286,7 +286,7 @@ export function PermissionsDialog({
                 aria-invalid={Boolean(error)}
               />
             </div>
-            <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
+            <div className="selectable flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
               <span className="font-mono text-sm">{preview}</span>
               <span className="text-2xs text-muted-foreground">
                 {parsed === null ? "Invalid mode" : `0o${parsed.toString(8).padStart(4, "0")}`}

@@ -90,7 +90,7 @@ export function HostKeyDialog() {
         </AlertDialogHeader>
 
         {challenge ? (
-          <div className="space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs">
+          <div className="selectable space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs">
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Server</span>
               <span className="font-mono text-foreground">

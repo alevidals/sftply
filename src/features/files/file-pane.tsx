@@ -63,7 +63,9 @@ export function FilePane({
         ) : (
           <ServerIcon className="size-3 text-muted-foreground/80" />
         )}
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{path}</span>
+        <span className="selectable truncate font-mono text-[11px] text-muted-foreground">
+          {path}
+        </span>
       </div>
 
       <div className="grid h-7 shrink-0 grid-cols-[minmax(0,1fr)_88px_132px] items-center gap-3 border-b border-border/60 bg-panel-header/60 px-3 text-2xs font-medium tracking-wide text-muted-foreground/80 uppercase">

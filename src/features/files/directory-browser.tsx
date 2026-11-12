@@ -5,6 +5,7 @@ import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
   Columns3Icon,
+  CopyIcon,
   EyeIcon,
   EyeOffIcon,
   FolderOpenIcon,
@@ -269,6 +270,22 @@ export function DirectoryBrowser({
         case "new-folder":
           setNewFolderOpen(true)
           break
+        case "copy-path": {
+          const fallback = activeEntry?.path ?? listing?.path
+          const paths =
+            selectedEntries.length > 0
+              ? selectedEntries.map((entry) => entry.path)
+              : fallback
+                ? [fallback]
+                : []
+          if (paths.length === 0) break
+          navigator.clipboard.writeText(paths.join("\n")).then(
+            () =>
+              toast.success(paths.length === 1 ? "Path copied" : `${paths.length} paths copied`),
+            (error) => reportError("Could not copy the path", error),
+          )
+          break
+        }
         case "transfer":
           if (selectedEntries.length > 0) transfer(selectedEntries)
           break
@@ -278,7 +295,9 @@ export function DirectoryBrowser({
       activeEntry,
       allowReveal,
       canChmod,
+      listing,
       openEntry,
+      reportError,
       revealEntry,
       selectedEntries,
       selection.selected.size,
@@ -811,6 +830,10 @@ function ActionsMenu({
             </DropdownMenuItem>
           </>
         ) : null}
+        <DropdownMenuItem onSelect={() => onAction("copy-path")}>
+          <CopyIcon />
+          Copy path
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={!canPermissions} onSelect={() => onAction("permissions")}>
           <InfoIcon />
           Permissions…
@@ -959,13 +982,13 @@ function PaneError({
         <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-destructive/30 bg-destructive/10 text-destructive">
           <AlertTriangleIcon className="size-5" />
         </span>
-        <h2 className="text-sm font-medium text-foreground">{message}</h2>
+        <h2 className="selectable text-sm font-medium text-foreground">{message}</h2>
         {normalized.detail ? (
-          <p className="mt-1 line-clamp-3 font-mono text-2xs break-words text-muted-foreground">
+          <p className="selectable mt-1 line-clamp-3 font-mono text-2xs break-words text-muted-foreground">
             {normalized.detail}
           </p>
         ) : (
-          <p className="mt-1 text-xs text-muted-foreground">{normalized.message}</p>
+          <p className="selectable mt-1 text-xs text-muted-foreground">{normalized.message}</p>
         )}
         <div className="mt-3 flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onRetry}>
