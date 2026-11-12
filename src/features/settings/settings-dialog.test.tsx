@@ -56,7 +56,7 @@ beforeEach(() => {
     ...settings,
     ...patch,
   }))
-  useUiStore.setState({ settingsOpen: true })
+  useUiStore.setState({ settingsOpen: true, settingsTab: "appearance" })
 })
 
 describe("SettingsDialog", () => {
@@ -78,6 +78,14 @@ describe("SettingsDialog", () => {
     expect(state.updateSettings).not.toHaveBeenCalled()
   })
 
+  it("opens on the requested tab", () => {
+    useUiStore.setState({ settingsOpen: true, settingsTab: "shortcuts" })
+    render(<SettingsDialog />)
+
+    expect(screen.getByText("Command palette")).toBeInTheDocument()
+    expect(screen.queryByText("Row density")).not.toBeInTheDocument()
+  })
+
   it("lists the keyboard shortcuts with platform labels", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     render(<SettingsDialog />)
@@ -88,6 +96,22 @@ describe("SettingsDialog", () => {
     expect(screen.getByText("⌘K")).toBeInTheDocument()
     expect(screen.getByText("Files and selection")).toBeInTheDocument()
     expect(screen.queryByText("Row density")).not.toBeInTheDocument()
+  })
+
+  it("saves a bandwidth limit and clears it when empty", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("tab", { name: "Transfers" }))
+    const input = screen.getByLabelText("Bandwidth limit")
+    await user.type(input, "512")
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() =>
+      expect(state.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ bandwidthLimitKbps: 512 }),
+      ),
+    )
   })
 
   it("saves the edited values and closes", async () => {

@@ -3,7 +3,7 @@
 **Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
 
 **Last updated:** 2026-11-11  
-**Current phase:** Phase 4 in progress — Phase 4a (single-file) and Phase 4b (recursive jobs, queue control, retry, in-app drag-and-drop) are implemented. Phase 4c hardening (large files, broken connections, 1000-item queue, server matrix) and transfer history persistence remain.
+**Current phase:** Phase 4 in progress — Phase 4a (single-file) and Phase 4b (recursive jobs, queue control, retry, in-app drag-and-drop, bandwidth limiter) are implemented. Phase 4c hardening (large files, broken connections, 1000-item queue, server matrix) and external OS file drops remain.
 **Overall status:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a/4b transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD, binary streaming round trips and nested-folder creation. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table (including drag/drop), dialogs and the transfer list; real-window visual QA remains pending. A minimal Docker FTP server for manual connection testing lives in `docker/dev-ftp/` and is documented below.
 
 ---
@@ -176,11 +176,12 @@ These were recommended in the architecture package. Implementation proceeds with
 
 - [x] 4a: single-file pipeline, progress, cancellation, conflicts, temp download
 - [x] 4b: recursive jobs, queue control, retry, in-app drag-and-drop (pause is queue-level only)
+- [x] 4b: shared bandwidth limiter and live concurrency changes
 - [ ] 4c: hardening (large files, broken connections, 1000-item queue, server matrix)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
 - [x] Honest capability gating verified (per-transfer pause/resume stays hidden; queue pause only)
-- [ ] Transfer history persistence across restarts
+- [x] Transfer history persistence across restarts
 - [ ] OS file drag-and-drop (Finder → pane) and drag-out
 
 ### Phase 4 exit criteria
@@ -849,3 +850,25 @@ which is only correct for local client connections. See
 **Next**
 
 - Add a global `?` shortcut that opens Settings directly on the Shortcuts tab.
+
+### 2026-11-12 — Session 20: bandwidth limiter and live queue settings
+
+**Added**
+
+- A shared bandwidth limiter in `TransferManager`. Chunks reserve a slot in a leaky-bucket schedule before sleeping, so the limit applies to the combined speed of every concurrent transfer instead of multiplying with concurrency. Cancellation interrupts the sleep immediately.
+- Settings → Transfers now exposes **Bandwidth limit** in kbps, with an empty field meaning unlimited. The existing `bandwidthLimitKbps` setting was persisted and validated in Rust but had no UI and no effect until now.
+- `?` opens Settings directly on the Shortcuts tab, and the command palette gained a **Keyboard shortcuts** command. The Shortcuts catalogue documents the new binding.
+
+**Fixed**
+
+- Changing **Simultaneous transfers** used to require a restart: the semaphore was built once at startup. The queue now uses an atomic active-slot gate, so raising or lowering the limit affects transfers that are already waiting, and running transfers are left alone.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (80 passed, 14 ignored). New Rust tests cover kbps→bytes conversion, slot spacing, resetting the schedule when the limit is removed, and growing concurrency while tasks wait.
+- `bun run check` (Biome, 145 Vitest tests in 24 files, strict TypeScript, production build). New tests cover saving a bandwidth limit and opening Settings on the Shortcuts tab.
+
+**Next**
+
+- Phase 4c hardening: >4 GiB files, broken connections, 1,000 queued items, retry safety.
+- External OS file drops remain blocked by Tauri's `dragDropEnabled` trade-off with in-app HTML5 drag and drop.

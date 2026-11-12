@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "cn"
 import { CheckIcon } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -29,12 +29,25 @@ import { isMacPlatform } from "@/lib/shortcuts"
 import { THEME_OPTIONS, THEME_VALUES } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
+const MIN_BANDWIDTH_KBPS = 16
+const MAX_BANDWIDTH_KBPS = 10_000_000
+
 const settingsSchema = z.object({
   theme: z.enum(THEME_VALUES),
   density: z.enum(["compact", "comfortable"]),
   showHiddenFiles: z.boolean(),
   confirmDelete: z.boolean(),
   transferConcurrency: z.number().int().min(1).max(8),
+  bandwidthLimit: z.string().refine(
+    (value) => {
+      if (value.trim() === "") return true
+      const parsed = Number(value)
+      return (
+        Number.isInteger(parsed) && parsed >= MIN_BANDWIDTH_KBPS && parsed <= MAX_BANDWIDTH_KBPS
+      )
+    },
+    { message: `Enter ${MIN_BANDWIDTH_KBPS}–${MAX_BANDWIDTH_KBPS} kbps, or leave it empty.` },
+  ),
   connectTimeoutSeconds: z.number().int().min(5).max(300),
   operationTimeoutSeconds: z.number().int().min(5).max(600),
 })
@@ -48,6 +61,7 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
     showHiddenFiles: settings.showHiddenFiles,
     confirmDelete: settings.confirmDelete,
     transferConcurrency: settings.transferConcurrency,
+    bandwidthLimit: settings.bandwidthLimitKbps?.toString() ?? "",
     connectTimeoutSeconds: settings.connectTimeoutSeconds,
     operationTimeoutSeconds: settings.operationTimeoutSeconds,
   }
@@ -58,7 +72,8 @@ export function SettingsDialog() {
   const setOpen = useUiStore((state) => state.setSettingsOpen)
   const { settings, updateSettings, saving } = useSettings()
   const appInfo = useAppInfo()
-  const [tab, setTab] = useState("appearance")
+  const tab = useUiStore((state) => state.settingsTab)
+  const setTab = useUiStore((state) => state.setSettingsTab)
   const wasOpen = useRef(false)
   const isMac = isMacPlatform(appInfo.data?.platform)
 
@@ -75,8 +90,12 @@ export function SettingsDialog() {
   }, [open, settings, reset])
 
   const onSubmit = handleSubmit(async (values) => {
+    const { bandwidthLimit, ...rest } = values
     try {
-      await updateSettings(values)
+      await updateSettings({
+        ...rest,
+        bandwidthLimitKbps: bandwidthLimit.trim() === "" ? null : Number(bandwidthLimit),
+      })
       toast.success("Settings saved")
       setOpen(false)
     } catch (error) {
@@ -336,6 +355,28 @@ export function SettingsDialog() {
                     {...register("transferConcurrency", { valueAsNumber: true })}
                   />
                   <FieldError errors={[formState.errors.transferConcurrency]} />
+                </Field>
+                <Field data-invalid={Boolean(formState.errors.bandwidthLimit)}>
+                  <FieldLabel htmlFor="bandwidth-limit">Bandwidth limit</FieldLabel>
+                  <FieldDescription>
+                    Caps the combined speed of every transfer. Leave it empty for unlimited. Values
+                    from 16 to 10,000,000 kbps.
+                  </FieldDescription>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="bandwidth-limit"
+                      type="number"
+                      min={MIN_BANDWIDTH_KBPS}
+                      max={MAX_BANDWIDTH_KBPS}
+                      step={16}
+                      placeholder="Unlimited"
+                      className="w-32"
+                      aria-invalid={Boolean(formState.errors.bandwidthLimit)}
+                      {...register("bandwidthLimit")}
+                    />
+                    <span className="text-xs text-muted-foreground">kbps</span>
+                  </div>
+                  <FieldError errors={[formState.errors.bandwidthLimit]} />
                 </Field>
               </TabsContent>
 

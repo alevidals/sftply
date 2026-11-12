@@ -7,6 +7,7 @@ describe("formatShortcut", () => {
     expect(formatShortcut("mod+Comma", true)).toBe("⌘,")
     expect(formatShortcut("mod+BracketLeft", true)).toBe("⌘[")
     expect(formatShortcut("mod+Backspace", true)).toBe("⌘⌫")
+    expect(formatShortcut("Shift+Slash", true)).toBe("?")
   })
 
   it("uses Ctrl and spelled-out modifiers elsewhere", () => {

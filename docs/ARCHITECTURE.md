@@ -689,29 +689,30 @@ Query key: `["fs", scopeKey, path]` where `scopeKey` is `"local"` or `"remote:<s
 
 The Settings → Shortcuts tab renders this same list, with Command labels on macOS and Ctrl labels elsewhere.
 
-| Shortcut                       | Action                                   |
-| ------------------------------ | ---------------------------------------- |
-| Cmd/Ctrl+K                     | Command palette                          |
-| Cmd/Ctrl+,                     | Open settings                            |
-| Cmd/Ctrl+J                     | Toggle transfers and activity panel      |
-| Cmd/Ctrl+1 / 2                 | Focus local / remote pane                |
-| Cmd/Ctrl+R                     | Refresh the active pane                  |
-| Cmd/Ctrl+F                     | Filter the active folder                 |
-| Cmd/Ctrl+L                     | Edit the path                            |
-| Cmd/Ctrl+[ / ]                 | Go back / forward                        |
-| Cmd/Ctrl+↑                     | Go to the enclosing folder               |
-| Cmd/Ctrl+Shift+N               | New folder                               |
-| ↑ / ↓                          | Move the cursor                          |
-| Shift+↑ / ↓                    | Extend the selection                     |
-| Home / End                     | First / last item                        |
-| Space                          | Select or deselect the active item       |
-| Cmd/Ctrl+A                     | Select all                               |
-| Enter                          | Open folder or file                      |
-| F2                             | Rename                                   |
-| Cmd+Backspace / Delete         | Delete the selection (macOS / elsewhere) |
-| Backspace                      | Go to the enclosing folder               |
-| Escape                         | Close dialog/menu, clear the selection   |
-| A–Z                            | Type-ahead                               |
+| Shortcut               | Action                                   |
+| ---------------------- | ---------------------------------------- |
+| Cmd/Ctrl+K             | Command palette                          |
+| Cmd/Ctrl+,             | Open settings                            |
+| ?                      | Open the keyboard shortcuts              |
+| Cmd/Ctrl+J             | Toggle transfers and activity panel      |
+| Cmd/Ctrl+1 / 2         | Focus local / remote pane                |
+| Cmd/Ctrl+R             | Refresh the active pane                  |
+| Cmd/Ctrl+F             | Filter the active folder                 |
+| Cmd/Ctrl+L             | Edit the path                            |
+| Cmd/Ctrl+[ / ]         | Go back / forward                        |
+| Cmd/Ctrl+↑             | Go to the enclosing folder               |
+| Cmd/Ctrl+Shift+N       | New folder                               |
+| ↑ / ↓                  | Move the cursor                          |
+| Shift+↑ / ↓            | Extend the selection                     |
+| Home / End             | First / last item                        |
+| Space                  | Select or deselect the active item       |
+| Cmd/Ctrl+A             | Select all                               |
+| Enter                  | Open folder or file                      |
+| F2                     | Rename                                   |
+| Cmd+Backspace / Delete | Delete the selection (macOS / elsewhere) |
+| Backspace              | Go to the enclosing folder               |
+| Escape                 | Close dialog/menu, clear the selection   |
+| A–Z                    | Type-ahead                               |
 
 A scope stack prevents shortcuts from firing inside text inputs or when a modal owns focus. Platform-aware labels use `⌘` vs `Ctrl`.
 

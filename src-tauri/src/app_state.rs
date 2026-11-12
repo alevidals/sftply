@@ -35,13 +35,18 @@ impl AppState {
         startup_warnings: Vec<String>,
     ) -> Self {
         let concurrency = settings.get().transfer_concurrency as usize;
+        let bandwidth_limit_kbps = settings.get().bandwidth_limit_kbps;
         Self {
             paths,
             settings,
             connections,
             known_hosts,
             sessions: SessionManager::default(),
-            transfers: Arc::new(TransferManager::new(concurrency, history)),
+            transfers: Arc::new(TransferManager::new(
+                concurrency,
+                bandwidth_limit_kbps,
+                history,
+            )),
             startup_warnings: RwLock::new(startup_warnings),
             _log_guard: Mutex::new(Some(log_guard)),
         }

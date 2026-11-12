@@ -37,6 +37,7 @@ export function CommandPalette() {
   const setOpen = useUiStore((state) => state.setPaletteOpen)
   const setActivePane = useUiStore((state) => state.setActivePane)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
+  const setSettingsTab = useUiStore((state) => state.setSettingsTab)
   const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
@@ -222,6 +223,19 @@ export function CommandPalette() {
             <Settings2Icon className="text-muted-foreground" />
             Open settings
             <CommandShortcut>⌘,</CommandShortcut>
+          </CommandItem>
+          <CommandItem
+            value="keyboard shortcuts reference"
+            onSelect={() =>
+              run(() => {
+                setSettingsTab("shortcuts")
+                setSettingsOpen(true)
+              })
+            }
+          >
+            <Settings2Icon className="text-muted-foreground" />
+            Keyboard shortcuts
+            <CommandShortcut>?</CommandShortcut>
           </CommandItem>
           <CommandItem value="copy diagnostics" onSelect={copyDiagnostics}>
             <CopyIcon className="text-muted-foreground" />

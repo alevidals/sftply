@@ -16,5 +16,13 @@ pub async fn settings_update(
     state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<AppSettings, AppError> {
-    state.settings.update(settings).await
+    let updated = state.settings.update(settings).await?;
+    // Apply transfer settings immediately instead of waiting for a restart.
+    state
+        .transfers
+        .set_concurrency(updated.transfer_concurrency as usize);
+    state
+        .transfers
+        .set_bandwidth_limit_kbps(updated.bandwidth_limit_kbps);
+    Ok(updated)
 }

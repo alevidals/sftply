@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use tauri::AppHandle;
 use tauri_specta::Event;
-use tokio::sync::{Semaphore, watch};
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
 use crate::domain::connection::ConnectionProfile;
@@ -53,23 +54,182 @@ pub struct TransferManager {
     items: RwLock<HashMap<String, TransferItem>>,
     tasks: Mutex<HashMap<String, CancellationToken>>,
     jobs: Mutex<HashMap<String, TransferJob>>,
-    semaphore: Arc<Semaphore>,
+    /// Current concurrency limit. Updated in place so tasks already waiting for
+    /// a slot see the new value instead of holding a stale semaphore.
+    concurrency: AtomicUsize,
+    active: AtomicUsize,
+    active_changed: watch::Sender<usize>,
     /// True while the queue is paused. Running transfers are allowed to finish;
     /// no new transfer starts until the queue is resumed.
     paused: watch::Sender<bool>,
+    bandwidth: BandwidthLimiter,
     history: Arc<TransferHistoryStore>,
 }
 
+/// Global pacing for every transfer. The limit is shared, so concurrency does
+/// not multiply the configured bandwidth. A zero rate means unlimited.
+struct BandwidthLimiter {
+    bytes_per_sec: AtomicU64,
+    next_slot: Mutex<Instant>,
+}
+
+impl BandwidthLimiter {
+    fn new(limit_kbps: Option<u32>) -> Self {
+        Self {
+            bytes_per_sec: AtomicU64::new(kbps_to_bytes_per_sec(limit_kbps)),
+            next_slot: Mutex::new(Instant::now()),
+        }
+    }
+
+    fn set_limit_kbps(&self, limit_kbps: Option<u32>) {
+        self.bytes_per_sec
+            .store(kbps_to_bytes_per_sec(limit_kbps), Ordering::Relaxed);
+        // Forget any reservation made under the previous rate, so a faster
+        // limit takes effect immediately instead of after a stale long wait.
+        *self.next_slot.lock().expect("bandwidth lock poisoned") = Instant::now();
+    }
+
+    /// Reserve capacity for `bytes` and return how long the caller must wait
+    /// before the next chunk. Reserving before sleeping keeps concurrent
+    /// transfers from each consuming the full limit.
+    fn reserve(&self, bytes: usize) -> Duration {
+        let rate = self.bytes_per_sec.load(Ordering::Relaxed);
+        if rate == 0 || bytes == 0 {
+            return Duration::ZERO;
+        }
+
+        let duration = Duration::from_secs_f64(bytes as f64 / rate as f64);
+        let mut next = self.next_slot.lock().expect("bandwidth lock poisoned");
+        let now = Instant::now();
+        let start = (*next).max(now);
+        *next = start + duration;
+        start.saturating_duration_since(now)
+    }
+
+    async fn wait(&self, wait: Duration, token: &CancellationToken) -> Result<(), AppError> {
+        if wait.is_zero() {
+            return Ok(());
+        }
+        tokio::select! {
+            _ = token.cancelled() => Err(cancelled()),
+            _ = tokio::time::sleep(wait) => Ok(()),
+        }
+    }
+}
+
+fn kbps_to_bytes_per_sec(limit_kbps: Option<u32>) -> u64 {
+    limit_kbps.map_or(0, |kbps| u64::from(kbps) * 125)
+}
+
+/// Releases the concurrency slot when the transfer task ends, however it ends.
+struct SlotGuard<'a> {
+    manager: &'a TransferManager,
+}
+
+impl Drop for SlotGuard<'_> {
+    fn drop(&mut self) {
+        self.manager.release_slot();
+    }
+}
+
 impl TransferManager {
-    pub fn new(concurrency: usize, history: Arc<TransferHistoryStore>) -> Self {
+    pub fn new(
+        concurrency: usize,
+        bandwidth_limit_kbps: Option<u32>,
+        history: Arc<TransferHistoryStore>,
+    ) -> Self {
         let (paused, _) = watch::channel(false);
+        let (active_changed, _) = watch::channel(0usize);
         Self {
             items: RwLock::new(HashMap::new()),
             tasks: Mutex::new(HashMap::new()),
             jobs: Mutex::new(HashMap::new()),
-            semaphore: Arc::new(Semaphore::new(concurrency.clamp(1, 8))),
+            concurrency: AtomicUsize::new(concurrency.clamp(1, 8)),
+            active: AtomicUsize::new(0),
+            active_changed,
             paused,
+            bandwidth: BandwidthLimiter::new(bandwidth_limit_kbps),
             history,
+        }
+    }
+
+    /// Change the limit in place. Running transfers are not interrupted, and
+    /// tasks already waiting for a slot re-check the new value.
+    pub fn set_concurrency(&self, concurrency: usize) {
+        self.concurrency
+            .store(concurrency.clamp(1, 8), Ordering::Relaxed);
+        self.active_changed
+            .send_replace(self.active.load(Ordering::Relaxed));
+    }
+
+    pub fn set_bandwidth_limit_kbps(&self, limit_kbps: Option<u32>) {
+        self.bandwidth.set_limit_kbps(limit_kbps);
+    }
+
+    fn try_acquire_slot(&self) -> bool {
+        let limit = self.concurrency.load(Ordering::Relaxed);
+        let mut active = self.active.load(Ordering::Relaxed);
+        loop {
+            if active >= limit {
+                return false;
+            }
+            match self.active.compare_exchange_weak(
+                active,
+                active + 1,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    self.active_changed.send_replace(active + 1);
+                    return true;
+                }
+                Err(current) => active = current,
+            }
+        }
+    }
+
+    fn release_slot(&self) {
+        let previous = self.active.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(previous > 0, "released a transfer slot that was not held");
+        self.active_changed.send_replace(previous.saturating_sub(1));
+    }
+
+    /// Wait for a concurrency slot, honouring queue pauses and cancellation.
+    async fn acquire_slot(
+        &self,
+        token: &CancellationToken,
+        paused: &mut watch::Receiver<bool>,
+    ) -> Result<SlotGuard<'_>, AppError> {
+        let mut active_changed = self.active_changed.subscribe();
+        loop {
+            while *paused.borrow() {
+                tokio::select! {
+                    biased;
+                    _ = token.cancelled() => return Err(cancelled()),
+                    changed = paused.changed() => {
+                        if changed.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if self.try_acquire_slot() {
+                // A pause can arrive while this task was waiting for a slot.
+                // Give it back instead of starting work after the pause.
+                if !self.is_paused() {
+                    return Ok(SlotGuard { manager: self });
+                }
+                self.release_slot();
+                continue;
+            }
+
+            tokio::select! {
+                biased;
+                _ = token.cancelled() => return Err(cancelled()),
+                _ = active_changed.changed() => {}
+                _ = paused.changed() => {}
+            }
         }
     }
 
@@ -242,7 +402,7 @@ pub fn emit_delta(app: &AppHandle, upserts: Vec<TransferItem>, removed: Vec<Stri
     }
 }
 
-/// Start a transfer task. The task waits for a global permit, opens its own
+/// Start a transfer task. The task waits for a concurrency slot, opens its own
 /// protocol connection when needed, streams 64 KiB chunks and finalizes the
 /// writer before reporting completion.
 pub fn spawn_transfer(
@@ -253,52 +413,16 @@ pub fn spawn_transfer(
     let token = CancellationToken::new();
     manager.register_task(&job.item.id, token.clone());
     let item = job.item.clone();
-    let semaphore = manager.semaphore.clone();
 
     tokio::spawn(async move {
         let mut paused = manager.paused.subscribe();
-        let permit = loop {
-            while *paused.borrow() {
-                tokio::select! {
-                    biased;
-                    _ = token.cancelled() => {
-                        finish_cancelled(&app, &manager, &mut job.item);
-                        manager.finish_task(&job.item.id);
-                        return;
-                    }
-                    changed = paused.changed() => {
-                        if changed.is_err() {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            let permit = tokio::select! {
-                biased;
-                _ = token.cancelled() => {
-                    finish_cancelled(&app, &manager, &mut job.item);
-                    manager.finish_task(&job.item.id);
-                    return;
-                }
-                permit = semaphore.clone().acquire_owned() => permit.ok(),
-            };
-            let Some(permit) = permit else {
-                fail(
-                    &app,
-                    &manager,
-                    &mut job.item,
-                    AppError::internal("The transfer queue is closed.", "semaphore closed"),
-                );
+        let slot = match manager.acquire_slot(&token, &mut paused).await {
+            Ok(slot) => slot,
+            Err(_) => {
+                finish_cancelled(&app, &manager, &mut job.item);
                 manager.finish_task(&job.item.id);
                 return;
-            };
-            // A pause can arrive while this task was waiting for a permit. Give
-            // the slot back and wait instead of starting work after the pause.
-            if !manager.is_paused() {
-                break permit;
             }
-            drop(permit);
         };
 
         let mut item = job.item.clone();
@@ -306,7 +430,7 @@ pub fn spawn_transfer(
         manager.publish(&app, &item);
 
         let outcome = run_job(&app, &manager, &mut item, &job, &token).await;
-        drop(permit);
+        drop(slot);
 
         match outcome {
             Ok(()) => {
@@ -549,11 +673,15 @@ async fn copy_stream(
         }
 
         item.transferred += written as f64;
-        if last_emit.elapsed() >= PROGRESS_INTERVAL {
+        // Reserve bandwidth before sleeping, and publish progress first so a
+        // slow limit does not leave the row frozen for the whole wait.
+        let wait = manager.bandwidth.reserve(written);
+        if wait >= PROGRESS_INTERVAL || last_emit.elapsed() >= PROGRESS_INTERVAL {
             update_progress(item, started);
             manager.publish(app, item);
             last_emit = Instant::now();
         }
+        manager.bandwidth.wait(wait, token).await?;
     }
 
     update_progress(item, started);
@@ -753,5 +881,51 @@ mod tests {
         update_progress(&mut item, Instant::now());
         assert!(item.bytes_per_sec > 0.0);
         assert!(item.eta_ms.is_some());
+    }
+
+    #[test]
+    fn converts_kilobits_to_bytes() {
+        assert_eq!(kbps_to_bytes_per_sec(None), 0);
+        assert_eq!(kbps_to_bytes_per_sec(Some(16)), 2_000);
+        assert_eq!(kbps_to_bytes_per_sec(Some(8_000)), 1_000_000);
+    }
+
+    #[test]
+    fn bandwidth_limiter_spaces_chunks_and_resets() {
+        let limiter = BandwidthLimiter::new(Some(16));
+        assert!(limiter.reserve(0).is_zero());
+        assert!(limiter.reserve(2_000).is_zero());
+
+        // The second 2,000-byte chunk has to wait for the next one-second slot.
+        let wait = limiter.reserve(2_000);
+        assert!(
+            wait >= Duration::from_millis(900),
+            "unexpected wait {wait:?}"
+        );
+
+        limiter.set_limit_kbps(None);
+        assert!(limiter.reserve(2_000).is_zero());
+    }
+
+    fn manager_with_concurrency(limit: usize) -> TransferManager {
+        let dir = tempfile::tempdir().unwrap();
+        let (history, warning) = TransferHistoryStore::load(dir.path().join("history.jsonl"));
+        assert!(warning.is_none());
+        TransferManager::new(limit, None, Arc::new(history))
+    }
+
+    #[test]
+    fn concurrency_limit_can_grow_while_tasks_wait() {
+        let manager = manager_with_concurrency(1);
+        assert!(manager.try_acquire_slot());
+        assert!(!manager.try_acquire_slot());
+
+        manager.set_concurrency(2);
+        assert!(manager.try_acquire_slot());
+        assert!(!manager.try_acquire_slot());
+
+        manager.release_slot();
+        manager.release_slot();
+        assert_eq!(manager.active.load(Ordering::Relaxed), 0);
     }
 }

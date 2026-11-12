@@ -60,6 +60,8 @@ export function isMacPlatform(platform: string | undefined): boolean {
 
 /** Format a chord such as `mod+Shift+KeyN` for display on the current platform. */
 export function formatShortcut(chord: string, isMac: boolean): string {
+  // The physical chord is Shift+/ on most layouts, but the key is labelled "?".
+  if (chord === "Shift+Slash") return "?"
   const tokens = chord.split("+").map((token) => {
     const key = token.toLowerCase()
     if (key.startsWith("key") && token.length === 4) return token.slice(3)
@@ -80,6 +82,11 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     shortcuts: [
       { id: "palette", label: "Command palette", mac: ["mod+KeyK"] },
       { id: "settings", label: "Open settings", mac: ["mod+Comma"] },
+      {
+        id: "shortcuts",
+        label: "Open the keyboard shortcuts",
+        mac: ["Shift+Slash"],
+      },
       { id: "panel", label: "Toggle transfers and activity panel", mac: ["mod+KeyJ"] },
       { id: "focus-local", label: "Focus local pane", mac: ["mod+Digit1"] },
       { id: "focus-remote", label: "Focus remote pane", mac: ["mod+Digit2"] },

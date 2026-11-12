@@ -8,6 +8,7 @@ import { type PaneId, useUiStore } from "@/stores/ui-store"
 export function useGlobalShortcuts() {
   const togglePalette = useUiStore((state) => state.togglePalette)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
+  const setSettingsTab = useUiStore((state) => state.setSettingsTab)
   const setActivePane = useUiStore((state) => state.setActivePane)
   const { settings, updateSettings } = useSettings()
 
@@ -36,6 +37,12 @@ export function useGlobalShortcuts() {
           event.preventDefault()
           setSettingsOpen(true)
         },
+        "Shift+Slash": (event) => {
+          if (useUiStore.getState().paletteOpen) return
+          event.preventDefault()
+          setSettingsTab("shortcuts")
+          setSettingsOpen(true)
+        },
         "$mod+KeyJ": (event) => {
           event.preventDefault()
           toggleBottomPanel()
@@ -49,6 +56,6 @@ export function useGlobalShortcuts() {
           focusPane("remote")
         },
       }),
-    [focusPane, setSettingsOpen, toggleBottomPanel, togglePalette],
+    [focusPane, setSettingsOpen, setSettingsTab, toggleBottomPanel, togglePalette],
   )
 }
