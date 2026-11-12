@@ -22,6 +22,20 @@ vi.mock("@/features/transfers/api", () => ({
   },
 }))
 
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 64,
+    getVirtualItems: () =>
+      Array.from({ length: Math.min(count, 12) }, (_, index) => ({
+        index,
+        key: index,
+        start: index * 64,
+        size: 64,
+      })),
+    measureElement: vi.fn(),
+  }),
+}))
+
 function item(overrides: Partial<TransferItem_Serialize> = {}): TransferItem_Serialize {
   return {
     id: "t1",
@@ -116,6 +130,17 @@ describe("TransferList", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Retry report.pdf" }))
     expect(retry).toHaveBeenCalledWith("t1")
+  })
+
+  it("virtualizes a large queue", () => {
+    const many = Array.from({ length: 1_000 }, (_, index) =>
+      item({ id: `t${index}`, name: `file-${index}.bin`, startedAt: index }),
+    )
+    useTransferStore.getState().setAll(many)
+    renderList()
+
+    expect(screen.getByText("file-999.bin")).toBeInTheDocument()
+    expect(screen.queryByText("file-0.bin")).not.toBeInTheDocument()
   })
 
   it("pauses and resumes the queue", async () => {

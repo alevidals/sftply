@@ -1,3 +1,4 @@
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
 import {
   ArrowDownToLineIcon,
@@ -13,6 +14,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react"
+import { type RefObject, useRef } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -39,6 +41,9 @@ const STATUS_META: Record<
   cancelled: { label: "Cancelled", icon: BanIcon, className: "text-warning" },
 }
 
+/** Keep short queues simple; virtualize once the row count can hurt updates. */
+const VIRTUALIZE_AFTER = 50
+
 export function TransferList() {
   const items = useTransferStore((state) => state.items)
   const order = useTransferStore((state) => state.order)
@@ -46,6 +51,7 @@ export function TransferList() {
   const speed = useTransferStore(selectTransferSpeed)
   const paused = useTransferStore((state) => state.paused)
   const setPaused = useTransferStore((state) => state.setPaused)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const hasFinished = order.some((id) => {
     const item = items[id]
     return item ? !["queued", "running"].includes(item.status) : false
@@ -85,13 +91,21 @@ export function TransferList() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ScrollArea className="min-h-0 flex-1">
-        <ul className="py-0.5" aria-label="Transfers">
-          {order.map((id) => {
-            const item = items[id]
-            return item ? <TransferRow key={id} item={item} /> : null
-          })}
-        </ul>
+      <ScrollArea viewportRef={scrollRef} className="min-h-0 flex-1">
+        {order.length > VIRTUALIZE_AFTER ? (
+          <VirtualTransferRows scrollRef={scrollRef} order={order} items={items} />
+        ) : (
+          <ul className="py-0.5" aria-label="Transfers">
+            {order.map((id) => {
+              const item = items[id]
+              return item ? (
+                <li key={id}>
+                  <TransferRow item={item} />
+                </li>
+              ) : null
+            })}
+          </ul>
+        )}
       </ScrollArea>
 
       <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border/60 px-3 text-2xs text-muted-foreground">
@@ -129,6 +143,44 @@ export function TransferList() {
   )
 }
 
+function VirtualTransferRows({
+  scrollRef,
+  order,
+  items,
+}: {
+  scrollRef: RefObject<HTMLDivElement | null>
+  order: string[]
+  items: Record<string, TransferItem_Serialize>
+}) {
+  const virtualizer = useVirtualizer({
+    count: order.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 64,
+    overscan: 8,
+  })
+
+  return (
+    <ul aria-label="Transfers" className="relative" style={{ height: virtualizer.getTotalSize() }}>
+      {virtualizer.getVirtualItems().map((virtualItem) => {
+        const id = order[virtualItem.index]
+        const item = id ? items[id] : undefined
+        if (!item) return null
+        return (
+          <li
+            key={virtualItem.key}
+            ref={virtualizer.measureElement}
+            data-index={virtualItem.index}
+            className="absolute top-0 left-0 w-full"
+            style={{ transform: `translateY(${virtualItem.start}px)` }}
+          >
+            <TransferRow item={item} />
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function TransferRow({ item }: { item: TransferItem_Serialize }) {
   const meta = STATUS_META[item.status]
   const Icon = meta.icon
@@ -163,7 +215,7 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
   }
 
   return (
-    <li
+    <div
       className="group relative px-3 py-1.5 transition-colors hover:bg-row-hover"
       data-status={item.status}
     >
@@ -254,7 +306,7 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
           {item.status === "completed" ? formatBytes(item.size) : `${Math.round(percent)}%`}
         </span>
       </div>
-    </li>
+    </div>
   )
 }
 
