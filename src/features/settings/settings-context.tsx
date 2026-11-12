@@ -65,7 +65,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     const sync = () => {
       const next = resolveTheme(themeMode, media.matches)
-      setEffectiveTheme(next)
+      setEffectiveTheme(next.dark ? "dark" : "light")
       applyDocumentTheme(next)
     }
 

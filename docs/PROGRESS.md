@@ -746,7 +746,7 @@ which is only correct for local client connections. See
 - In-app drag-and-drop did nothing in the packaged window. Tauri installs a native drag-drop handler on the webview by default, and on macOS wry reports the drag as handled before WKWebView can dispatch `dragover`/`drop`; the HTML5 handlers never ran. The main window now sets `dragDropEnabled: false`, so HTML5 drag events reach the page. OS file drops were not implemented yet, so nothing regresses.
 - Drag targets also relied on `dataTransfer.types`, which WebKit can hide during `dragover`. The drag payload is now kept in memory between `dragstart` and `dragend`, and `isTransferDrag`/`readTransferDrag` fall back to it. The in-memory copy is cleared on drop and on `dragend`.
 - The settings dialog rendered at 384 px because the base `sm:max-w-sm` won over `max-w-2xl` in the generated stylesheet, clipping the two-column tab layout. It now uses `sm:max-w-2xl`.
-- The settings dialog was taller than the window because every `TabsContent` used `forceMount`, and Radix keeps forced panels mounted *and visible* (`hidden` is tied to presence, not selection). All five sections stacked into one column. Removed `forceMount` so only the active panel renders, and capped the form at `min(600px, 100vh - 3rem)` with the content area scrolling.
+- The settings dialog was taller than the window because every `TabsContent` used `forceMount`, and Radix keeps forced panels mounted _and visible_ (`hidden` is tied to presence, not selection). All five sections stacked into one column. Removed `forceMount` so only the active panel renders, and capped the form at `min(600px, 100vh - 3rem)` with the content area scrolling.
 
 **Added**
 
@@ -768,3 +768,28 @@ which is only correct for local client connections. See
 - Phase 4b remainder: bandwidth limiter and external OS file drops.
 - Phase 4c hardening: server matrix, >4 GiB files, 1,000 queued items, retry safety.
 - Push the repository to a remote and confirm the first CI run is green.
+
+### 2026-11-12 — Session 16: named themes and a robust sidebar
+
+**Added**
+
+- Eight built-in palettes next to System/Dark/Light: One Dark, Gruvbox Dark, Gruvbox Light, Nord, Dracula, Solarized Light, Tokyo Night and Catppuccin Mocha. `ThemeMode` gained camelCase variants (`oneDark`, `gruvboxDark`, …) while keeping the legacy `system`/`dark`/`light` values loadable; a Rust round-trip test locks the ids.
+- `src/lib/themes.ts` is the single catalogue for labels, icons, dark/light flags and preview swatches. The settings gallery, title-bar menu and command palette all read from it, so a new theme only needs a Rust variant plus a CSS block.
+- `applyDocumentTheme` now writes `<html data-theme>` as well as `.dark` and `color-scheme`. `theme-init.js` resolves the same map before React paints, and `index.html` starts with `data-theme="dark"`.
+- Full CSS variable blocks for every named palette, declared after `.dark` so they override the base palettes. Light named themes drop `.dark`, so Tailwind `dark:` variants stay correct.
+- Settings gallery shows a colour swatch per theme in a two-column grid; the title-bar menu scrolls and separates the named palettes from the base modes.
+
+**Fixed**
+
+- The sidebar could be dragged narrow enough to clip a connection card's action buttons. It is now clamped to 240–420 px in the shell (legacy persisted values are clamped on read), and connection rows truncate the name, host and group instead of overflowing. The name/host spans now carry `min-w-0`, which is what actually let a nowrap string push the buttons out of view.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (77 passed, 14 ignored).
+- `bun run check` (Biome, 136 Vitest tests in 23 files, strict TypeScript, production build).
+- Theme tests cover named-palette resolution, `data-theme`, the catalogue/ids invariant, and saving a named palette from the settings gallery.
+
+**Next**
+
+- Confirm the theme gallery, sidebar limits and existing drag-and-drop/settings/History fixes in the real Tauri window.
+- Phase 4b remainder: bandwidth limiter and external OS file drops.

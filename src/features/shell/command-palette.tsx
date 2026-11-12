@@ -3,13 +3,10 @@ import {
   ArrowDownUpIcon,
   CopyIcon,
   HardDriveIcon,
-  MonitorIcon,
-  MoonIcon,
   PanelBottomIcon,
   RefreshCwIcon,
   ServerIcon,
   Settings2Icon,
-  SunIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react"
@@ -29,14 +26,9 @@ import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { THEME_OPTIONS } from "@/lib/themes"
 import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
-
-const THEME_COMMANDS: Array<{ mode: ThemeMode; label: string; icon: typeof SunIcon }> = [
-  { mode: "dark", label: "Dark theme", icon: MoonIcon },
-  { mode: "light", label: "Light theme", icon: SunIcon },
-  { mode: "system", label: "System theme", icon: MonitorIcon },
-]
 
 export function CommandPalette() {
   const { settings, updateSettings } = useSettings()
@@ -143,15 +135,15 @@ export function CommandPalette() {
         <CommandEmpty>No matching commands.</CommandEmpty>
 
         <CommandGroup heading="Appearance">
-          {THEME_COMMANDS.map(({ mode, label, icon: Icon }) => (
+          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
             <CommandItem
-              key={mode}
-              value={label}
-              data-checked={settings.theme === mode}
-              onSelect={() => changeTheme(mode)}
+              key={value}
+              value={`${label} theme`}
+              data-checked={settings.theme === value}
+              onSelect={() => changeTheme(value)}
             >
               <Icon className="text-muted-foreground" />
-              {label}
+              {label} theme
             </CommandItem>
           ))}
         </CommandGroup>

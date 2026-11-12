@@ -19,6 +19,10 @@ import { useStartupReport } from "@/hooks/use-startup-report"
 import { useTransferBridge } from "@/hooks/use-transfer-bridge"
 import { recordActivity } from "@/stores/activity-store"
 
+/** Keep the sidebar wide enough for a connection card's actions. */
+const SIDEBAR_MIN_WIDTH = 240
+const SIDEBAR_MAX_WIDTH = 420
+
 export function AppShell() {
   const { settings } = useSettings()
   const persistLayout = useDebouncedSettingsPatch()
@@ -27,6 +31,10 @@ export function AppShell() {
   const readyLogged = useRef(false)
   const warningsLogged = useRef(false)
   const reportErrorLogged = useRef(false)
+  const sidebarWidth = Math.min(
+    SIDEBAR_MAX_WIDTH,
+    Math.max(SIDEBAR_MIN_WIDTH, settings.sidebarWidth),
+  )
 
   useActivityBridge()
   useSessionBridge()
@@ -63,9 +71,9 @@ export function AppShell() {
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
         <ResizablePanel
           id="sidebar"
-          defaultSize={settings.sidebarWidth}
-          minSize={200}
-          maxSize={420}
+          defaultSize={sidebarWidth}
+          minSize={SIDEBAR_MIN_WIDTH}
+          maxSize={SIDEBAR_MAX_WIDTH}
           groupResizeBehavior="preserve-pixel-size"
           onResize={(size, _id, previous) => {
             if (!previous) return

@@ -1,20 +1,30 @@
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { themeIsDark } from "@/lib/themes"
 
 export type EffectiveTheme = "dark" | "light"
+
+export interface ResolvedTheme {
+  /** Concrete theme id applied to `<html data-theme>` (never `system`). */
+  id: ThemeMode
+  dark: boolean
+}
 
 export const THEME_STORAGE_KEY = "sftply.theme"
 export const DENSITY_STORAGE_KEY = "sftply.density"
 
-export function resolveTheme(mode: ThemeMode, prefersDark: boolean): EffectiveTheme {
-  if (mode === "system") return prefersDark ? "dark" : "light"
-  return mode
+export function resolveTheme(mode: ThemeMode, prefersDark: boolean): ResolvedTheme {
+  if (mode === "system") {
+    return { id: prefersDark ? "dark" : "light", dark: prefersDark }
+  }
+  return { id: mode, dark: themeIsDark(mode) }
 }
 
-/** Apply the theme class and color-scheme to `<html>`. */
-export function applyDocumentTheme(theme: EffectiveTheme): void {
+/** Apply the theme class, palette id and color-scheme to `<html>`. */
+export function applyDocumentTheme(theme: ResolvedTheme): void {
   const root = document.documentElement
-  root.classList.toggle("dark", theme === "dark")
-  root.style.colorScheme = theme
+  root.classList.toggle("dark", theme.dark)
+  root.dataset.theme = theme.id
+  root.style.colorScheme = theme.dark ? "dark" : "light"
 }
 
 export function applyDocumentDensity(density: "compact" | "comfortable"): void {

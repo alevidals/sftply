@@ -1,11 +1,5 @@
-import {
-  CircleDotIcon,
-  MonitorIcon,
-  MoonIcon,
-  SearchIcon,
-  Settings2Icon,
-  SunIcon,
-} from "lucide-react"
+import { CircleDotIcon, SearchIcon, Settings2Icon } from "lucide-react"
+import { Fragment } from "react"
 import { toast } from "sonner"
 import { BrandMark } from "@/components/brand"
 import { Kbd } from "@/components/kbd"
@@ -23,25 +17,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useSettings } from "@/features/settings/settings-context"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { THEME_OPTIONS, themeOption } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
-
-const THEME_ICONS = {
-  system: MonitorIcon,
-  dark: MoonIcon,
-  light: SunIcon,
-} as const
-
-const THEME_LABELS: Record<ThemeMode, string> = {
-  system: "System",
-  dark: "Dark",
-  light: "Light",
-}
 
 export function TitleBar() {
   const { settings, updateSettings } = useSettings()
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
-  const ThemeIcon = THEME_ICONS[settings.theme]
+  const ThemeIcon = themeOption(settings.theme).icon
 
   const changeTheme = (theme: string) => {
     updateSettings({ theme: theme as ThemeMode }).catch((error) => {
@@ -88,17 +71,20 @@ export function TitleBar() {
               <ThemeIcon />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="max-h-[min(70vh,22rem)] w-52 overflow-y-auto">
             <DropdownMenuLabel>Appearance</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup value={settings.theme} onValueChange={changeTheme}>
-              {(Object.keys(THEME_ICONS) as ThemeMode[]).map((mode) => {
-                const Icon = THEME_ICONS[mode]
+              {THEME_OPTIONS.map((option, index) => {
+                const Icon = option.icon
                 return (
-                  <DropdownMenuRadioItem key={mode} value={mode}>
-                    <Icon className="size-3.5 text-muted-foreground" />
-                    {THEME_LABELS[mode]}
-                  </DropdownMenuRadioItem>
+                  <Fragment key={option.value}>
+                    {index === 3 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuRadioItem value={option.value}>
+                      <Icon className="size-3.5 text-muted-foreground" />
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  </Fragment>
                 )
               })}
             </DropdownMenuRadioGroup>

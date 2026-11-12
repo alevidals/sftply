@@ -292,7 +292,7 @@ export function ConnectionRow({
       <ContextMenuTrigger asChild>
         <div
           className={cn(
-            "group flex items-center gap-0.5 rounded-md transition-colors",
+            "group flex min-w-0 items-center gap-0.5 overflow-hidden rounded-md transition-colors",
             active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/70",
           )}
         >
@@ -321,22 +321,22 @@ export function ConnectionRow({
               ) : null}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1">
-                <span className="truncate text-xs font-medium text-foreground">
+              <span className="flex min-w-0 items-center gap-1">
+                <span className="min-w-0 truncate text-xs font-medium text-foreground">
                   {connection.name}
                 </span>
                 {connection.favorite ? (
                   <StarIcon className="size-2.5 shrink-0 fill-warning text-warning" />
                 ) : null}
               </span>
-              <span className="flex items-center gap-1 truncate text-2xs text-muted-foreground">
-                <span>{PROTOCOL_LABELS[connection.protocol]}</span>
-                <span className="text-muted-foreground/40">·</span>
-                <span className="truncate font-mono">{connection.host}</span>
+              <span className="flex min-w-0 items-center gap-1 overflow-hidden text-2xs text-muted-foreground">
+                <span className="shrink-0">{PROTOCOL_LABELS[connection.protocol]}</span>
+                <span className="shrink-0 text-muted-foreground/40">·</span>
+                <span className="min-w-0 flex-1 truncate font-mono">{connection.host}</span>
                 {session ? (
                   <>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span className={lost ? "text-warning" : "text-success"}>
+                    <span className="shrink-0 text-muted-foreground/40">·</span>
+                    <span className={cn("shrink-0", lost ? "text-warning" : "text-success")}>
                       {lost
                         ? "Connection lost"
                         : `${Math.max(1, Math.round(session.latencyMs))} ms`}
@@ -344,8 +344,8 @@ export function ConnectionRow({
                   </>
                 ) : connection.group ? (
                   <>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span className="truncate">{connection.group}</span>
+                    <span className="shrink-0 text-muted-foreground/40">·</span>
+                    <span className="min-w-0 max-w-[45%] truncate">{connection.group}</span>
                   </>
                 ) : null}
               </span>

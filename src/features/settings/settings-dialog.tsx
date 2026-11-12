@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "cn"
-import type { LucideIcon } from "lucide-react"
-import { CheckIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
+import { CheckIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -23,11 +22,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
-import type { AppSettings_Serialize, ThemeMode } from "@/lib/ipc/bindings"
+import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
+import { THEME_OPTIONS, THEME_VALUES } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
 const settingsSchema = z.object({
-  theme: z.enum(["system", "dark", "light"]),
+  theme: z.enum(THEME_VALUES),
   density: z.enum(["compact", "comfortable"]),
   showHiddenFiles: z.boolean(),
   confirmDelete: z.boolean(),
@@ -37,17 +37,6 @@ const settingsSchema = z.object({
 })
 
 type SettingsFormValues = z.infer<typeof settingsSchema>
-
-const THEME_OPTIONS: Array<{
-  value: ThemeMode
-  label: string
-  description: string
-  icon: LucideIcon
-}> = [
-  { value: "system", label: "System", description: "Follow the OS", icon: MonitorIcon },
-  { value: "dark", label: "Dark", description: "Always dark", icon: MoonIcon },
-  { value: "light", label: "Light", description: "Always light", icon: SunIcon },
-]
 
 function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
   return {
@@ -139,15 +128,16 @@ export function SettingsDialog() {
                     control={control}
                     name="theme"
                     render={({ field }) => (
-                      <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-2">
+                      <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2">
                         {THEME_OPTIONS.map((option) => {
                           const Icon = option.icon
                           const selected = field.value === option.value
                           return (
                             <label
                               key={option.value}
+                              title={option.description}
                               className={cn(
-                                "group relative flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors focus-within:ring-2 focus-within:ring-ring/50",
+                                "group relative flex cursor-pointer flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors focus-within:ring-2 focus-within:ring-ring/50",
                                 selected
                                   ? "border-primary/40 bg-primary/5"
                                   : "border-border hover:border-border hover:bg-muted/40",
@@ -162,20 +152,37 @@ export function SettingsDialog() {
                                 onBlur={field.onBlur}
                                 className="sr-only"
                               />
-                              <span className="flex w-full items-center justify-between">
+                              <span
+                                aria-hidden
+                                className="flex h-7 w-full items-center gap-1.5 rounded-md border border-black/10 px-2 dark:border-white/10"
+                                style={{ backgroundColor: option.preview.background }}
+                              >
+                                <span
+                                  className="size-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: option.preview.accent }}
+                                />
+                                <span
+                                  className="h-1.5 flex-1 rounded-full opacity-70"
+                                  style={{ backgroundColor: option.preview.foreground }}
+                                />
+                                <span
+                                  className="size-2 shrink-0 rounded-full opacity-50"
+                                  style={{ backgroundColor: option.preview.foreground }}
+                                />
+                              </span>
+                              <span className="flex w-full items-center gap-1.5">
                                 <Icon
                                   className={cn(
-                                    "size-4",
+                                    "size-3.5 shrink-0",
                                     selected ? "text-primary" : "text-muted-foreground",
                                   )}
                                 />
-                                {selected ? <CheckIcon className="size-3.5 text-primary" /> : null}
-                              </span>
-                              <span className="space-y-0.5">
-                                <span className="block text-xs font-medium">{option.label}</span>
-                                <span className="block text-2xs text-muted-foreground">
-                                  {option.description}
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                                  {option.label}
                                 </span>
+                                {selected ? (
+                                  <CheckIcon className="size-3.5 shrink-0 text-primary" />
+                                ) : null}
                               </span>
                             </label>
                           )

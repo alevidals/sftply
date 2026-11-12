@@ -499,7 +499,7 @@ export type StartupReport = {
 	warnings: string[],
 };
 
-export type ThemeMode = "system" | "dark" | "light";
+export type ThemeMode = "system" | "dark" | "light" | "oneDark" | "gruvboxDark" | "gruvboxLight" | "nord" | "dracula" | "solarizedLight" | "tokyoNight" | "catppuccinMocha";
 
 /**  TLS verification settings for FTPS. These are not secrets. */
 export type TlsOptions = TlsOptions_Serialize | TlsOptions_Deserialize;

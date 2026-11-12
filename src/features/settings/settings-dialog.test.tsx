@@ -95,4 +95,16 @@ describe("SettingsDialog", () => {
     )
     await waitFor(() => expect(useUiStore.getState().settingsOpen).toBe(false))
   })
+
+  it("saves a named palette from the theme gallery", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("radio", { name: "Nord" }))
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() =>
+      expect(state.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "nord" })),
+    )
+  })
 })

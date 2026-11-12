@@ -4,12 +4,20 @@ use specta::Type;
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum ThemeMode {
     System,
     #[default]
     Dark,
     Light,
+    OneDark,
+    GruvboxDark,
+    GruvboxLight,
+    Nord,
+    Dracula,
+    SolarizedLight,
+    TokyoNight,
+    CatppuccinMocha,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
@@ -151,6 +159,27 @@ mod tests {
             ..AppSettings::default()
         };
         assert!(too_long.normalized().is_err());
+    }
+
+    #[test]
+    fn theme_ids_round_trip() {
+        for (id, theme) in [
+            ("system", ThemeMode::System),
+            ("dark", ThemeMode::Dark),
+            ("light", ThemeMode::Light),
+            ("oneDark", ThemeMode::OneDark),
+            ("gruvboxDark", ThemeMode::GruvboxDark),
+            ("gruvboxLight", ThemeMode::GruvboxLight),
+            ("nord", ThemeMode::Nord),
+            ("dracula", ThemeMode::Dracula),
+            ("solarizedLight", ThemeMode::SolarizedLight),
+            ("tokyoNight", ThemeMode::TokyoNight),
+            ("catppuccinMocha", ThemeMode::CatppuccinMocha),
+        ] {
+            let json = format!("\"{id}\"");
+            assert_eq!(serde_json::from_str::<ThemeMode>(&json).unwrap(), theme);
+            assert_eq!(serde_json::to_string(&theme).unwrap(), json);
+        }
     }
 
     #[test]
