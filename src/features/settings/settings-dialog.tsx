@@ -368,7 +368,7 @@ export function SettingsDialog() {
                       type="number"
                       min={MIN_BANDWIDTH_KBPS}
                       max={MAX_BANDWIDTH_KBPS}
-                      step={16}
+                      step={1}
                       placeholder="Unlimited"
                       className="w-32"
                       aria-invalid={Boolean(formState.errors.bandwidthLimit)}
