@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
+import { BrandMark } from "@/components/brand"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -333,11 +334,14 @@ export function SettingsDialog() {
               </TabsContent>
 
               <TabsContent value="about" className="space-y-5">
-                <div>
-                  <h3 className="text-sm font-medium">sftply</h3>
-                  <p className="text-xs text-muted-foreground">
-                    A modern FTP, FTPS and SFTP desktop client.
-                  </p>
+                <div className="flex items-center gap-3">
+                  <BrandMark className="size-10 shadow-lg shadow-primary/20" />
+                  <div>
+                    <h3 className="text-sm font-medium">sftply</h3>
+                    <p className="text-xs text-muted-foreground">
+                      A modern FTP, FTPS and SFTP desktop client.
+                    </p>
+                  </div>
                 </div>
                 <dl className="selectable grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
                   <dt className="text-muted-foreground">Version</dt>

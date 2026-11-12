@@ -201,7 +201,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - [ ] Density/column/date/size preferences
 - [ ] Accessibility audit (keyboard, labels, contrast, reduced motion)
 - [ ] Startup/scroll/memory performance pass
-- [ ] App icon, metadata, packaging (macOS signing/notarization; Windows/Linux)
+- [x] App icon and in-app branding
+- [ ] Product metadata, packaging (macOS signing/notarization; Windows/Linux)
 - [ ] Cross-platform visual QA
 
 ---
@@ -806,3 +807,23 @@ which is only correct for local client connections. See
 **Verified**
 
 - `bun run check` (Biome, 137 Vitest tests in 23 files, strict TypeScript, production build). New test: the file row context menu dispatches `copy-path`.
+
+### 2026-11-12 — Session 18: app icon and branding
+
+**Added**
+
+- `src-tauri/icons/app-icon.svg` is the 1024 px master icon: a violet→blue rounded square with a soft top sheen, a hairline highlight and two bold white transfer arrows. It replaces the stock Tauri icon in the bundle.
+- Regenerated every desktop asset with `bunx tauri icon src-tauri/icons/app-icon.svg`: PNG sizes, `icon.icns`, `icon.ico` and the Microsoft Store logos. The generated `android/` and `ios/` trees were deleted because the project ships desktop targets only.
+- `public/mark.svg` is the same mark cropped to the tile, used as the favicon, and `index.html` gained a `theme-color` matching the icon.
+- `BrandMark` now renders the new mark, so the title bar, boot screen and Settings → About all show the real app icon instead of a placeholder.
+
+**Verified**
+
+- Rendered the mark at 32/64/128/1024 px and the favicon through `qlmanage` to confirm the arrows stay legible at small sizes.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (77 passed, 14 ignored).
+- `bun run check` (Biome, 137 Vitest tests in 23 files, strict TypeScript, production build).
+
+**Next**
+
+- Restart `bun run tauri -- dev` to pick up the new bundle icon, then verify Dock icon, title bar, boot screen, About tab and favicon.
+- Phase 4b remainder: bandwidth limiter and external OS file drops.
