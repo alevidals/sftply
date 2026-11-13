@@ -6,6 +6,7 @@ import {
   BanIcon,
   CircleCheckIcon,
   ClockIcon,
+  CopyIcon,
   LoaderCircleIcon,
   OctagonXIcon,
   PauseIcon,
@@ -17,6 +18,14 @@ import {
 import { type RefObject, useRef } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { transfersApi } from "@/features/transfers/api"
@@ -93,14 +102,24 @@ export function TransferList() {
     <div className="flex min-h-0 flex-1 flex-col">
       <ScrollArea viewportRef={scrollRef} className="min-h-0 flex-1">
         {order.length > VIRTUALIZE_AFTER ? (
-          <VirtualTransferRows scrollRef={scrollRef} order={order} items={items} />
+          <VirtualTransferRows
+            scrollRef={scrollRef}
+            order={order}
+            items={items}
+            hasFinished={hasFinished}
+            onClearFinished={clearFinished}
+          />
         ) : (
           <ul className="py-0.5" aria-label="Transfers">
             {order.map((id) => {
               const item = items[id]
               return item ? (
                 <li key={id}>
-                  <TransferRow item={item} />
+                  <TransferRow
+                    item={item}
+                    hasFinished={hasFinished}
+                    onClearFinished={clearFinished}
+                  />
                 </li>
               ) : null
             })}
@@ -147,10 +166,14 @@ function VirtualTransferRows({
   scrollRef,
   order,
   items,
+  hasFinished,
+  onClearFinished,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>
   order: string[]
   items: Record<string, TransferItem_Serialize>
+  hasFinished: boolean
+  onClearFinished: () => void
 }) {
   const virtualizer = useVirtualizer({
     count: order.length,
@@ -173,7 +196,7 @@ function VirtualTransferRows({
             className="absolute top-0 left-0 w-full"
             style={{ transform: `translateY(${virtualItem.start}px)` }}
           >
-            <TransferRow item={item} />
+            <TransferRow item={item} hasFinished={hasFinished} onClearFinished={onClearFinished} />
           </li>
         )
       })}
@@ -181,7 +204,15 @@ function VirtualTransferRows({
   )
 }
 
-function TransferRow({ item }: { item: TransferItem_Serialize }) {
+function TransferRow({
+  item,
+  hasFinished,
+  onClearFinished,
+}: {
+  item: TransferItem_Serialize
+  hasFinished: boolean
+  onClearFinished: () => void
+}) {
   const meta = STATUS_META[item.status]
   const Icon = meta.icon
   const DirectionIcon = item.direction === "upload" ? ArrowUpFromLineIcon : ArrowDownToLineIcon
@@ -214,99 +245,146 @@ function TransferRow({ item }: { item: TransferItem_Serialize }) {
       })
   }
 
+  const copyPaths = (label: string, value: string) => {
+    navigator.clipboard.writeText(value).then(
+      () => toast.success(`${label} copied`),
+      (error) =>
+        toast.error(`Could not copy the ${label.toLowerCase()}`, {
+          description: errorMessage(error),
+        }),
+    )
+  }
+
   return (
-    <div
-      className="group relative px-3 py-1.5 transition-colors hover:bg-row-hover"
-      data-status={item.status}
-    >
-      <div className="flex items-center gap-2">
-        <DirectionIcon
-          className={cn(
-            "size-3.5 shrink-0",
-            item.direction === "upload" ? "text-info" : "text-success",
-          )}
-        />
-        <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={item.name}>
-          {item.name}
-        </span>
-        <span className={cn("flex shrink-0 items-center gap-1 text-2xs", meta.className)}>
-          <Icon className={cn("size-3", item.status === "running" && "animate-spin")} />
-          {meta.label}
-        </span>
-        <span className="w-28 shrink-0 text-right font-mono text-2xs text-muted-foreground tabular">
-          {item.status === "running"
-            ? `${formatBytes(item.bytesPerSec)}/s`
-            : `${formatBytes(item.transferred)} / ${formatBytes(item.size)}`}
-        </span>
-        {cancellable ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Cancel ${item.name}`}
-                className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                onClick={cancel}
-              >
-                <XIcon className="size-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              Cancel transfer
-            </TooltipContent>
-          </Tooltip>
-        ) : retryable ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Retry ${item.name}`}
-                className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                onClick={retry}
-              >
-                <RotateCcwIcon className="size-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              Retry transfer
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <span className="size-5 shrink-0" />
-        )}
-      </div>
-
-      <div className="mt-1 ml-[22px] flex items-center gap-2">
-        <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn(
-              "h-full rounded-full transition-[width] duration-200",
-              item.status === "failed"
-                ? "bg-destructive"
-                : item.status === "cancelled"
-                  ? "bg-warning"
-                  : item.status === "completed"
-                    ? "bg-success"
-                    : "bg-primary",
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="group relative px-3 py-1.5 transition-colors hover:bg-row-hover"
+          data-status={item.status}
+        >
+          <div className="flex items-center gap-2">
+            <DirectionIcon
+              className={cn(
+                "size-3.5 shrink-0",
+                item.direction === "upload" ? "text-info" : "text-success",
+              )}
+            />
+            <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={item.name}>
+              {item.name}
+            </span>
+            <span className={cn("flex shrink-0 items-center gap-1 text-2xs", meta.className)}>
+              <Icon className={cn("size-3", item.status === "running" && "animate-spin")} />
+              {meta.label}
+            </span>
+            <span className="w-28 shrink-0 text-right font-mono text-2xs text-muted-foreground tabular">
+              {item.status === "running"
+                ? `${formatBytes(item.bytesPerSec)}/s`
+                : `${formatBytes(item.transferred)} / ${formatBytes(item.size)}`}
+            </span>
+            {cancellable ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Cancel ${item.name}`}
+                    className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    onClick={cancel}
+                  >
+                    <XIcon className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  Cancel transfer
+                </TooltipContent>
+              </Tooltip>
+            ) : retryable ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Retry ${item.name}`}
+                    className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    onClick={retry}
+                  >
+                    <RotateCcwIcon className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  Retry transfer
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="size-5 shrink-0" />
             )}
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-        <span className="selectable w-28 shrink-0 truncate text-right text-2xs text-muted-foreground/80">
-          {detail(item)}
-        </span>
-      </div>
+          </div>
 
-      <div className="mt-0.5 ml-[22px] flex items-center gap-2 text-2xs text-muted-foreground/70">
-        <span className="truncate">
-          {item.sourceLabel} → {item.targetLabel}
-        </span>
-        <span className="ml-auto shrink-0 tabular">
-          {item.status === "completed" ? formatBytes(item.size) : `${Math.round(percent)}%`}
-        </span>
-      </div>
-    </div>
+          <div className="mt-1 ml-[22px] flex items-center gap-2">
+            <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width] duration-200",
+                  item.status === "failed"
+                    ? "bg-destructive"
+                    : item.status === "cancelled"
+                      ? "bg-warning"
+                      : item.status === "completed"
+                        ? "bg-success"
+                        : "bg-primary",
+                )}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+            <span className="selectable w-28 shrink-0 truncate text-right text-2xs text-muted-foreground/80">
+              {detail(item)}
+            </span>
+          </div>
+
+          <div className="mt-0.5 ml-[22px] flex items-center gap-2 text-2xs text-muted-foreground/70">
+            <span className="truncate">
+              {item.sourceLabel} → {item.targetLabel}
+            </span>
+            <span className="ml-auto shrink-0 tabular">
+              {item.status === "completed" ? formatBytes(item.size) : `${Math.round(percent)}%`}
+            </span>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent className="w-56">
+        <ContextMenuLabel className="max-w-52 truncate font-normal">{item.name}</ContextMenuLabel>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={!cancellable} onSelect={cancel}>
+          <XIcon />
+          Cancel transfer
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!retryable} onSelect={retry}>
+          <RotateCcwIcon />
+          Retry transfer
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => copyPaths("Source path", item.sourcePath)}>
+          <CopyIcon />
+          Copy source path
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => copyPaths("Target path", item.targetPath)}>
+          <CopyIcon />
+          Copy target path
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => copyPaths("Paths", `${item.sourcePath}\n${item.targetPath}`)}
+        >
+          <CopyIcon />
+          Copy both paths
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={!hasFinished} onSelect={onClearFinished}>
+          <Trash2Icon />
+          Clear finished transfers
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

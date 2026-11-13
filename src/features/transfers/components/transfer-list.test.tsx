@@ -156,4 +156,70 @@ describe("TransferList", () => {
     expect(resumeQueue).toHaveBeenCalled()
     expect(useTransferStore.getState().paused).toBe(false)
   })
+
+  it("cancels a running transfer from its context menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    useTransferStore.getState().setAll([item()])
+    renderList()
+
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("report.pdf") })
+    await user.click(await screen.findByRole("menuitem", { name: "Cancel transfer" }))
+
+    expect(cancel).toHaveBeenCalledWith("t1")
+  })
+
+  it("disables menu actions that do not apply to the current status", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    useTransferStore
+      .getState()
+      .setAll([item({ status: "completed", transferred: 1000, bytesPerSec: 0 })])
+    renderList()
+
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("report.pdf") })
+
+    expect(await screen.findByRole("menuitem", { name: "Cancel transfer" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
+    expect(screen.getByRole("menuitem", { name: "Retry transfer" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
+    expect(screen.getByRole("menuitem", { name: "Clear finished transfers" })).not.toHaveAttribute(
+      "aria-disabled",
+    )
+  })
+
+  it("copies both transfer paths from the context menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    useTransferStore.getState().setAll([item()])
+    renderList()
+
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("report.pdf") })
+    await user.click(await screen.findByRole("menuitem", { name: "Copy both paths" }))
+
+    await expect(navigator.clipboard.readText()).resolves.toBe(
+      "/remote/report.pdf\n/local/report.pdf",
+    )
+  })
+
+  it("clears finished rows from a row context menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    useTransferStore.getState().setAll([
+      item(),
+      item({
+        id: "done",
+        name: "done.bin",
+        status: "completed",
+        transferred: 1000,
+        startedAt: 1,
+      }),
+    ])
+    renderList()
+
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByText("report.pdf") })
+    await user.click(await screen.findByRole("menuitem", { name: "Clear finished transfers" }))
+
+    expect(clearFinished).toHaveBeenCalled()
+  })
 })
