@@ -179,6 +179,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4b: shared bandwidth limiter and live concurrency changes
 - [x] 4c: atomic uploads (hidden temp + rename, backup/restore on overwrite) and download temp cleanup
 - [x] 4c: stalled sockets time out after 60 s idle and cancellation interrupts stalled reads/writes
+- [x] 4c: retry uses a fresh id and partial file, then replaces the same target (no duplicate copy)
 - [ ] 4c: remaining hardening (>4 GiB transfers, disk-full/auth expiry/permission-change matrix, event-rate profiling)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
@@ -916,3 +917,19 @@ which is only correct for local client connections. See
 
 - Verify cancel-while-stalled and reconnect behavior in the real Tauri window.
 - Continue Phase 4c: retry duplicate-data proof and the remaining server matrix (disk-full, auth expiry, permission changes).
+
+### 2026-11-13 — Session 23: retries cannot duplicate data
+
+**Changed**
+
+- Extracted retry construction into `retry_job`, so the contract is testable without a Tauri app handle. A retry clones the stored job snapshot, assigns a fresh UUID, resets counters, status, error and timestamps, and keeps the same source and target paths.
+- Because every partial name includes the item id, each attempt writes its own hidden file and replaces the same target. A retry never appends to a previous attempt or creates a second copy; two retries produce distinct partial paths for the same target.
+- `can_retry` states the rule explicitly: only `Failed` and `Cancelled` rows are retryable. `Queued`, `Running` and `Completed` rows are rejected with `CONFLICT`, so a completed transfer cannot be replayed into a duplicate.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (90 passed, 18 ignored). New tests cover the retryable-status rule, the fresh id and counter reset, unchanged source/target, an untouched original snapshot, and distinct partial paths across two retries.
+
+**Next**
+
+- Continue Phase 4c: the remaining server matrix (disk-full, auth expiry, permission changes) and event-rate profiling.

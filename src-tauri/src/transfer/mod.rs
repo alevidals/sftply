@@ -271,7 +271,7 @@ impl TransferManager {
     /// Requeue a failed or cancelled transfer with a fresh id. The original job
     /// snapshot is reused, so credentials never round-trip through the UI.
     pub fn retry(self: &Arc<Self>, app: &AppHandle, id: &str) -> Result<TransferItem, AppError> {
-        let (status, mut job) = {
+        let (status, job) = {
             let items = self.items.read().expect("transfer lock poisoned");
             let item = items.get(id).ok_or_else(|| {
                 AppError::new(
@@ -295,23 +295,11 @@ impl TransferManager {
             (status, job)
         };
 
-        if !matches!(status, TransferStatus::Failed | TransferStatus::Cancelled) {
-            return Err(AppError::new(
-                ErrorCode::Conflict,
-                "Only failed or cancelled transfers can be retried.",
-            ));
+        if !can_retry(status) {
+            return Err(retry_conflict());
         }
 
-        let mut item = job.item.clone();
-        item.id = uuid::Uuid::new_v4().to_string();
-        item.status = TransferStatus::Queued;
-        item.transferred = 0.0;
-        item.bytes_per_sec = 0.0;
-        item.eta_ms = None;
-        item.error = None;
-        item.finished_at = None;
-        item.started_at = crate::domain::activity::unix_millis();
-        job.item = item.clone();
+        let (item, job) = retry_job(&job);
 
         self.insert(item.clone());
         self.remember_job(job.clone());
@@ -801,6 +789,36 @@ fn update_progress(item: &mut TransferItem, started: Instant) {
 
 fn cancelled() -> AppError {
     AppError::new(ErrorCode::Cancelled, "The transfer was cancelled.")
+}
+
+fn retry_conflict() -> AppError {
+    AppError::new(
+        ErrorCode::Conflict,
+        "Only failed or cancelled transfers can be retried.",
+    )
+}
+
+fn can_retry(status: TransferStatus) -> bool {
+    matches!(status, TransferStatus::Failed | TransferStatus::Cancelled)
+}
+
+/// Build a fresh queued attempt for a retry. Each attempt gets its own id, so
+/// uploads and downloads write a new hidden partial file and replace the same
+/// target instead of appending to whatever a previous attempt left behind.
+fn retry_job(job: &TransferJob) -> (TransferItem, TransferJob) {
+    let mut item = job.item.clone();
+    item.id = uuid::Uuid::new_v4().to_string();
+    item.status = TransferStatus::Queued;
+    item.transferred = 0.0;
+    item.bytes_per_sec = 0.0;
+    item.eta_ms = None;
+    item.error = None;
+    item.finished_at = None;
+    item.started_at = crate::domain::activity::unix_millis();
+
+    let mut job = job.clone();
+    job.item = item.clone();
+    (item, job)
 }
 
 /// Bound a metadata or open call so a half-open socket cannot hang a transfer.
@@ -1406,5 +1424,76 @@ mod tests {
             .await
             .expect_err("cancellation must win over a stalled read");
         assert_eq!(error.code, ErrorCode::Cancelled);
+    }
+
+    fn sample_job() -> TransferJob {
+        TransferJob {
+            item: TransferItem {
+                id: "original".into(),
+                direction: TransferDirection::Upload,
+                status: TransferStatus::Failed,
+                source_path: "/local/report.bin".into(),
+                target_path: "/remote/report.bin".into(),
+                source_label: "This Mac".into(),
+                target_label: "Server".into(),
+                name: "report.bin".into(),
+                size: 1024.0,
+                transferred: 1024.0,
+                bytes_per_sec: 512.0,
+                eta_ms: Some(10.0),
+                error: Some("The connection dropped.".into()),
+                started_at: 1.0,
+                finished_at: Some(2.0),
+            },
+            source_remote: None,
+            target_remote: None,
+            policy: ConflictPolicy::Overwrite,
+        }
+    }
+
+    #[test]
+    fn only_failed_or_cancelled_transfers_can_be_retried() {
+        assert!(can_retry(TransferStatus::Failed));
+        assert!(can_retry(TransferStatus::Cancelled));
+        assert!(!can_retry(TransferStatus::Queued));
+        assert!(!can_retry(TransferStatus::Running));
+        assert!(!can_retry(TransferStatus::Completed));
+    }
+
+    #[test]
+    fn retry_gets_a_fresh_id_and_keeps_the_same_target() {
+        let job = sample_job();
+        let (item, retried) = retry_job(&job);
+
+        assert_ne!(item.id, job.item.id);
+        assert_eq!(item.status, TransferStatus::Queued);
+        assert_eq!(item.transferred, 0.0);
+        assert_eq!(item.bytes_per_sec, 0.0);
+        assert_eq!(item.eta_ms, None);
+        assert_eq!(item.error, None);
+        assert_eq!(item.finished_at, None);
+        // A retry replaces the same file; it must not produce a second copy.
+        assert_eq!(item.source_path, job.item.source_path);
+        assert_eq!(item.target_path, job.item.target_path);
+        assert_eq!(retried.item.id, item.id);
+        assert_eq!(retried.policy, job.policy);
+        // The original snapshot stays intact for history and later retries.
+        assert_eq!(job.item.id, "original");
+        assert_eq!(job.item.transferred, 1024.0);
+        assert_eq!(job.item.status, TransferStatus::Failed);
+    }
+
+    #[test]
+    fn retries_write_distinct_partial_files() {
+        let job = sample_job();
+        let (first, _) = retry_job(&job);
+        let (second, _) = retry_job(&job);
+
+        assert_ne!(first.id, second.id);
+        assert_ne!(
+            temp_download_path(&first.target_path, &first.id),
+            temp_download_path(&second.target_path, &second.id)
+        );
+        assert_eq!(first.target_path, second.target_path);
     }
 }
