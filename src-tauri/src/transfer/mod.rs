@@ -1119,7 +1119,7 @@ mod tests {
             2048.0,
         );
         item.transferred = 1024.0;
-        update_progress(&mut item, Instant::now());
+        update_progress(&mut item, Instant::now() - Duration::from_secs(1));
         assert!(item.bytes_per_sec > 0.0);
         assert!(item.eta_ms.is_some());
     }
@@ -1555,6 +1555,7 @@ mod tests {
         dirs: HashSet<String>,
         read_fail_after: Option<usize>,
         write_fail_after: Option<usize>,
+        open_write_error: Option<ErrorCode>,
         deny_rename: bool,
         chunk_delay: Option<Duration>,
     }
@@ -1770,6 +1771,14 @@ mod tests {
             path: &str,
             _offset: u64,
         ) -> Result<Box<dyn FileWriter>, AppError> {
+            if let Some(code) = self
+                .state
+                .lock()
+                .expect("script lock poisoned")
+                .open_write_error
+            {
+                return Err(AppError::new(code, "The server rejected the sign-in."));
+            }
             Ok(Box::new(ScriptedWriter {
                 path: path.to_string(),
                 buffer: Vec::new(),
@@ -2011,6 +2020,48 @@ mod tests {
         assert!(
             leftover_remote_keys(&state).is_empty(),
             "a partial upload was left behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_expired_session_fails_the_upload_without_touching_the_target() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("report.bin");
+        tokio::fs::write(&source, vec![b'n'; 4096]).await.unwrap();
+
+        let (mock, state) = ScriptedRemote::new(&[("/dir/report.bin", b"old contents")]);
+        state.lock().unwrap().open_write_error = Some(ErrorCode::AuthFailed);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Upload,
+            source.to_str().unwrap(),
+            "/dir/report.bin",
+            4096.0,
+        );
+        let token = CancellationToken::new();
+        let error = upload(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect_err("an expired session must fail the upload");
+
+        assert_eq!(error.code, ErrorCode::AuthFailed);
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.files.get("/dir/report.bin").map(Vec::as_slice),
+            Some(&b"old contents"[..])
+        );
+        assert!(
+            leftover_remote_keys(&state).is_empty(),
+            "an expired session left a partial upload behind"
         );
     }
 

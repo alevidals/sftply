@@ -183,7 +183,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4c: end-to-end pipeline tests cover success, cancel and broken connections with an in-memory remote
 - [x] 4c: disk-full errors map to an honest local/server message
 - [x] 4c: progress events capped per transfer, >4 GiB counters verified, denied finalization preserves the old file
-- [ ] 4c: remaining hardening (>4 GiB transfer run, auth expiry matrix)
+- [x] 4c: expired-session upload fails before creating a partial
+- [ ] 4c: real >4 GiB transfer run (manual/integration)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
@@ -985,3 +986,18 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 4c: a real >4 GiB transfer run and the auth-expiry matrix.
+
+### 2026-11-13 — Session 27: expired sessions and a flaky speed test
+
+**Changed**
+
+- Added an auth-expiry case to the pipeline tests: when opening the remote writer fails with `AUTH_FAILED`, the upload fails before creating any partial, and the previous remote file stays untouched.
+- Fixed a flaky unit test: `computes_speed_and_eta` started at `Instant::now()`, so on a fast run the elapsed time was zero and the computed speed stayed zero. It now starts one second in the past.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (100 passed, 18 ignored). The transfer tests were repeated six times to confirm the timing fix.
+
+**Next**
+
+- Real >4 GiB transfer run against the local Docker stack when convenient; the counters and ETA math are already covered.
