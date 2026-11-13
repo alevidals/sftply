@@ -8,7 +8,6 @@ import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
-  FolderOpenIcon,
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
@@ -18,7 +17,6 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SearchIcon,
-  SearchXIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -48,6 +46,7 @@ import {
   PermissionsDialog,
 } from "@/features/files/components/file-dialogs"
 import { type FileAction, FileTable } from "@/features/files/components/file-table"
+import { PaneEmpty } from "@/features/files/components/pane-empty"
 import { PathBar } from "@/features/files/components/path-bar"
 import { useFsListing } from "@/features/files/hooks/use-fs-listing"
 import { usePathNavigation } from "@/features/files/hooks/use-path-navigation"
@@ -655,7 +654,8 @@ export function DirectoryBrowser({
         <PaneEmpty
           filtered={filter.trim().length > 0 && (listing?.entries.length ?? 0) > 0}
           description={emptyDescription}
-          onNewFolder={() => canMkdir && setNewFolderOpen(true)}
+          canCreate={canMkdir}
+          onNewFolder={() => setNewFolderOpen(true)}
           onClearFilter={() => {
             setFilter("")
             setFilterOpen(false)
@@ -935,45 +935,6 @@ function TableSkeleton({ columns, rowHeight }: { columns: ColumnOptions; rowHeig
           {columns.permissions ? <Skeleton className="ml-auto h-3 w-8 rounded-sm" /> : null}
         </div>
       ))}
-    </div>
-  )
-}
-
-function PaneEmpty({
-  filtered,
-  description,
-  onNewFolder,
-  onClearFilter,
-}: {
-  filtered: boolean
-  description?: string
-  onNewFolder: () => void
-  onClearFilter: () => void
-}) {
-  const Icon = filtered ? SearchXIcon : FolderOpenIcon
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-      <div className="flex max-w-[280px] flex-col items-center text-center">
-        <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-border/70 bg-muted/40 text-muted-foreground">
-          <Icon className="size-5" />
-        </span>
-        <h2 className="text-sm font-medium text-foreground">
-          {filtered ? "No matching items" : "This folder is empty"}
-        </h2>
-        <p className="mt-1 text-xs leading-relaxed text-balance text-muted-foreground">
-          {filtered
-            ? "No files or folders match the current filter."
-            : (description ?? "Create a folder to get started, or go to another location.")}
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-3"
-          onClick={filtered ? onClearFilter : onNewFolder}
-        >
-          {filtered ? "Clear filter" : "New folder"}
-        </Button>
-      </div>
     </div>
   )
 }

@@ -1120,3 +1120,18 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: remaining empty/error states and packaging/product metadata.
+
+### 2026-11-13 — Session 35: honest empty-folder action
+
+**Changed**
+
+- Extracted the pane empty state into `PaneEmpty` and gave it an explicit `canCreate` flag. The **New folder** button now only appears when the active scope actually supports `mkdir`; servers without that capability show the explanation without a dead action.
+- A filtered empty state always offers **Clear filter**, even on read-only servers, because that action is always possible.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 188 tests in 28 files, production build). New tests cover the create-enabled, read-only and filtered variants.
+
+**Next**
+
+- Continue Phase 5: packaging and product metadata.
