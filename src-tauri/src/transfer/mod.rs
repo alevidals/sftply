@@ -806,7 +806,7 @@ fn temp_download_path(target: &str, id: &str) -> String {
 }
 
 /// Hidden sibling used for an atomic upload or its rollback backup.
-fn temp_remote_path(target: &str, id: &str, kind: &str) -> Result<String, AppError> {
+pub(crate) fn temp_remote_path(target: &str, id: &str, kind: &str) -> Result<String, AppError> {
     let parent = remote_parent(target)?.unwrap_or_else(|| "/".to_string());
     let name = remote_leaf(target)?;
     join_remote(&parent, &hidden_partial_name(&name, kind, id))

@@ -890,6 +890,7 @@ which is only correct for local client connections. See
 
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (84 passed, 14 ignored). New Rust tests cover bounded partial names, remote partial/backup paths, a successful atomic replacement, and restoring the previous file when the final rename fails.
 - `bun run check` (Biome, 148 Vitest tests in 24 files, strict TypeScript, production build). New frontend test covers byte formatting above 4 GiB without unit fallback.
+- Added real-server integration tests that run the exact upload sequence (write a hidden sibling, then `replace_remote_file`) against explicit FTPS, implicit FTPS and SFTP, including a non-ASCII name whose partial name lands on the 255-byte limit. 13 tests passed across FTPS/SFTP streaming, CRUD, custom CA, certificate pinning, changed host key and atomic replacement. Plain FTP tests were skipped because the manual dev container owns port 2121; the integration stack, volumes and images were removed afterwards.
 
 **Next**
 

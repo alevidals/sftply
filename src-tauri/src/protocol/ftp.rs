@@ -1251,4 +1251,132 @@ mod integration {
             Err(error) => assert_eq!(error.code, ErrorCode::AuthFailed),
         }
     }
+
+    /// Stream a payload through the same writer the upload pipeline uses.
+    async fn write_remote(remote: &mut Box<dyn RemoteFs>, path: &str, data: &[u8]) {
+        let mut writer = remote.open_write(path, 0).await.expect("open write");
+        let mut written = 0;
+        while written < data.len() {
+            let count = writer
+                .write(&data[written..])
+                .await
+                .unwrap_or_else(|error| panic!("write {path}: {error}"));
+            assert!(count > 0, "the server accepted no data for {path}");
+            written += count;
+        }
+        writer
+            .finish()
+            .await
+            .unwrap_or_else(|error| panic!("finish {path}: {error}"));
+    }
+
+    async fn read_remote(remote: &mut Box<dyn RemoteFs>, path: &str) -> Vec<u8> {
+        let mut reader = remote.open_read(path, 0).await.expect("open read");
+        let mut data = Vec::new();
+        let mut buffer = [0u8; 16 * 1024];
+        loop {
+            let count = reader
+                .read(&mut buffer)
+                .await
+                .unwrap_or_else(|error| panic!("read {path}: {error}"));
+            if count == 0 {
+                break;
+            }
+            data.extend_from_slice(&buffer[..count]);
+        }
+        reader
+            .finish()
+            .await
+            .unwrap_or_else(|error| panic!("finish read {path}: {error}"));
+        data
+    }
+
+    /// The transfer pipeline uploads to a hidden sibling and renames it into
+    /// place. Exercise that sequence against a real server, including a
+    /// non-ASCII name whose partial name lands exactly on the 255-byte limit.
+    async fn exercise_atomic_replace(protocol: ConnectionProtocol, port: u16, secure: bool) {
+        use crate::domain::transfer::ConflictPolicy;
+
+        let profile = profile(protocol, port);
+        let connector = secure.then(test_connector);
+        let remote = FtpRemote::connect_with(&profile, PASSWORD, connector)
+            .await
+            .unwrap_or_else(|error| panic!("connect to {protocol:?} on {port}: {error}"));
+        let mut client: Box<dyn RemoteFs> = Box::new(remote);
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("atomic-{stamp}");
+        let folder_path = format!("/{folder}");
+        client.mkdir("/", &folder).await.expect("mkdir");
+
+        let long_name = format!("résumé-{}.bin", "ñ".repeat(120));
+        for name in ["report.bin", long_name.as_str()] {
+            let target = format!("{folder_path}/{name}");
+            let temp = crate::transfer::temp_remote_path(&target, "test", "part")
+                .expect("build the partial path");
+            assert!(
+                remote_leaf(&temp).expect("partial leaf").len() <= 255,
+                "the partial name exceeds the server limit"
+            );
+
+            write_remote(&mut client, &target, b"previous contents").await;
+            write_remote(&mut client, &temp, b"replacement contents").await;
+            crate::transfer::replace_remote_file(
+                &mut client,
+                &temp,
+                &target,
+                "test",
+                ConflictPolicy::Overwrite,
+            )
+            .await
+            .unwrap_or_else(|error| panic!("replace {target}: {error}"));
+
+            assert_eq!(
+                read_remote(&mut client, &target).await,
+                b"replacement contents"
+            );
+            assert_eq!(
+                client.stat(&temp).await.expect_err("partial is gone").code,
+                ErrorCode::NotFound
+            );
+        }
+
+        let listing = client.list(&folder_path).await.expect("list folder");
+        let mut names: Vec<String> = listing
+            .entries
+            .iter()
+            .map(|entry| entry.name.clone())
+            .collect();
+        names.sort();
+        let mut expected = vec!["report.bin".to_string(), long_name];
+        expected.sort();
+        assert_eq!(names, expected, "partial or backup files were left behind");
+
+        client
+            .delete(&folder_path, true)
+            .await
+            .expect("delete tree");
+        client.disconnect().await.expect("disconnect");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn plain_ftp_atomic_replace_keeps_no_leftovers() {
+        exercise_atomic_replace(ConnectionProtocol::Ftp, 2121, false).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn explicit_ftps_atomic_replace_keeps_no_leftovers() {
+        exercise_atomic_replace(ConnectionProtocol::FtpsExplicit, 2122, true).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn implicit_ftps_atomic_replace_keeps_no_leftovers() {
+        exercise_atomic_replace(ConnectionProtocol::FtpsImplicit, 2990, true).await;
+    }
 }
