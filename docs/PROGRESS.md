@@ -1035,3 +1035,20 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: remaining empty/error states and the accessibility audit.
+
+### 2026-11-13 — Session 30: draggable session tabs
+
+**Changed**
+
+- Session tabs can be reordered by dragging. Dragging uses a private MIME type, so it never looks like a file-transfer drag to the panes.
+- The store gained `moveSession(sessionId, toIndex)`, which clamps the destination and ignores no-op moves.
+- Tabs also expose **Move tab left** and **Move tab right** in their context menu, disabled at the edges. This keeps reordering available without a pointer drag.
+- The drop target shows a focus ring and the dragged tab fades, so the reorder has visible feedback.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 158 tests in 24 files, production build). New tests cover the context-menu move and an HTML5 drag from the second tab onto the first.
+
+**Next**
+
+- Continue Phase 5: date/size format preferences and the accessibility audit.

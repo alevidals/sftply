@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { RemotePane } from "@/features/sessions/components/remote-pane"
@@ -70,6 +70,18 @@ function resetStore() {
     reconnecting: {},
     paths: {},
   })
+}
+
+function dataTransfer(): DataTransfer {
+  const store = new Map<string, string>()
+  return {
+    effectAllowed: "none",
+    dropEffect: "none",
+    setData: (type: string, value: string) => {
+      store.set(type, value)
+    },
+    getData: (type: string) => store.get(type) ?? "",
+  } as unknown as DataTransfer
 }
 
 beforeEach(() => {
@@ -203,5 +215,49 @@ describe("RemotePane", () => {
     expect(reconnect).not.toHaveAttribute("aria-disabled")
     await user.click(reconnect)
     expect(actions.reconnect).toHaveBeenCalledWith("b")
+  })
+
+  it("moves a tab with the context menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const first = session("a", "Staging")
+    const second = session("b", "Production")
+    useSessionStore.setState({
+      sessions: { a: first, b: second },
+      order: ["a", "b"],
+      activeSessionId: "a",
+    })
+
+    render(<RemotePane />)
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Staging" }),
+    })
+    await user.click(await screen.findByRole("menuitem", { name: "Move tab right" }))
+
+    expect(useSessionStore.getState().order).toEqual(["b", "a"])
+  })
+
+  it("reorders tabs by dragging", () => {
+    const first = session("a", "Staging")
+    const second = session("b", "Production")
+    const third = session("c", "Development")
+    useSessionStore.setState({
+      sessions: { a: first, b: second, c: third },
+      order: ["a", "b", "c"],
+      activeSessionId: "a",
+    })
+
+    render(<RemotePane />)
+
+    const transfer = dataTransfer()
+    const staging = screen.getByRole("tab", { name: "Staging" })
+    const production = screen.getByRole("tab", { name: "Production" })
+
+    fireEvent.dragStart(production, { dataTransfer: transfer })
+    fireEvent.dragOver(staging, { dataTransfer: transfer })
+    fireEvent.drop(staging, { dataTransfer: transfer })
+
+    expect(useSessionStore.getState().order).toEqual(["b", "a", "c"])
   })
 })

@@ -1,5 +1,7 @@
 import { cn } from "cn"
 import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
   CopyIcon,
   LoaderCircleIcon,
   PowerIcon,
@@ -8,6 +10,7 @@ import {
   WifiOffIcon,
   XIcon,
 } from "lucide-react"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +30,9 @@ import { copyText } from "@/lib/clipboard"
 import type { SessionInfo } from "@/lib/ipc/bindings"
 import { useSessionStore } from "@/stores/session-store"
 
+/** Private MIME type so tab drags never look like file-transfer drags. */
+const SESSION_DRAG_TYPE = "application/x-sftply-session"
+
 /** Remote pane: one tab per live session, each with an isolated browser. */
 export function RemotePane() {
   const sessions = useSessionStore((state) => state.sessions)
@@ -37,6 +43,9 @@ export function RemotePane() {
   const paths = useSessionStore((state) => state.paths)
   const setActiveSession = useSessionStore((state) => state.setActiveSession)
   const setPath = useSessionStore((state) => state.setPath)
+  const moveSession = useSessionStore((state) => state.moveSession)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null)
   const { disconnect, reconnect, cancel } = useSessionActions()
 
   const active = activeSessionId ? (sessions[activeSessionId] ?? null) : null
@@ -71,15 +80,57 @@ export function RemotePane() {
             if (!session) return null
             const selected = session.id === active.id
             const sessionLost = Boolean(lost[session.id])
+            const dragging = draggingId === session.id
+            const target = dropTarget?.id === session.id
+            const index = order.indexOf(session.id)
             return (
               <ContextMenu key={session.id}>
                 <ContextMenuTrigger asChild>
                   <div
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move"
+                      event.dataTransfer.setData(SESSION_DRAG_TYPE, session.id)
+                      setDraggingId(session.id)
+                    }}
+                    onDragEnd={() => {
+                      setDraggingId(null)
+                      setDropTarget(null)
+                    }}
+                    onDragOver={(event) => {
+                      if (!draggingId || draggingId === session.id) return
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = "move"
+                      const rect = event.currentTarget.getBoundingClientRect()
+                      setDropTarget({
+                        id: session.id,
+                        after: event.clientX > rect.left + rect.width / 2,
+                      })
+                    }}
+                    onDragLeave={(event) => {
+                      const related = event.relatedTarget
+                      if (related instanceof Node && event.currentTarget.contains(related)) return
+                      setDropTarget((current) => (current?.id === session.id ? null : current))
+                    }}
+                    onDrop={(event) => {
+                      if (!draggingId || draggingId === session.id) return
+                      event.preventDefault()
+                      const from = order.indexOf(draggingId)
+                      const targetIndex = order.indexOf(session.id)
+                      const after = dropTarget?.id === session.id ? dropTarget.after : false
+                      let to = targetIndex + (after ? 1 : 0)
+                      if (from < to) to -= 1
+                      moveSession(draggingId, to)
+                      setDraggingId(null)
+                      setDropTarget(null)
+                    }}
                     className={cn(
                       "flex h-6 shrink-0 items-center rounded-md border text-2xs transition-colors",
                       selected
                         ? "border-border bg-background text-foreground"
                         : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      dragging && "opacity-50",
+                      target && "ring-1 ring-primary/60",
                     )}
                   >
                     <button
@@ -122,6 +173,21 @@ export function RemotePane() {
                   <ContextMenuItem onSelect={() => void disconnect(session.id)}>
                     <PowerIcon />
                     Disconnect
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    disabled={index <= 0}
+                    onSelect={() => moveSession(session.id, index - 1)}
+                  >
+                    <ArrowLeftIcon />
+                    Move tab left
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    disabled={index >= order.length - 1}
+                    onSelect={() => moveSession(session.id, index + 1)}
+                  >
+                    <ArrowRightIcon />
+                    Move tab right
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem

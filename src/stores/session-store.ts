@@ -18,6 +18,8 @@ interface SessionStoreState {
   upsertSession: (session: SessionInfo) => void
   removeSession: (sessionId: string) => void
   setActiveSession: (sessionId: string | null) => void
+  /** Move a session tab to a final position in the tab order. */
+  moveSession: (sessionId: string, toIndex: number) => void
   setConnecting: (connectionId: string, value: boolean) => void
   setLost: (sessionId: string, message: string) => void
   clearLost: (sessionId: string) => void
@@ -95,6 +97,18 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
     }),
 
   setActiveSession: (activeSessionId) => set({ activeSessionId }),
+
+  moveSession: (sessionId, toIndex) =>
+    set((state) => {
+      const from = state.order.indexOf(sessionId)
+      if (from < 0 || state.order.length < 2) return state
+      const to = Math.max(0, Math.min(toIndex, state.order.length - 1))
+      if (to === from) return state
+      const order = [...state.order]
+      order.splice(from, 1)
+      order.splice(to, 0, sessionId)
+      return { order }
+    }),
 
   setConnecting: (connectionId, value) =>
     set((state) => {
