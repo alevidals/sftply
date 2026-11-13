@@ -14,6 +14,7 @@ import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import { formatBytes, formatCount } from "@/lib/format"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { useActivityStore } from "@/stores/activity-store"
 import { useSessionStore } from "@/stores/session-store"
 import {
@@ -127,7 +128,8 @@ export function StatusBar() {
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>
-            {settings.bottomPanelOpen ? "Hide panel" : "Show panel"} <Kbd className="ml-1">⌘J</Kbd>
+            {settings.bottomPanelOpen ? "Hide panel" : "Show panel"}{" "}
+            <Kbd className="ml-1">{shortcutLabel("panel")}</Kbd>
           </TooltipContent>
         </Tooltip>
 
@@ -139,7 +141,7 @@ export function StatusBar() {
             : "sftply"}
         </span>
 
-        <Kbd className="ml-1 hidden md:inline-flex">⌘K</Kbd>
+        <Kbd className="ml-1 hidden md:inline-flex">{shortcutLabel("palette")}</Kbd>
       </div>
     </footer>
   )

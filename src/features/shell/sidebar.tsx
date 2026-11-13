@@ -2,6 +2,7 @@ import { Settings2Icon } from "lucide-react"
 import { Kbd } from "@/components/kbd"
 import { Button } from "@/components/ui/button"
 import { ConnectionsPanel } from "@/features/connections/components/connections-panel"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { useUiStore } from "@/stores/ui-store"
 
 export function Sidebar() {
@@ -20,7 +21,7 @@ export function Sidebar() {
         >
           <Settings2Icon />
           Settings
-          <Kbd className="ml-auto">⌘,</Kbd>
+          <Kbd className="ml-auto">{shortcutLabel("settings")}</Kbd>
         </Button>
       </div>
     </aside>

@@ -26,6 +26,7 @@ import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { THEME_OPTIONS } from "@/lib/themes"
 import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
@@ -155,12 +156,12 @@ export function CommandPalette() {
           <CommandItem value="focus local pane" onSelect={() => focusPane("local")}>
             <HardDriveIcon className="text-muted-foreground" />
             Focus local pane
-            <CommandShortcut>⌘1</CommandShortcut>
+            <CommandShortcut>{shortcutLabel("focus-local")}</CommandShortcut>
           </CommandItem>
           <CommandItem value="focus remote pane" onSelect={() => focusPane("remote")}>
             <ServerIcon className="text-muted-foreground" />
             Focus remote pane
-            <CommandShortcut>⌘2</CommandShortcut>
+            <CommandShortcut>{shortcutLabel("focus-remote")}</CommandShortcut>
           </CommandItem>
           <CommandItem value="show activity" onSelect={() => showPanel("activity")}>
             <ActivityIcon className="text-muted-foreground" />
@@ -173,7 +174,7 @@ export function CommandPalette() {
           <CommandItem value="toggle bottom panel" onSelect={togglePanel}>
             <PanelBottomIcon className="text-muted-foreground" />
             Toggle bottom panel
-            <CommandShortcut>⌘J</CommandShortcut>
+            <CommandShortcut>{shortcutLabel("panel")}</CommandShortcut>
           </CommandItem>
         </CommandGroup>
 
@@ -222,7 +223,7 @@ export function CommandPalette() {
           >
             <Settings2Icon className="text-muted-foreground" />
             Open settings
-            <CommandShortcut>⌘,</CommandShortcut>
+            <CommandShortcut>{shortcutLabel("settings")}</CommandShortcut>
           </CommandItem>
           <CommandItem
             value="keyboard shortcuts reference"
@@ -235,7 +236,7 @@ export function CommandPalette() {
           >
             <Settings2Icon className="text-muted-foreground" />
             Keyboard shortcuts
-            <CommandShortcut>?</CommandShortcut>
+            <CommandShortcut>{shortcutLabel("shortcuts")}</CommandShortcut>
           </CommandItem>
           <CommandItem value="copy diagnostics" onSelect={copyDiagnostics}>
             <CopyIcon className="text-muted-foreground" />

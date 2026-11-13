@@ -1019,3 +1019,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: pane/sidebar context menus, then the full command palette and keyboard scope map.
+
+### 2026-11-13 — Session 29: platform-aware shortcut labels
+
+**Changed**
+
+- Added `shortcutLabel(id)` to the shortcut registry. It looks a shortcut up by id and formats its chord for the current platform, so macOS shows `⌘K` while Windows and Linux show `Ctrl+K`.
+- Replaced every hardcoded Mac hint in the UI: title bar, status bar, sidebar, bottom panel, command palette, path bar, file toolbar, file actions menu and file context menu. Delete now shows `⌘⌫` on macOS and `Delete` on Windows/Linux, matching the actual keybinding.
+- Command palette hints for focus, panel and settings use the same registry, so they can no longer drift from the global keymap.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 156 tests in 24 files, production build). New unit tests cover Mac/Windows labels for the palette, new folder, delete and open shortcuts, plus the unknown-id fallback.
+
+**Next**
+
+- Continue Phase 5: remaining empty/error states and the accessibility audit.

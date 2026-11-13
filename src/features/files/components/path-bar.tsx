@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { pathBreadcrumbs } from "@/features/files/model/path"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { useUiStore } from "@/stores/ui-store"
 
 interface PathBarProps {
@@ -76,13 +77,23 @@ export function PathBar({
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/60 bg-background/40 px-2">
-      <NavButton label="Back" shortcut="⌘[" disabled={!canBack} onClick={onBack}>
+      <NavButton label="Back" shortcut={shortcutLabel("back")} disabled={!canBack} onClick={onBack}>
         <ArrowLeftIcon />
       </NavButton>
-      <NavButton label="Forward" shortcut="⌘]" disabled={!canForward} onClick={onForward}>
+      <NavButton
+        label="Forward"
+        shortcut={shortcutLabel("forward")}
+        disabled={!canForward}
+        onClick={onForward}
+      >
         <ArrowRightIcon />
       </NavButton>
-      <NavButton label="Enclosing folder" shortcut="⌘↑" disabled={!canUp} onClick={onUp}>
+      <NavButton
+        label="Enclosing folder"
+        shortcut={shortcutLabel("up")}
+        disabled={!canUp}
+        onClick={onUp}
+      >
         <ArrowUpIcon />
       </NavButton>
 
@@ -141,7 +152,7 @@ export function PathBar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
-              Edit path <span className="ml-1 text-muted-foreground">⌘L</span>
+              Edit path <span className="ml-1 text-muted-foreground">{shortcutLabel("path")}</span>
             </TooltipContent>
           </Tooltip>
         </div>

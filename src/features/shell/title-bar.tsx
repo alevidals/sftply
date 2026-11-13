@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useSettings } from "@/features/settings/settings-context"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { THEME_OPTIONS, themeOption } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
@@ -60,7 +61,7 @@ export function TitleBar() {
         >
           <SearchIcon className="size-3.5 shrink-0 opacity-70" />
           <span className="flex-1 text-left">Search or jump to…</span>
-          <Kbd className="hidden sm:inline-flex">⌘K</Kbd>
+          <Kbd className="hidden sm:inline-flex">{shortcutLabel("palette")}</Kbd>
         </button>
       </div>
 
@@ -103,7 +104,7 @@ export function TitleBar() {
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            Settings <Kbd className="ml-1">⌘,</Kbd>
+            Settings <Kbd className="ml-1">{shortcutLabel("settings")}</Kbd>
           </TooltipContent>
         </Tooltip>
       </div>

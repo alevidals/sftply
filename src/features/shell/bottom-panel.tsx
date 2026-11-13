@@ -19,6 +19,7 @@ import { TransferHistoryList } from "@/features/transfers/components/transfer-hi
 import { TransferList } from "@/features/transfers/components/transfer-list"
 import { formatClock } from "@/lib/format"
 import type { ActivityLevel } from "@/lib/ipc/bindings"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { useActivityStore } from "@/stores/activity-store"
 import { selectActiveTransferCount, useTransferStore } from "@/stores/transfer-store"
 import { useUiStore } from "@/stores/ui-store"
@@ -90,7 +91,8 @@ export function BottomPanel() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6}>
-              Collapse panel <span className="ml-1 font-mono text-[10px]">⌘J</span>
+              Collapse panel{" "}
+              <span className="ml-1 font-mono text-[10px]">{shortcutLabel("panel")}</span>
             </TooltipContent>
           </Tooltip>
         </div>

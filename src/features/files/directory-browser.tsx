@@ -79,6 +79,7 @@ import { useTransferActions } from "@/features/transfers/use-transfer-actions"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
 import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
+import { shortcutLabel } from "@/lib/shortcuts"
 import { recordActivity } from "@/stores/activity-store"
 import { useUiStore } from "@/stores/ui-store"
 
@@ -507,7 +508,7 @@ export function DirectoryBrowser({
         <div className="ml-auto flex items-center gap-0.5">
           <ToolbarButton
             label="New folder"
-            shortcut="⌘⇧N"
+            shortcut={shortcutLabel("new-folder")}
             disabled={!listing || !canMkdir}
             onClick={() => setNewFolderOpen(true)}
           >
@@ -562,7 +563,7 @@ export function DirectoryBrowser({
           ) : (
             <ToolbarButton
               label="Filter this folder"
-              shortcut="⌘F"
+              shortcut={shortcutLabel("filter")}
               onClick={() => setFilterOpen(true)}
             >
               <SearchIcon />
@@ -820,7 +821,7 @@ function ActionsMenu({
         <DropdownMenuItem disabled={!canOpen} onSelect={() => onAction("open")}>
           <ArrowDownToLineIcon />
           Open
-          <DropdownMenuShortcut>↩</DropdownMenuShortcut>
+          <DropdownMenuShortcut>{shortcutLabel("open")}</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!canTransfer} onSelect={() => onAction("transfer")}>
           <TransferIcon />
@@ -834,12 +835,12 @@ function ActionsMenu({
         <DropdownMenuItem onSelect={() => onAction("new-folder")}>
           <FolderPlusIcon />
           New folder
-          <DropdownMenuShortcut>⌘⇧N</DropdownMenuShortcut>
+          <DropdownMenuShortcut>{shortcutLabel("new-folder")}</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!canDelete} onSelect={() => onAction("delete")}>
           <Trash2Icon />
           Delete
-          <DropdownMenuShortcut>⌫</DropdownMenuShortcut>
+          <DropdownMenuShortcut>{shortcutLabel("delete")}</DropdownMenuShortcut>
         </DropdownMenuItem>
         {canReveal ? (
           <>

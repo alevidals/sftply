@@ -147,3 +147,25 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     ],
   },
 ]
+
+/** Find a shortcut by its stable id. */
+export function findShortcut(id: string): ShortcutDefinition | undefined {
+  for (const group of SHORTCUT_GROUPS) {
+    const match = group.shortcuts.find((shortcut) => shortcut.id === id)
+    if (match) return match
+  }
+  return undefined
+}
+
+/**
+ * Platform label for a shortcut id, for example `⌘K` on macOS or `Ctrl+K`
+ * elsewhere. Returns an empty string when the id is unknown, so callers can
+ * render a menu without a stale Mac-only hint.
+ */
+export function shortcutLabel(id: string, isMac = isMacPlatform(undefined)): string {
+  const shortcut = findShortcut(id)
+  if (!shortcut) return ""
+  return shortcutChords(shortcut, isMac)
+    .map((chord) => formatShortcut(chord, isMac))
+    .join(" / ")
+}

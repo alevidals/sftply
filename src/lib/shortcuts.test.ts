@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { formatShortcut, isMacPlatform, SHORTCUT_GROUPS, shortcutChords } from "@/lib/shortcuts"
+import {
+  formatShortcut,
+  isMacPlatform,
+  SHORTCUT_GROUPS,
+  shortcutChords,
+  shortcutLabel,
+} from "@/lib/shortcuts"
 
 describe("formatShortcut", () => {
   it("uses Command symbols on macOS", () => {
@@ -45,5 +51,21 @@ describe("isMacPlatform", () => {
     expect(isMacPlatform("macos")).toBe(true)
     expect(isMacPlatform("windows")).toBe(false)
     expect(isMacPlatform("linux")).toBe(false)
+  })
+})
+
+describe("shortcutLabel", () => {
+  it("renders the platform label for a shortcut id", () => {
+    expect(shortcutLabel("palette", true)).toBe("⌘K")
+    expect(shortcutLabel("palette", false)).toBe("Ctrl+K")
+    expect(shortcutLabel("new-folder", true)).toBe("⌘⇧N")
+    expect(shortcutLabel("new-folder", false)).toBe("Ctrl+Shift+N")
+    expect(shortcutLabel("delete", true)).toBe("⌘⌫")
+    expect(shortcutLabel("delete", false)).toBe("Delete")
+    expect(shortcutLabel("open", false)).toBe("Enter")
+  })
+
+  it("returns an empty label for an unknown id", () => {
+    expect(shortcutLabel("not-a-shortcut", false)).toBe("")
   })
 })

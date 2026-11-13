@@ -35,6 +35,7 @@ import {
 } from "@/features/transfers/model"
 import { formatBytes, formatMode, formatModified } from "@/lib/format"
 import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
+import { shortcutLabel } from "@/lib/shortcuts"
 
 export type FileAction =
   | "open"
@@ -397,7 +398,7 @@ export function FileTable({
         <ContextMenuItem disabled={actionDisabled("open")} onSelect={() => onAction("open")}>
           <ArrowDownToLineIcon />
           Open
-          <ContextMenuShortcut>↩</ContextMenuShortcut>
+          <ContextMenuShortcut>{shortcutLabel("open")}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
           disabled={actionDisabled("transfer")}
@@ -425,7 +426,7 @@ export function FileTable({
         <ContextMenuItem onSelect={() => onAction("new-folder")}>
           <FolderPlusIcon />
           New folder
-          <ContextMenuShortcut>⌘⇧N</ContextMenuShortcut>
+          <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
           variant="destructive"
@@ -434,7 +435,7 @@ export function FileTable({
         >
           <Trash2Icon />
           Delete
-          <ContextMenuShortcut>⌫</ContextMenuShortcut>
+          <ContextMenuShortcut>{shortcutLabel("delete")}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
