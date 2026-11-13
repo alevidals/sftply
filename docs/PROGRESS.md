@@ -177,6 +177,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4a: single-file pipeline, progress, cancellation, conflicts, temp download
 - [x] 4b: recursive jobs, queue control, retry, in-app drag-and-drop (pause is queue-level only)
 - [x] 4b: shared bandwidth limiter and live concurrency changes
+- [x] 4c: atomic uploads (hidden temp + rename, backup/restore on overwrite) and download temp cleanup
 - [ ] 4c: hardening (large files, broken connections, server matrix)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
@@ -256,7 +257,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-**Last verification run:** 2026-11-11 — all gates green.
+**Last verification run:** 2026-11-13 — all gates green.
 
 | Gate                 | Result                                                              |
 | -------------------- | ------------------------------------------------------------------- |
@@ -875,3 +876,22 @@ which is only correct for local client connections. See
 
 - Phase 4c hardening: >4 GiB files, broken connections, retry safety and the wider server matrix.
 - External OS file drops remain blocked by Tauri's `dragDropEnabled` trade-off with in-app HTML5 drag and drop.
+
+### 2026-11-13 — Session 21: atomic uploads and download cleanup
+
+**Changed**
+
+- Uploads no longer truncate the destination before the bytes arrive. Each upload streams into a hidden sibling (`.<name>.sftply-part-<id>`) and is renamed into place only after both the reader and writer finish, so a cancelled or failed transfer leaves the previous remote file untouched. Servers without rename fall back to writing the target directly.
+- Overwriting a file that the server refuses to rename over uses a backup-and-restore sequence: the old file moves to a hidden backup, the new file is renamed in, the backup is deleted, and the old file is restored if the final rename fails. The caller discards the finished temporary upload on failure because the local source is still intact and retry is the recovery path.
+- Partial and backup names are bounded to 255 bytes and truncated on a UTF-8 boundary, so long or non-ASCII target names cannot produce invalid remote names.
+- Downloads now clean up their temporary file when the reader or writer fails to finish, not only when the copy loop fails. If finalization itself fails, the completed temporary file is kept because it is the only copy of the downloaded bytes.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (84 passed, 14 ignored). New Rust tests cover bounded partial names, remote partial/backup paths, a successful atomic replacement, and restoring the previous file when the final rename fails.
+- `bun run check` (Biome, 148 Vitest tests in 24 files, strict TypeScript, production build). New frontend test covers byte formatting above 4 GiB without unit fallback.
+
+**Next**
+
+- Verify a failed/cancelled upload preserves the previous remote file in the real Tauri window against the dev FTP container; restart `bun run tauri -- dev` first because the change is in Rust.
+- Continue Phase 4c: broken connections, retry duplicate-data proof, and the wider server matrix.

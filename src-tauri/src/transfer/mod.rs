@@ -28,6 +28,9 @@ use history::TransferHistoryStore;
 
 const CHUNK_SIZE: usize = 64 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
+/// Most servers and filesystems cap a single name at 255 bytes. Partial and
+/// backup names are kept below that limit even when the target name is at it.
+const PARTIAL_NAME_MAX_BYTES: usize = 255;
 
 /// Everything needed to open an independent protocol connection for a
 /// transfer. A transfer never holds the browsing session's stream, so the file
@@ -576,21 +579,29 @@ async fn download(
     let mut reader = client.open_read(&item.source_path, 0).await?;
     let mut writer: Box<dyn FileWriter> = Box::new(LocalWriter::open(&temp, 0).await?);
 
-    let result = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await;
-
-    match result {
-        Ok(()) => {
-            reader.finish().await?;
-            writer.finish().await?;
-            replace_local_file(&temp, &target).await?;
-            Ok(())
-        }
-        Err(error) => {
-            let _ = writer.abort().await;
-            let _ = tokio::fs::remove_file(&temp).await;
-            Err(error)
-        }
+    if let Err(error) = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await {
+        let _ = writer.abort().await;
+        remove_local_temp(&temp).await;
+        return Err(error);
     }
+    if let Err(error) = reader.finish().await {
+        let _ = writer.abort().await;
+        remove_local_temp(&temp).await;
+        return Err(error);
+    }
+    if let Err(error) = writer.finish().await {
+        remove_local_temp(&temp).await;
+        return Err(error);
+    }
+
+    // If finalization fails, keep the completed partial file: it is the only
+    // copy of the downloaded bytes and the destination may already be gone on
+    // platforms that cannot rename over an existing file.
+    if let Err(error) = replace_local_file(&temp, &target).await {
+        tracing::warn!("kept a completed download after finalization failed");
+        return Err(error);
+    }
+    Ok(())
 }
 
 async fn upload(
@@ -610,27 +621,93 @@ async fn upload(
         manager.publish(app, item);
     }
 
-    if let Some(parent) = remote_parent(&target)? {
-        ensure_remote_dir(client, &parent).await?;
-    }
+    let parent = remote_parent(&target)?.unwrap_or_else(|| "/".to_string());
+    ensure_remote_dir(client, &parent).await?;
+
+    // Upload to a hidden sibling and rename it into place on success, so a
+    // failed or cancelled upload never truncates an existing file. Servers
+    // without rename fall back to writing the target directly.
+    let atomic = client.capabilities().rename;
+    let upload_path = if atomic {
+        temp_remote_path(&target, &item.id, "part")?
+    } else {
+        target.clone()
+    };
+
     let mut reader: Box<dyn FileReader> = Box::new(LocalReader::open(&item.source_path, 0).await?);
-    let mut writer = client.open_write(&target, 0).await?;
+    let mut writer = client.open_write(&upload_path, 0).await?;
 
-    let result = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await;
+    if let Err(error) = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await {
+        let _ = writer.abort().await;
+        cleanup_remote_upload(client, &upload_path).await;
+        return Err(error);
+    }
+    if let Err(error) = reader.finish().await {
+        let _ = writer.abort().await;
+        cleanup_remote_upload(client, &upload_path).await;
+        return Err(error);
+    }
+    if let Err(error) = writer.finish().await {
+        cleanup_remote_upload(client, &upload_path).await;
+        return Err(error);
+    }
 
-    match result {
-        Ok(()) => {
-            reader.finish().await?;
-            writer.finish().await?;
+    if atomic
+        && let Err(error) =
+            replace_remote_file(client, &upload_path, &target, &item.id, policy).await
+    {
+        cleanup_remote_upload(client, &upload_path).await;
+        return Err(error);
+    }
+    Ok(())
+}
+
+/// Best-effort removal of a partial or backup upload. A failure here must not
+/// replace the original transfer error.
+async fn cleanup_remote_upload(client: &mut Box<dyn RemoteFs>, path: &str) {
+    let _ = tokio::time::timeout(Duration::from_secs(5), client.delete(path, false)).await;
+}
+
+/// Put a finished upload in place. Servers that refuse to rename over an
+/// existing file get a backup-and-restore sequence, so a failed finalization
+/// cannot destroy the previous version.
+pub(crate) async fn replace_remote_file(
+    client: &mut Box<dyn RemoteFs>,
+    temp: &str,
+    target: &str,
+    id: &str,
+    policy: ConflictPolicy,
+) -> Result<(), AppError> {
+    let final_name = remote_leaf(target)?;
+    let rename_error = match client.rename(temp, &final_name).await {
+        Ok(_) => return Ok(()),
+        Err(error) => error,
+    };
+    if policy != ConflictPolicy::Overwrite {
+        return Err(rename_error);
+    }
+
+    match client.stat(target).await {
+        Ok(entry) if entry.kind == EntryKind::File => {}
+        Ok(_) => return Err(rename_error),
+        Err(error) if error.code == ErrorCode::NotFound => return Err(rename_error),
+        Err(error) => return Err(error),
+    }
+
+    let backup = temp_remote_path(target, id, "backup")?;
+    let backup_name = remote_leaf(&backup)?;
+    client.rename(target, &backup_name).await?;
+    match client.rename(temp, &final_name).await {
+        Ok(_) => {
+            let _ =
+                tokio::time::timeout(Duration::from_secs(5), client.delete(&backup, false)).await;
             Ok(())
         }
         Err(error) => {
-            let _ = writer.abort().await;
-            // Best effort: do not leave a partial upload behind when the
-            // control channel still answers. A failure here must not replace
-            // the original transfer error.
-            let _ =
-                tokio::time::timeout(Duration::from_secs(5), client.delete(&target, false)).await;
+            // Restore the previous version. The caller discards the finished
+            // upload; the local source is still intact, so retry is the
+            // recovery path instead of leaving a hidden orphan behind.
+            let _ = client.rename(&backup, &final_name).await;
             Err(error)
         }
     }
@@ -723,9 +800,44 @@ fn temp_download_path(target: &str, id: &str) -> String {
         .and_then(|name| name.to_str())
         .unwrap_or("download");
     parent
-        .join(format!(".{name}.sftply-part-{id}"))
+        .join(hidden_partial_name(name, "part", id))
         .to_string_lossy()
         .into_owned()
+}
+
+/// Hidden sibling used for an atomic upload or its rollback backup.
+fn temp_remote_path(target: &str, id: &str, kind: &str) -> Result<String, AppError> {
+    let parent = remote_parent(target)?.unwrap_or_else(|| "/".to_string());
+    let name = remote_leaf(target)?;
+    join_remote(&parent, &hidden_partial_name(&name, kind, id))
+}
+
+/// Build a hidden partial name without exceeding the common 255-byte limit.
+/// The readable prefix is truncated on a character boundary, never mid-UTF-8.
+fn hidden_partial_name(name: &str, kind: &str, id: &str) -> String {
+    let suffix = format!(".sftply-{kind}-{id}");
+    let budget = PARTIAL_NAME_MAX_BYTES.saturating_sub(1 + suffix.len());
+    let name = if name.is_empty() { "file" } else { name };
+    format!(".{}{suffix}", truncate_utf8(name, budget))
+}
+
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    if value.len() <= max_bytes {
+        return value;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
+}
+
+async fn remove_local_temp(path: &str) {
+    if let Err(error) = tokio::fs::remove_file(path).await
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::warn!(%error, "could not remove a partial download");
+    }
 }
 
 async fn replace_local_file(temp: &str, target: &str) -> Result<(), AppError> {
@@ -821,6 +933,33 @@ mod tests {
         assert_eq!(
             temp_download_path("/tmp/report.pdf", "abc"),
             "/tmp/.report.pdf.sftply-part-abc"
+        );
+    }
+
+    #[test]
+    fn bounds_partial_names_without_splitting_utf8() {
+        assert_eq!(
+            hidden_partial_name("report.pdf", "part", "abc"),
+            ".report.pdf.sftply-part-abc"
+        );
+
+        // 200 two-byte characters exceed the 255-byte name budget.
+        let long = "é".repeat(200);
+        let name = hidden_partial_name(&long, "part", "abc");
+        assert!(name.len() <= PARTIAL_NAME_MAX_BYTES, "{}", name.len());
+        assert!(name.starts_with('.'));
+        assert!(name.ends_with(".sftply-part-abc"));
+    }
+
+    #[test]
+    fn builds_remote_partial_and_backup_paths_in_the_target_folder() {
+        assert_eq!(
+            temp_remote_path("/docs/report.pdf", "abc", "part").unwrap(),
+            "/docs/.report.pdf.sftply-part-abc"
+        );
+        assert_eq!(
+            temp_remote_path("/report.pdf", "abc", "backup").unwrap(),
+            "/.report.pdf.sftply-backup-abc"
         );
     }
 
@@ -927,5 +1066,217 @@ mod tests {
         manager.release_slot();
         manager.release_slot();
         assert_eq!(manager.active.load(Ordering::Relaxed), 0);
+    }
+
+    use crate::domain::fs::FsEntry;
+    use async_trait::async_trait;
+
+    #[derive(Default)]
+    struct RenameState {
+        files: HashMap<String, Vec<u8>>,
+        calls: Vec<String>,
+        fail_final_rename: bool,
+        target_renames: usize,
+    }
+
+    struct RenameMock {
+        state: Arc<Mutex<RenameState>>,
+    }
+
+    fn mock_entry(path: &str, size: usize) -> FsEntry {
+        FsEntry {
+            name: remote_leaf(path).unwrap_or_else(|_| path.to_string()),
+            path: path.to_string(),
+            kind: EntryKind::File,
+            size: size as f64,
+            modified_at: None,
+            permissions: None,
+            owner: None,
+            group: None,
+            link_target: None,
+            hidden: false,
+            metadata_complete: true,
+        }
+    }
+
+    fn mock_client(
+        files: &[(&str, &[u8])],
+        fail_final_rename: bool,
+    ) -> (RenameMock, Arc<Mutex<RenameState>>) {
+        let mut state = RenameState {
+            fail_final_rename,
+            ..Default::default()
+        };
+        for (path, data) in files {
+            state.files.insert((*path).to_string(), data.to_vec());
+        }
+        let state = Arc::new(Mutex::new(state));
+        (
+            RenameMock {
+                state: state.clone(),
+            },
+            state,
+        )
+    }
+
+    #[async_trait]
+    impl RemoteFs for RenameMock {
+        async fn list(&mut self, _path: &str) -> Result<crate::domain::fs::Listing, AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn stat(&mut self, path: &str) -> Result<FsEntry, AppError> {
+            let state = self.state.lock().expect("mock lock poisoned");
+            state
+                .files
+                .get(path)
+                .map(|data| mock_entry(path, data.len()))
+                .ok_or_else(|| AppError::new(ErrorCode::NotFound, "That item does not exist."))
+        }
+
+        async fn mkdir(&mut self, _parent: &str, _name: &str) -> Result<FsEntry, AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError> {
+            let parent = remote_parent(path)?.unwrap_or_else(|| "/".to_string());
+            let target = join_remote(&parent, new_name)?;
+            let mut state = self.state.lock().expect("mock lock poisoned");
+            state.calls.push(format!("rename {path} -> {target}"));
+            if target == path {
+                return state
+                    .files
+                    .get(path)
+                    .map(|data| mock_entry(path, data.len()))
+                    .ok_or_else(|| {
+                        AppError::new(ErrorCode::NotFound, "That item does not exist.")
+                    });
+            }
+            if target == "/dir/target.txt" {
+                state.target_renames += 1;
+                if state.fail_final_rename && state.target_renames == 2 {
+                    return Err(AppError::new(
+                        ErrorCode::Protocol,
+                        "The final rename failed.",
+                    ));
+                }
+            }
+            let Some(data) = state.files.remove(path) else {
+                return Err(AppError::new(
+                    ErrorCode::NotFound,
+                    "That item does not exist.",
+                ));
+            };
+            if state.files.contains_key(&target) {
+                state.files.insert(path.to_string(), data);
+                return Err(AppError::new(ErrorCode::Protocol, "The target exists."));
+            }
+            let size = data.len();
+            state.files.insert(target.clone(), data);
+            Ok(mock_entry(&target, size))
+        }
+
+        async fn delete(&mut self, path: &str, _recursive: bool) -> Result<(), AppError> {
+            let mut state = self.state.lock().expect("mock lock poisoned");
+            state.calls.push(format!("delete {path}"));
+            state
+                .files
+                .remove(path)
+                .map(|_| ())
+                .ok_or_else(|| AppError::new(ErrorCode::NotFound, "That item does not exist."))
+        }
+
+        async fn chmod(&mut self, _path: &str, _mode: u32) -> Result<(), AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn open_read(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn FileReader>, AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn open_write(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn FileWriter>, AppError> {
+            unimplemented!("not used by these tests")
+        }
+
+        async fn disconnect(&mut self) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> crate::domain::fs::FsCapabilities {
+            crate::domain::fs::FsCapabilities::local()
+        }
+    }
+
+    #[tokio::test]
+    async fn atomic_upload_replaces_the_previous_file() {
+        let temp = "/dir/.target.txt.sftply-part-abc";
+        let (mock, state) = mock_client(&[("/dir/target.txt", b"old"), (temp, b"new")], false);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        replace_remote_file(
+            &mut client,
+            temp,
+            "/dir/target.txt",
+            "abc",
+            ConflictPolicy::Overwrite,
+        )
+        .await
+        .expect("replace the existing file");
+
+        let state = state.lock().expect("mock lock poisoned");
+        assert_eq!(
+            state.files.get("/dir/target.txt").map(Vec::as_slice),
+            Some(&b"new"[..])
+        );
+        assert!(!state.files.contains_key(temp));
+        assert!(
+            !state
+                .files
+                .contains_key("/dir/.target.txt.sftply-backup-abc")
+        );
+        assert!(
+            state
+                .calls
+                .iter()
+                .any(|call| call.starts_with("delete /dir/.target.txt.sftply-backup-abc"))
+        );
+    }
+
+    #[tokio::test]
+    async fn atomic_upload_restores_the_previous_file_when_the_final_rename_fails() {
+        let temp = "/dir/.target.txt.sftply-part-abc";
+        let (mock, state) = mock_client(&[("/dir/target.txt", b"old"), (temp, b"new")], true);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let error = replace_remote_file(
+            &mut client,
+            temp,
+            "/dir/target.txt",
+            "abc",
+            ConflictPolicy::Overwrite,
+        )
+        .await
+        .expect_err("the final rename must fail");
+
+        assert_eq!(error.code, ErrorCode::Protocol);
+        let state = state.lock().expect("mock lock poisoned");
+        assert_eq!(
+            state.files.get("/dir/target.txt").map(Vec::as_slice),
+            Some(&b"old"[..])
+        );
+        assert_eq!(state.files.get(temp).map(Vec::as_slice), Some(&b"new"[..]));
+        assert!(
+            !state
+                .files
+                .contains_key("/dir/.target.txt.sftply-backup-abc")
+        );
     }
 }

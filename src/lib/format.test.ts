@@ -23,6 +23,13 @@ describe("formatBytes", () => {
     expect(formatBytes(100 * 1024 * 1024)).toBe("100 MB")
   })
 
+  it("keeps large values in the right unit", () => {
+    // Values above 4 GiB must not wrap or fall back to a smaller unit.
+    expect(formatBytes(5 * 1024 ** 3)).toBe("5.00 GB")
+    expect(formatBytes(1024 ** 4)).toBe("1.00 TB")
+    expect(formatBytes(Number.MAX_SAFE_INTEGER)).toBe("8.00 PB")
+  })
+
   it("handles invalid values honestly", () => {
     expect(formatBytes(-1)).toBe("—")
     expect(formatBytes(Number.NaN)).toBe("—")
