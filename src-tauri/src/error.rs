@@ -102,6 +102,23 @@ impl std::error::Error for AppError {}
 
 impl From<std::io::Error> for AppError {
     fn from(error: std::io::Error) -> Self {
-        Self::internal("A filesystem operation failed.", error.to_string()).retryable()
+        let message = match error.kind() {
+            std::io::ErrorKind::StorageFull => "The disk is full.",
+            _ => "A filesystem operation failed.",
+        };
+        Self::internal(message, error.to_string()).retryable()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_a_full_disk_to_an_honest_message() {
+        let error = AppError::from(std::io::Error::from(std::io::ErrorKind::StorageFull));
+        assert_eq!(error.code, ErrorCode::Internal);
+        assert_eq!(error.message, "The disk is full.");
+        assert!(error.retryable);
     }
 }

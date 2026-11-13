@@ -407,6 +407,7 @@ fn io_error(error: std::io::Error, action: &str, path: &Path) -> AppError {
             "An item with that name already exists.",
         ),
         ErrorKind::InvalidInput => (ErrorCode::InvalidInput, "That path is not valid."),
+        ErrorKind::StorageFull => (ErrorCode::Internal, "The disk is full."),
         _ => (ErrorCode::Internal, "A filesystem operation failed."),
     };
 
@@ -551,6 +552,9 @@ mod tests {
             path,
         );
         assert_eq!(denied.code, ErrorCode::PermissionDenied);
+        let full = io_error(std::io::Error::from(ErrorKind::StorageFull), "write", path);
+        assert_eq!(full.code, ErrorCode::Internal);
+        assert_eq!(full.message, "The disk is full.");
     }
 
     #[tokio::test]

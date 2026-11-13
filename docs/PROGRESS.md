@@ -181,7 +181,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4c: stalled sockets time out after 60 s idle and cancellation interrupts stalled reads/writes
 - [x] 4c: retry uses a fresh id and partial file, then replaces the same target (no duplicate copy)
 - [x] 4c: end-to-end pipeline tests cover success, cancel and broken connections with an in-memory remote
-- [ ] 4c: remaining hardening (>4 GiB transfers, disk-full/auth expiry/permission-change matrix, event-rate profiling)
+- [x] 4c: disk-full errors map to an honest local/server message
+- [ ] 4c: remaining hardening (>4 GiB transfer run, auth expiry/permission-change matrix, event-rate profiling)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
@@ -951,3 +952,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 4c: the remaining server matrix (disk-full, auth expiry, permission changes) and event-rate profiling.
+
+### 2026-11-13 — Session 25: honest disk-full errors
+
+**Changed**
+
+- Local write failures caused by a full disk (`ENOSPC`) now report **"The disk is full."** instead of the generic "A filesystem operation failed." The same mapping applies to `LocalWriter` and to the local filesystem operations that use `io_error`.
+- FTP replies `552 ExceededStorage`, and `452` replies whose text mentions space, storage or quota, now report **"The server does not have enough space for that file."** Other `452` replies keep the generic rejection message.
+- SFTP `Failure` responses whose message mentions "no space", "disk full" or "quota" now report the same server-side message. The sanitized server text remains in `detail` for diagnostics.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (96 passed, 18 ignored). New tests cover the local `From<io::Error>` mapping, the local `io_error` mapping, FTP `552`/`452`, and an SFTP failure with "No space left on device".
+
+**Next**
+
+- Continue Phase 4c: auth expiry/permission-change matrix and event-rate profiling.

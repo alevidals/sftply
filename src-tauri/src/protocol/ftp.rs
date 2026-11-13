@@ -698,6 +698,21 @@ fn map_status(status: suppaftp::Status, body: &[u8]) -> AppError {
             (ErrorCode::Network, "The server closed the connection.")
         }
         Status::TransferAborted => (ErrorCode::Network, "The server aborted the operation."),
+        Status::ExceededStorage => (
+            ErrorCode::Protocol,
+            "The server does not have enough space for that file.",
+        ),
+        Status::RequestedActionNotTaken => {
+            let lower = detail.to_ascii_lowercase();
+            if lower.contains("space") || lower.contains("storage") || lower.contains("quota") {
+                (
+                    ErrorCode::Protocol,
+                    "The server does not have enough space for that file.",
+                )
+            } else {
+                (ErrorCode::Protocol, "The server rejected the operation.")
+            }
+        }
         _ => (ErrorCode::Protocol, "The server rejected the request."),
     };
     AppError::new(code, message).with_detail(detail)
@@ -735,6 +750,27 @@ mod tests {
 
         let aborted = map_status(suppaftp::Status::TransferAborted, b"426");
         assert_eq!(aborted.code, ErrorCode::Network);
+
+        let full = map_status(suppaftp::Status::ExceededStorage, b"552 exceeded storage");
+        assert_eq!(
+            full.message,
+            "The server does not have enough space for that file."
+        );
+
+        let transient = map_status(
+            suppaftp::Status::RequestedActionNotTaken,
+            b"452 Sorry, insufficient disk space",
+        );
+        assert_eq!(
+            transient.message,
+            "The server does not have enough space for that file."
+        );
+
+        let other = map_status(
+            suppaftp::Status::RequestedActionNotTaken,
+            b"452 Try again later",
+        );
+        assert_eq!(other.message, "The server rejected the operation.");
     }
 
     #[test]

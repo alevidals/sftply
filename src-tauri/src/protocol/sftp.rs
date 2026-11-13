@@ -571,24 +571,39 @@ fn map_transfer_io(error: std::io::Error) -> AppError {
 fn map_sftp_error(error: SftpError) -> AppError {
     match error {
         SftpError::Status(status) => {
-            let (code, message) = match status.status_code {
-                StatusCode::NoSuchFile => (ErrorCode::NotFound, "That remote item does not exist."),
-                StatusCode::PermissionDenied => (
-                    ErrorCode::PermissionDenied,
-                    "You do not have permission for that item.",
-                ),
-                StatusCode::OpUnsupported => (
-                    ErrorCode::Unsupported,
-                    "The server does not support that operation.",
-                ),
-                StatusCode::NoConnection | StatusCode::ConnectionLost => (
-                    ErrorCode::SessionNotReady,
-                    "The SFTP session was disconnected.",
-                ),
-                StatusCode::Failure => (ErrorCode::Protocol, "The server rejected the request."),
-                _ => (ErrorCode::Protocol, "The server rejected the request."),
-            };
             let detail = sanitize_detail(&status.error_message);
+            let lower = detail.to_ascii_lowercase();
+            let out_of_space = lower.contains("no space")
+                || lower.contains("disk full")
+                || lower.contains("quota");
+            let (code, message) = if out_of_space {
+                (
+                    ErrorCode::Protocol,
+                    "The server does not have enough space for that file.",
+                )
+            } else {
+                match status.status_code {
+                    StatusCode::NoSuchFile => {
+                        (ErrorCode::NotFound, "That remote item does not exist.")
+                    }
+                    StatusCode::PermissionDenied => (
+                        ErrorCode::PermissionDenied,
+                        "You do not have permission for that item.",
+                    ),
+                    StatusCode::OpUnsupported => (
+                        ErrorCode::Unsupported,
+                        "The server does not support that operation.",
+                    ),
+                    StatusCode::NoConnection | StatusCode::ConnectionLost => (
+                        ErrorCode::SessionNotReady,
+                        "The SFTP session was disconnected.",
+                    ),
+                    StatusCode::Failure => {
+                        (ErrorCode::Protocol, "The server rejected the request.")
+                    }
+                    _ => (ErrorCode::Protocol, "The server rejected the request."),
+                }
+            };
             if detail.is_empty() {
                 AppError::new(code, message)
             } else {
@@ -615,6 +630,35 @@ fn map_sftp_error(error: SftpError) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_a_full_remote_disk_to_an_honest_message() {
+        let error = map_sftp_error(SftpError::Status(russh_sftp::protocol::Status {
+            id: 0,
+            status_code: StatusCode::Failure,
+            error_message: "No space left on device".into(),
+            language_tag: String::new(),
+        }));
+        assert_eq!(
+            error.message,
+            "The server does not have enough space for that file."
+        );
+        assert!(
+            error
+                .detail
+                .as_deref()
+                .unwrap_or_default()
+                .contains("No space left")
+        );
+
+        let generic = map_sftp_error(SftpError::Status(russh_sftp::protocol::Status {
+            id: 0,
+            status_code: StatusCode::Failure,
+            error_message: "Operation failed".into(),
+            language_tag: String::new(),
+        }));
+        assert_eq!(generic.message, "The server rejected the request.");
+    }
 
     #[test]
     fn maps_file_attributes_and_masks_type_bits() {
