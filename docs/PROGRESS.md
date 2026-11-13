@@ -209,7 +209,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Tabs polish (overflow, reorder, close behavior)
 - [ ] All empty/loading/error/first-run states
 - [x] Density/column/date/size preferences
-- [ ] Accessibility audit (keyboard, labels, contrast, reduced motion)
+- [x] Accessibility audit (keyboard, labels, contrast, reduced motion)
 - [ ] Startup/scroll/memory performance pass
 - [x] App icon and in-app branding
 - [ ] Product metadata, packaging (macOS signing/notarization; Windows/Linux)
@@ -1104,3 +1104,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: contrast review, remaining empty/error states and packaging metadata.
+
+### 2026-11-13 — Session 34: theme contrast audit
+
+**Changed**
+
+- Added `src/lib/contrast.ts`: hex/`oklch()` parsing, alpha compositing, WCAG relative luminance and contrast ratios. It is dependency-free and only used by tests today.
+- Added a token-level audit that reads `globals.css`, checks every built-in theme, and fails below 4.5:1 for small text: body/card/popover text, muted text on both background and muted surfaces, secondary/accent/primary button pairs, `text-primary`, sidebar and chrome text, sidebar accent over translucent surfaces, and the status colors (`destructive`, `success`, `warning`, `info`) on background, card and popover.
+- Fixed every failing token. The most visible changes: dark-mode primary and sidebar-primary buttons now use dark ink (they were white on light purple at 3.04:1); One Dark, Gruvbox, Nord, Dracula, Solarized Light and Tokyo Night muted text is lighter or darker enough to pass; Solarized Light and Gruvbox Light primary colors were deepened so both the button label and `text-primary` pass; Nord info, Dracula destructive and the light-mode status colors were adjusted to stay readable on cards and menus.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 185 tests in 27 files, production build). New tests cover the color helpers, theme parsing and all contrast pairs; the audit fails the build if a future token change regresses a theme.
+
+**Next**
+
+- Continue Phase 5: remaining empty/error states and packaging/product metadata.
