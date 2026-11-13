@@ -86,6 +86,7 @@ export function RemotePane() {
             return (
               <ContextMenu key={session.id}>
                 <ContextMenuTrigger asChild>
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: the inner button handles activation and the context menu offers keyboard reordering; this wrapper only adds drag-and-drop. */}
                   <div
                     draggable
                     onDragStart={(event) => {

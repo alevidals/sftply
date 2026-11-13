@@ -35,6 +35,8 @@ const MAX_BANDWIDTH_KBPS = 10_000_000
 const settingsSchema = z.object({
   theme: z.enum(THEME_VALUES),
   density: z.enum(["compact", "comfortable"]),
+  sizeFormat: z.enum(["binary", "decimal"]),
+  dateFormat: z.enum(["friendly", "iso"]),
   showHiddenFiles: z.boolean(),
   confirmDelete: z.boolean(),
   transferConcurrency: z.number().int().min(1).max(8),
@@ -58,6 +60,8 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
   return {
     theme: settings.theme,
     density: settings.density,
+    sizeFormat: settings.sizeFormat,
+    dateFormat: settings.dateFormat,
     showHiddenFiles: settings.showHiddenFiles,
     confirmDelete: settings.confirmDelete,
     transferConcurrency: settings.transferConcurrency,
@@ -264,6 +268,52 @@ export function SettingsDialog() {
                     )}
                   />
                 </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium">File sizes</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Binary uses 1 KB = 1024 bytes; decimal uses 1 KB = 1000 bytes.
+                    </p>
+                  </div>
+                  <Controller
+                    control={control}
+                    name="sizeFormat"
+                    render={({ field }) => (
+                      <PreferenceChoices
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: "binary", label: "Binary", hint: "1 KB = 1024 B" },
+                          { value: "decimal", label: "Decimal", hint: "1 KB = 1000 B" },
+                        ]}
+                      />
+                    )}
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium">Dates</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Choose a compact friendly date or an unambiguous ISO timestamp.
+                    </p>
+                  </div>
+                  <Controller
+                    control={control}
+                    name="dateFormat"
+                    render={({ field }) => (
+                      <PreferenceChoices
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: "friendly", label: "Friendly", hint: "Nov 13, 10:30" },
+                          { value: "iso", label: "ISO 8601", hint: "2026-11-13 10:30" },
+                        ]}
+                      />
+                    )}
+                  />
+                </section>
               </TabsContent>
 
               <TabsContent value="behavior" className="space-y-3">
@@ -459,6 +509,42 @@ function SettingRow({
         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {children}
+    </div>
+  )
+}
+
+function PreferenceChoices<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: readonly { value: T; label: string; hint: string }[]
+  onChange: (value: T) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((option) => {
+        const selected = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+              selected ? "border-primary/40 bg-primary/5" : "border-border hover:bg-muted/40",
+            )}
+          >
+            <span>
+              <span className="block text-xs font-medium">{option.label}</span>
+              <span className="block text-2xs text-muted-foreground">{option.hint}</span>
+            </span>
+            {selected ? <CheckIcon className="size-3.5 text-primary" /> : null}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useFormatPreferences } from "@/features/settings/settings-context"
 import type { ConflictChoice } from "@/features/transfers/use-transfer-actions"
 import { errorMessage } from "@/lib/errors"
 import { formatBytes } from "@/lib/format"
@@ -30,6 +31,7 @@ export function TransferConflictDialog({
   onOpenChange,
   onConfirm,
 }: TransferConflictDialogProps) {
+  const { sizeFormat } = useFormatPreferences()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,7 +74,7 @@ export function TransferConflictDialog({
                 {conflict.targetPath}
               </span>
               <span className="shrink-0 tabular text-muted-foreground/80">
-                {conflict.kind === "directory" ? "folder" : formatBytes(conflict.size)}
+                {conflict.kind === "directory" ? "folder" : formatBytes(conflict.size, sizeFormat)}
               </span>
             </div>
           ))}

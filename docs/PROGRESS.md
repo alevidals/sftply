@@ -208,7 +208,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [ ] Context menus everywhere + disabled reasons
 - [ ] Tabs polish (overflow, reorder, close behavior)
 - [ ] All empty/loading/error/first-run states
-- [ ] Density/column/date/size preferences
+- [x] Density/column/date/size preferences
 - [ ] Accessibility audit (keyboard, labels, contrast, reduced motion)
 - [ ] Startup/scroll/memory performance pass
 - [x] App icon and in-app branding
@@ -1052,3 +1052,21 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: date/size format preferences and the accessibility audit.
+
+### 2026-11-13 — Session 31: size and date format preferences
+
+**Changed**
+
+- Added persisted `sizeFormat` (`binary` / `decimal`) and `dateFormat` (`friendly` / `iso`) settings. Older settings files keep working because the struct fills missing fields from its defaults.
+- `formatBytes` now accepts the size base: binary keeps 1 KB = 1024 B, decimal uses 1 KB = 1000 B. `formatModified` accepts the date style: friendly keeps the compact current-year format, ISO renders `YYYY-MM-DD HH:mm` in local time.
+- File table, transfer list, transfer history, conflict dialog and status bar all follow the preferences. A `useFormatPreferences` hook falls back to the defaults when a presentational component is rendered without the settings provider.
+- The Appearance settings tab gained two option groups with plain-language hints and live selection state.
+
+**Verified**
+
+- Rust: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (101 passed, 18 ignored). A new test proves a settings file without the new fields loads with the defaults.
+- Frontend: `bun run check` (typecheck, Biome, 161 tests in 24 files, production build). New tests cover decimal sizes, ISO timestamps and saving both preferences from the dialog.
+
+**Next**
+
+- Continue Phase 5: accessibility audit (keyboard walkthrough, labels, focus restoration, reduced motion).

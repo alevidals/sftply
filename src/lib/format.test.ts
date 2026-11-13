@@ -34,6 +34,15 @@ describe("formatBytes", () => {
     expect(formatBytes(-1)).toBe("—")
     expect(formatBytes(Number.NaN)).toBe("—")
   })
+
+  it("switches to decimal units when requested", () => {
+    expect(formatBytes(999, "decimal")).toBe("999 B")
+    expect(formatBytes(1000, "decimal")).toBe("1.00 KB")
+    expect(formatBytes(1500, "decimal")).toBe("1.50 KB")
+    expect(formatBytes(1024, "decimal")).toBe("1.02 KB")
+    expect(formatBytes(1_000_000, "decimal")).toBe("1.00 MB")
+    expect(formatBytes(5 * 1000 ** 3, "decimal")).toBe("5.00 GB")
+  })
 })
 
 describe("formatCount", () => {
@@ -79,5 +88,11 @@ describe("formatModified", () => {
     expect(formatModified(1_700_000_000_000)).toMatch(/\d/)
     expect(formatModified(null)).toBe("—")
     expect(formatModified(Number.NaN)).toBe("—")
+  })
+
+  it("renders an unambiguous ISO timestamp when requested", () => {
+    const date = new Date(2026, 0, 5, 9, 7)
+    expect(formatModified(date.getTime(), "iso")).toBe("2026-01-05 09:07")
+    expect(formatModified(null, "iso")).toBe("—")
   })
 })

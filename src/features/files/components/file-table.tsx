@@ -25,6 +25,7 @@ import { FileEntryIcon } from "@/features/files/components/file-entry-icon"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
 import { entryNameError } from "@/features/files/model/names"
 import type { SelectionMode, SelectionState } from "@/features/files/model/selection"
+import { useFormatPreferences } from "@/features/settings/settings-context"
 import {
   clearTransferDrag,
   isTransferDrag,
@@ -110,6 +111,7 @@ export function FileTable({
   })
   const [contextIndex, setContextIndex] = useState<number | null>(null)
   const [dropPath, setDropPath] = useState<string | null>(null)
+  const { sizeFormat, dateFormat } = useFormatPreferences()
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -365,14 +367,14 @@ export function FileTable({
                     role="gridcell"
                     className="truncate text-right font-mono text-2xs text-muted-foreground tabular"
                   >
-                    {entry.kind === "directory" ? "—" : formatBytes(entry.size)}
+                    {entry.kind === "directory" ? "—" : formatBytes(entry.size, sizeFormat)}
                   </div>
 
                   <div
                     role="gridcell"
                     className="truncate text-right text-2xs text-muted-foreground tabular"
                   >
-                    {formatModified(entry.modifiedAt)}
+                    {formatModified(entry.modifiedAt, dateFormat)}
                   </div>
 
                   {columns.permissions ? (

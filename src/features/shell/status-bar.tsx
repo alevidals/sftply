@@ -107,7 +107,9 @@ export function StatusBar() {
           <ArrowDownUpIcon className="size-3" />
           <span className="tabular">{activeTransfers}</span>
           {transferSpeed > 0 ? (
-            <span className="tabular text-muted-foreground/70">{formatBytes(transferSpeed)}/s</span>
+            <span className="tabular text-muted-foreground/70">
+              {formatBytes(transferSpeed, settings.sizeFormat)}/s
+            </span>
           ) : null}
         </StatusButton>
 

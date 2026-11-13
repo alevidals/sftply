@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useFormatPreferences } from "@/features/settings/settings-context"
 import { TRANSFER_HISTORY_QUERY_KEY, transfersApi } from "@/features/transfers/api"
 import { errorMessage } from "@/lib/errors"
 import { formatBytes, formatClock } from "@/lib/format"
@@ -120,6 +121,7 @@ export function TransferHistoryList() {
 function HistoryRow({ entry }: { entry: TransferHistoryEntry_Serialize }) {
   const meta = STATUS_META[entry.status]
   const Icon = meta.icon
+  const { sizeFormat } = useFormatPreferences()
   const DirectionIcon = entry.direction === "upload" ? ArrowUpFromLineIcon : ArrowDownToLineIcon
 
   return (
@@ -144,7 +146,7 @@ function HistoryRow({ entry }: { entry: TransferHistoryEntry_Serialize }) {
         {meta.label}
       </span>
       <span className="w-20 shrink-0 text-right font-mono text-2xs text-muted-foreground tabular">
-        {formatBytes(entry.transferred)} / {formatBytes(entry.size)}
+        {formatBytes(entry.transferred, sizeFormat)} / {formatBytes(entry.size, sizeFormat)}
       </span>
       <time
         className="w-12 shrink-0 text-right font-mono text-2xs text-muted-foreground/80 tabular"

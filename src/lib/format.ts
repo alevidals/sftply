@@ -1,12 +1,15 @@
+import type { DateFormat, SizeFormat } from "@/lib/ipc/bindings"
+
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const
 
-/** Format a byte count using binary units and at most two decimals. */
-export function formatBytes(bytes: number): string {
+/** Format a byte count using the selected base and at most two decimals. */
+export function formatBytes(bytes: number, format: SizeFormat = "binary"): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—"
-  if (bytes < 1024) return `${Math.round(bytes)} B`
+  const base = format === "decimal" ? 1000 : 1024
+  if (bytes < base) return `${Math.round(bytes)} B`
 
-  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), BYTE_UNITS.length - 1)
-  const value = bytes / 1024 ** exponent
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(base)), BYTE_UNITS.length - 1)
+  const value = bytes / base ** exponent
   const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2
   const unit = BYTE_UNITS[exponent] ?? "B"
 
@@ -61,9 +64,16 @@ const fileDateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 })
 
 /** Format a file modification timestamp compactly for a dense table. */
-export function formatModified(timestampMs: number | null | undefined): string {
+export function formatModified(
+  timestampMs: number | null | undefined,
+  format: DateFormat = "friendly",
+): string {
   if (timestampMs == null || !Number.isFinite(timestampMs)) return "—"
   const date = new Date(timestampMs)
+  if (format === "iso") {
+    const pad = (value: number) => String(value).padStart(2, "0")
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
   const now = new Date()
   return date.getFullYear() === now.getFullYear()
     ? fileDateTimeFormatter.format(date)

@@ -28,6 +28,24 @@ pub enum Density {
     Comfortable,
 }
 
+/// Base used when formatting byte counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SizeFormat {
+    #[default]
+    Binary,
+    Decimal,
+}
+
+/// How file modification timestamps are displayed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DateFormat {
+    #[default]
+    Friendly,
+    Iso,
+}
+
 /// Persisted user settings. Secrets must never be added to this struct.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", default)]
@@ -35,6 +53,8 @@ pub struct AppSettings {
     pub schema_version: u32,
     pub theme: ThemeMode,
     pub density: Density,
+    pub size_format: SizeFormat,
+    pub date_format: DateFormat,
     pub show_hidden_files: bool,
     pub confirm_delete: bool,
     pub transfer_concurrency: u8,
@@ -56,6 +76,8 @@ impl Default for AppSettings {
             schema_version: SETTINGS_SCHEMA_VERSION,
             theme: ThemeMode::Dark,
             density: Density::Compact,
+            size_format: SizeFormat::Binary,
+            date_format: DateFormat::Friendly,
             show_hidden_files: false,
             confirm_delete: true,
             transfer_concurrency: 3,
@@ -180,6 +202,14 @@ mod tests {
             assert_eq!(serde_json::from_str::<ThemeMode>(&json).unwrap(), theme);
             assert_eq!(serde_json::to_string(&theme).unwrap(), json);
         }
+    }
+
+    #[test]
+    fn missing_format_fields_use_defaults() {
+        let json = r#"{"schemaVersion":1,"theme":"dark","density":"compact"}"#;
+        let settings: AppSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(settings.size_format, SizeFormat::Binary);
+        assert_eq!(settings.date_format, DateFormat::Friendly);
     }
 
     #[test]

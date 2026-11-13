@@ -14,7 +14,7 @@ import { BrandMark } from "@/components/brand"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { normalizeError } from "@/lib/errors"
-import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
+import type { AppSettings_Serialize, DateFormat, SizeFormat } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 import {
   applyDocumentDensity,
@@ -146,6 +146,21 @@ export function useSettings(): SettingsContextValue {
   const value = useContext(SettingsContext)
   if (!value) throw new Error("useSettings must be used inside SettingsProvider")
   return value
+}
+
+/**
+ * Formatting preferences with safe defaults, so presentational components can
+ * be tested without mounting the full settings provider.
+ */
+export function useFormatPreferences(): {
+  sizeFormat: SizeFormat
+  dateFormat: DateFormat
+} {
+  const value = useContext(SettingsContext)
+  return {
+    sizeFormat: value?.settings.sizeFormat ?? "binary",
+    dateFormat: value?.settings.dateFormat ?? "friendly",
+  }
 }
 
 function BootScreen() {

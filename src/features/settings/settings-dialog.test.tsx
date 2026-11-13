@@ -35,6 +35,8 @@ const settings: AppSettings_Serialize = {
   schemaVersion: 1,
   theme: "dark",
   density: "compact",
+  sizeFormat: "binary",
+  dateFormat: "friendly",
   showHiddenFiles: false,
   confirmDelete: true,
   transferConcurrency: 3,
@@ -110,6 +112,21 @@ describe("SettingsDialog", () => {
     await waitFor(() =>
       expect(state.updateSettings).toHaveBeenCalledWith(
         expect.objectContaining({ bandwidthLimitKbps: 512 }),
+      ),
+    )
+  })
+
+  it("saves size and date format preferences", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("button", { name: /Decimal/ }))
+    await user.click(screen.getByRole("button", { name: /ISO 8601/ }))
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() =>
+      expect(state.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ sizeFormat: "decimal", dateFormat: "iso" }),
       ),
     )
   })

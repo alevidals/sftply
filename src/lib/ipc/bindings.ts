@@ -144,6 +144,8 @@ export type AppSettings_Deserialize = {
 	schemaVersion?: number,
 	theme?: ThemeMode,
 	density?: Density,
+	sizeFormat?: SizeFormat,
+	dateFormat?: DateFormat,
 	showHiddenFiles?: boolean,
 	confirmDelete?: boolean,
 	transferConcurrency?: number,
@@ -164,6 +166,8 @@ export type AppSettings_Serialize = {
 	schemaVersion: number,
 	theme: ThemeMode,
 	density: Density,
+	sizeFormat: SizeFormat,
+	dateFormat: DateFormat,
 	showHiddenFiles: boolean,
 	confirmDelete: boolean,
 	transferConcurrency: number,
@@ -274,6 +278,9 @@ export type ConnectionProfile_Serialize = {
 };
 
 export type ConnectionProtocol = "ftp" | "ftpsExplicit" | "ftpsImplicit" | "sftp";
+
+/**  How file modification timestamps are displayed. */
+export type DateFormat = "friendly" | "iso";
 
 export type Density = "compact" | "comfortable";
 
@@ -490,6 +497,9 @@ export type SessionStateEvent_Serialize = {
 	/**  Unix epoch milliseconds, UTC. */
 	timestamp: number,
 };
+
+/**  Base used when formatting byte counts. */
+export type SizeFormat = "binary" | "decimal";
 
 /**
  *  One-shot diagnostics produced while the app starts. Fetched by the frontend

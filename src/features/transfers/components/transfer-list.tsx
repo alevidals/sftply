@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/context-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useFormatPreferences } from "@/features/settings/settings-context"
 import { transfersApi } from "@/features/transfers/api"
 import { copyText } from "@/lib/clipboard"
 import { errorMessage } from "@/lib/errors"
@@ -61,6 +62,7 @@ export function TransferList() {
   const speed = useTransferStore(selectTransferSpeed)
   const paused = useTransferStore((state) => state.paused)
   const setPaused = useTransferStore((state) => state.setPaused)
+  const { sizeFormat } = useFormatPreferences()
   const scrollRef = useRef<HTMLDivElement>(null)
   const hasFinished = order.some((id) => {
     const item = items[id]
@@ -131,7 +133,7 @@ export function TransferList() {
       <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border/60 px-3 text-2xs text-muted-foreground">
         <span className="tabular">
           {activeCount === 0 ? "Idle" : `${activeCount} active`}
-          {speed > 0 ? ` · ${formatBytes(speed)}/s` : ""}
+          {speed > 0 ? ` · ${formatBytes(speed, sizeFormat)}/s` : ""}
         </span>
         <span className="ml-auto flex items-center gap-1">
           {paused ? <span className="mr-1 text-warning">Queue paused</span> : null}
@@ -216,6 +218,7 @@ function TransferRow({
 }) {
   const meta = STATUS_META[item.status]
   const Icon = meta.icon
+  const { sizeFormat } = useFormatPreferences()
   const DirectionIcon = item.direction === "upload" ? ArrowUpFromLineIcon : ArrowDownToLineIcon
   const percent =
     item.size > 0
@@ -273,8 +276,8 @@ function TransferRow({
             </span>
             <span className="w-28 shrink-0 text-right font-mono text-2xs text-muted-foreground tabular">
               {item.status === "running"
-                ? `${formatBytes(item.bytesPerSec)}/s`
-                : `${formatBytes(item.transferred)} / ${formatBytes(item.size)}`}
+                ? `${formatBytes(item.bytesPerSec, sizeFormat)}/s`
+                : `${formatBytes(item.transferred, sizeFormat)} / ${formatBytes(item.size, sizeFormat)}`}
             </span>
             {cancellable ? (
               <Tooltip>
@@ -341,7 +344,9 @@ function TransferRow({
               {item.sourceLabel} → {item.targetLabel}
             </span>
             <span className="ml-auto shrink-0 tabular">
-              {item.status === "completed" ? formatBytes(item.size) : `${Math.round(percent)}%`}
+              {item.status === "completed"
+                ? formatBytes(item.size, sizeFormat)
+                : `${Math.round(percent)}%`}
             </span>
           </div>
         </div>
