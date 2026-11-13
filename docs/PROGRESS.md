@@ -178,7 +178,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4b: recursive jobs, queue control, retry, in-app drag-and-drop (pause is queue-level only)
 - [x] 4b: shared bandwidth limiter and live concurrency changes
 - [x] 4c: atomic uploads (hidden temp + rename, backup/restore on overwrite) and download temp cleanup
-- [ ] 4c: hardening (large files, broken connections, server matrix)
+- [x] 4c: stalled sockets time out after 60 s idle and cancellation interrupts stalled reads/writes
+- [ ] 4c: remaining hardening (>4 GiB transfers, disk-full/auth expiry/permission-change matrix, event-rate profiling)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
@@ -896,3 +897,22 @@ which is only correct for local client connections. See
 
 - Verify a failed/cancelled upload preserves the previous remote file in the real Tauri window against the dev FTP container; restart `bun run tauri -- dev` first because the change is in Rust.
 - Continue Phase 4c: broken connections, retry duplicate-data proof, and the wider server matrix.
+
+### 2026-11-13 — Session 22: stalled connections time out and cancel
+
+**Changed**
+
+- Transfer I/O now bounds idle time, not total duration. Every chunk read, chunk write, open and metadata call has a 60-second timeout, so a half-open socket fails with the retryable `TIMEOUT` error instead of leaving the row `Running` and a concurrency slot occupied forever. Large transfers that keep making progress are unaffected.
+- Reads and writes select on the cancellation token, so **Cancel** wins immediately even while the socket is stalled; the pending future is dropped and the existing abort/cleanup path removes the partial upload or download.
+- The protocol `finish()` call (which waits for the server's completion reply) and `disconnect()` are bounded too. Disconnecting a dead control channel no longer delays the final status, and upload finalization is covered by the same timeout with cleanup on expiry.
+- Added `tokio`'s `test-util` feature as a dev-dependency so timeout tests can use paused time instead of sleeping.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (87 passed, 18 ignored). New tests use a never-resolving reader and writer with paused Tokio time to prove the idle timeout yields a retryable `TIMEOUT`, and that cancellation interrupts a stalled read.
+- No frontend changes; the last `bun run check` remains green (148 tests).
+
+**Next**
+
+- Verify cancel-while-stalled and reconnect behavior in the real Tauri window.
+- Continue Phase 4c: retry duplicate-data proof and the remaining server matrix (disk-full, auth expiry, permission changes).

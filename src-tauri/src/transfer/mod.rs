@@ -28,6 +28,13 @@ use history::TransferHistoryStore;
 
 const CHUNK_SIZE: usize = 64 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
+/// A transfer can legitimately run for hours, so this bounds idle time between
+/// chunks and metadata replies, not total duration. A dead socket must not
+/// leave a row "running" and a concurrency slot occupied forever.
+const TRANSFER_IO_TIMEOUT: Duration = Duration::from_secs(60);
+/// Closing a connection is best effort; a dead control channel must not delay
+/// the final status.
+const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 /// Most servers and filesystems cap a single name at 255 bytes. Partial and
 /// backup names are kept below that limit even when the target name is at it.
 const PARTIAL_NAME_MAX_BYTES: usize = 255;
@@ -492,7 +499,7 @@ async fn run_job(
             })?;
             let mut client = connect_remote(access).await?;
             let result = download(app, manager, item, &mut client, job.policy, token).await;
-            let _ = client.disconnect().await;
+            let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
             result
         }
         TransferDirection::Upload => {
@@ -501,7 +508,7 @@ async fn run_job(
             })?;
             let mut client = connect_remote(access).await?;
             let result = upload(app, manager, item, &mut client, job.policy, token).await;
-            let _ = client.disconnect().await;
+            let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
             result
         }
     }
@@ -538,7 +545,7 @@ pub(crate) async fn ensure_remote_dir(
     let mut current = "/".to_string();
     for segment in dir.trim_start_matches('/').split('/') {
         let next = join_remote(&current, segment)?;
-        match client.stat(&next).await {
+        match remote_call(client.stat(&next)).await {
             Ok(entry) if entry.kind == EntryKind::Directory => {}
             Ok(_) => {
                 return Err(AppError::new(
@@ -548,7 +555,7 @@ pub(crate) async fn ensure_remote_dir(
                 .with_detail(next));
             }
             Err(error) if error.code == ErrorCode::NotFound => {
-                client.mkdir(&current, segment).await?;
+                remote_call(client.mkdir(&current, segment)).await?;
             }
             Err(error) => return Err(error),
         }
@@ -576,7 +583,7 @@ async fn download(
     }
     ensure_local_parent(&target).await?;
     let temp = temp_download_path(&target, &item.id);
-    let mut reader = client.open_read(&item.source_path, 0).await?;
+    let mut reader = remote_call(client.open_read(&item.source_path, 0)).await?;
     let mut writer: Box<dyn FileWriter> = Box::new(LocalWriter::open(&temp, 0).await?);
 
     if let Err(error) = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await {
@@ -584,12 +591,12 @@ async fn download(
         remove_local_temp(&temp).await;
         return Err(error);
     }
-    if let Err(error) = reader.finish().await {
+    if let Err(error) = finish_reader(reader).await {
         let _ = writer.abort().await;
         remove_local_temp(&temp).await;
         return Err(error);
     }
-    if let Err(error) = writer.finish().await {
+    if let Err(error) = finish_writer(writer).await {
         remove_local_temp(&temp).await;
         return Err(error);
     }
@@ -635,29 +642,40 @@ async fn upload(
     };
 
     let mut reader: Box<dyn FileReader> = Box::new(LocalReader::open(&item.source_path, 0).await?);
-    let mut writer = client.open_write(&upload_path, 0).await?;
+    let mut writer = remote_call(client.open_write(&upload_path, 0)).await?;
 
     if let Err(error) = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await {
         let _ = writer.abort().await;
         cleanup_remote_upload(client, &upload_path).await;
         return Err(error);
     }
-    if let Err(error) = reader.finish().await {
+    if let Err(error) = finish_reader(reader).await {
         let _ = writer.abort().await;
         cleanup_remote_upload(client, &upload_path).await;
         return Err(error);
     }
-    if let Err(error) = writer.finish().await {
+    if let Err(error) = finish_writer(writer).await {
         cleanup_remote_upload(client, &upload_path).await;
         return Err(error);
     }
 
-    if atomic
-        && let Err(error) =
-            replace_remote_file(client, &upload_path, &target, &item.id, policy).await
-    {
-        cleanup_remote_upload(client, &upload_path).await;
-        return Err(error);
+    if atomic {
+        match tokio::time::timeout(
+            TRANSFER_IO_TIMEOUT,
+            replace_remote_file(client, &upload_path, &target, &item.id, policy),
+        )
+        .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                cleanup_remote_upload(client, &upload_path).await;
+                return Err(error);
+            }
+            Err(_) => {
+                cleanup_remote_upload(client, &upload_path).await;
+                return Err(crate::session::timeout_error());
+            }
+        }
     }
     Ok(())
 }
@@ -729,7 +747,7 @@ async fn copy_stream(
         if token.is_cancelled() {
             return Err(cancelled());
         }
-        let read = reader.read(&mut buffer).await?;
+        let read = read_chunk(&mut *reader, &mut buffer, token).await?;
         if read == 0 {
             break;
         }
@@ -739,7 +757,7 @@ async fn copy_stream(
             if token.is_cancelled() {
                 return Err(cancelled());
             }
-            let count = writer.write(&buffer[written..read]).await?;
+            let count = write_chunk(&mut *writer, &buffer[written..read], token).await?;
             if count == 0 {
                 return Err(AppError::new(
                     ErrorCode::Network,
@@ -783,6 +801,48 @@ fn update_progress(item: &mut TransferItem, started: Instant) {
 
 fn cancelled() -> AppError {
     AppError::new(ErrorCode::Cancelled, "The transfer was cancelled.")
+}
+
+/// Bound a metadata or open call so a half-open socket cannot hang a transfer.
+async fn remote_call<T>(
+    future: impl std::future::Future<Output = Result<T, AppError>>,
+) -> Result<T, AppError> {
+    tokio::time::timeout(TRANSFER_IO_TIMEOUT, future)
+        .await
+        .unwrap_or_else(|_| Err(crate::session::timeout_error()))
+}
+
+/// Read one chunk, observing cancellation while the socket is stalled.
+async fn read_chunk(
+    reader: &mut dyn FileReader,
+    buffer: &mut [u8],
+    token: &CancellationToken,
+) -> Result<usize, AppError> {
+    tokio::select! {
+        _ = token.cancelled() => Err(cancelled()),
+        result = remote_call(reader.read(buffer)) => result,
+    }
+}
+
+/// Write one chunk, observing cancellation while the socket is stalled.
+async fn write_chunk(
+    writer: &mut dyn FileWriter,
+    buffer: &[u8],
+    token: &CancellationToken,
+) -> Result<usize, AppError> {
+    tokio::select! {
+        _ = token.cancelled() => Err(cancelled()),
+        result = remote_call(writer.write(buffer)) => result,
+    }
+}
+
+/// `finish` reads the protocol's completion reply, which can also stall.
+async fn finish_reader(reader: Box<dyn FileReader>) -> Result<(), AppError> {
+    remote_call(reader.finish()).await
+}
+
+async fn finish_writer(writer: Box<dyn FileWriter>) -> Result<(), AppError> {
+    remote_call(writer.finish()).await
 }
 
 fn normalize_local_target(path: &str) -> Result<String, AppError> {
@@ -902,7 +962,7 @@ async fn unique_local_target(target: &str) -> Result<String, AppError> {
 }
 
 async fn remote_exists(client: &mut Box<dyn RemoteFs>, path: &str) -> Result<bool, AppError> {
-    match client.stat(path).await {
+    match remote_call(client.stat(path)).await {
         Ok(_) => Ok(true),
         Err(error) if error.code == ErrorCode::NotFound => Ok(false),
         Err(error) => Err(error),
@@ -1278,5 +1338,73 @@ mod tests {
                 .files
                 .contains_key("/dir/.target.txt.sftply-backup-abc")
         );
+    }
+
+    struct HangingReader;
+
+    #[async_trait]
+    impl FileReader for HangingReader {
+        async fn read(&mut self, _buf: &mut [u8]) -> Result<usize, AppError> {
+            std::future::pending().await
+        }
+
+        async fn finish(self: Box<Self>) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    struct HangingWriter;
+
+    #[async_trait]
+    impl FileWriter for HangingWriter {
+        async fn write(&mut self, _buf: &[u8]) -> Result<usize, AppError> {
+            std::future::pending().await
+        }
+
+        async fn finish(self: Box<Self>) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        async fn abort(self: Box<Self>) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_stalled_read_times_out_instead_of_hanging() {
+        let token = CancellationToken::new();
+        let mut reader: Box<dyn FileReader> = Box::new(HangingReader);
+        let mut buffer = [0u8; 8];
+
+        let error = read_chunk(&mut *reader, &mut buffer, &token)
+            .await
+            .expect_err("a stalled read must fail");
+        assert_eq!(error.code, ErrorCode::Timeout);
+        assert!(error.retryable);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_stalled_write_times_out_instead_of_hanging() {
+        let token = CancellationToken::new();
+        let mut writer: Box<dyn FileWriter> = Box::new(HangingWriter);
+
+        let error = write_chunk(&mut *writer, b"payload", &token)
+            .await
+            .expect_err("a stalled write must fail");
+        assert_eq!(error.code, ErrorCode::Timeout);
+        assert!(error.retryable);
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_a_stalled_read() {
+        let token = CancellationToken::new();
+        token.cancel();
+        let mut reader: Box<dyn FileReader> = Box::new(HangingReader);
+        let mut buffer = [0u8; 8];
+
+        let error = read_chunk(&mut *reader, &mut buffer, &token)
+            .await
+            .expect_err("cancellation must win over a stalled read");
+        assert_eq!(error.code, ErrorCode::Cancelled);
     }
 }
