@@ -1070,3 +1070,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: accessibility audit (keyboard walkthrough, labels, focus restoration, reduced motion).
+
+### 2026-11-13 — Session 32: keyboard navigation for session tabs
+
+**Changed**
+
+- Session tabs now follow the ARIA tabs pattern: the selected tab is the only tab stop, and Left/Right/Home/End move the selection and focus. Arrow navigation wraps around the ends.
+- Each tab declares `aria-controls` for the shared panel, and the panel is a `tabpanel` labelled by the active tab.
+- Reduced motion was already handled globally in `globals.css`; this session verified it while auditing focus and tab semantics.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 162 tests in 24 files, production build). A new test focuses a tab, presses Right, and checks both the active session and the focused tab.
+
+**Next**
+
+- Continue Phase 5: contrast review and the remaining command-palette coverage.

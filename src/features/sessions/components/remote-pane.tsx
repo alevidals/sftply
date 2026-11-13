@@ -32,6 +32,7 @@ import { useSessionStore } from "@/stores/session-store"
 
 /** Private MIME type so tab drags never look like file-transfer drags. */
 const SESSION_DRAG_TYPE = "application/x-sftply-session"
+const SESSION_PANEL_ID = "session-panel"
 
 /** Remote pane: one tab per live session, each with an isolated browser. */
 export function RemotePane() {
@@ -73,6 +74,7 @@ export function RemotePane() {
         <div
           role="tablist"
           aria-label="Remote sessions"
+          aria-orientation="horizontal"
           className="flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b border-border/70 bg-chrome px-1.5"
         >
           {order.map((id) => {
@@ -137,8 +139,36 @@ export function RemotePane() {
                     <button
                       type="button"
                       role="tab"
+                      id={`session-tab-${session.id}`}
                       aria-selected={selected}
+                      aria-controls={SESSION_PANEL_ID}
+                      tabIndex={selected ? 0 : -1}
                       onClick={() => setActiveSession(session.id)}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key !== "ArrowLeft" &&
+                          event.key !== "ArrowRight" &&
+                          event.key !== "Home" &&
+                          event.key !== "End"
+                        ) {
+                          return
+                        }
+                        event.preventDefault()
+                        const current = order.indexOf(session.id)
+                        if (current < 0) return
+                        const nextIndex =
+                          event.key === "ArrowLeft"
+                            ? (current - 1 + order.length) % order.length
+                            : event.key === "ArrowRight"
+                              ? (current + 1) % order.length
+                              : event.key === "Home"
+                                ? 0
+                                : order.length - 1
+                        const nextId = order[nextIndex]
+                        if (!nextId) return
+                        setActiveSession(nextId)
+                        document.getElementById(`session-tab-${nextId}`)?.focus()
+                      }}
                       className="flex h-full max-w-44 items-center gap-1.5 rounded-l-md px-2 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                     >
                       {sessionLost ? (
@@ -223,7 +253,12 @@ export function RemotePane() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1">
+      <div
+        className="min-h-0 flex-1"
+        role="tabpanel"
+        id={SESSION_PANEL_ID}
+        aria-labelledby={`session-tab-${active.id}`}
+      >
         {lostMessage ? (
           <ConnectionLostPane
             session={active}

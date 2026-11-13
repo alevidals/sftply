@@ -238,6 +238,25 @@ describe("RemotePane", () => {
     expect(useSessionStore.getState().order).toEqual(["b", "a"])
   })
 
+  it("moves between tabs with the arrow keys", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const first = session("a", "Staging")
+    const second = session("b", "Production")
+    useSessionStore.setState({
+      sessions: { a: first, b: second },
+      order: ["a", "b"],
+      activeSessionId: "a",
+    })
+
+    render(<RemotePane />)
+
+    screen.getByRole("tab", { name: "Staging" }).focus()
+    await user.keyboard("{ArrowRight}")
+
+    expect(useSessionStore.getState().activeSessionId).toBe("b")
+    expect(screen.getByRole("tab", { name: "Production" })).toHaveFocus()
+  })
+
   it("reorders tabs by dragging", () => {
     const first = session("a", "Staging")
     const second = session("b", "Production")
