@@ -136,4 +136,72 @@ describe("RemotePane", () => {
     await user.click(screen.getByRole("button", { name: "cancel-listing" }))
     expect(actions.cancel).toHaveBeenCalledWith("a")
   })
+
+  it("copies connection details from a tab context menu", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const first = session("a", "Staging")
+    const second = session("b", "Production")
+    useSessionStore.setState({
+      sessions: { a: first, b: second },
+      order: ["a", "b"],
+      activeSessionId: "b",
+      paths: { a: "/var/log" },
+    })
+
+    render(<RemotePane />)
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Staging" }),
+    })
+    await user.click(await screen.findByRole("menuitem", { name: "Copy host" }))
+    await expect(navigator.clipboard.readText()).resolves.toBe("a.example.com:22")
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Staging" }),
+    })
+    await user.click(await screen.findByRole("menuitem", { name: "Copy login" }))
+    await expect(navigator.clipboard.readText()).resolves.toBe("ada@a.example.com:22")
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Staging" }),
+    })
+    await user.click(await screen.findByRole("menuitem", { name: "Copy current path" }))
+    await expect(navigator.clipboard.readText()).resolves.toBe("/var/log")
+  })
+
+  it("only enables reconnect on a lost tab", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const first = session("a", "Staging")
+    const second = session("b", "Production")
+    useSessionStore.setState({
+      sessions: { a: first, b: second },
+      order: ["a", "b"],
+      activeSessionId: "b",
+      lost: { b: "The server took too long to respond." },
+    })
+
+    render(<RemotePane />)
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Staging" }),
+    })
+    expect(await screen.findByRole("menuitem", { name: "Reconnect" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
+    await user.keyboard("{Escape}")
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("tab", { name: "Production" }),
+    })
+    const reconnect = await screen.findByRole("menuitem", { name: "Reconnect" })
+    expect(reconnect).not.toHaveAttribute("aria-disabled")
+    await user.click(reconnect)
+    expect(actions.reconnect).toHaveBeenCalledWith("b")
+  })
 })

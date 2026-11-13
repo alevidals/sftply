@@ -1,5 +1,6 @@
 import { cn } from "cn"
 import {
+  CopyIcon,
   LoaderCircleIcon,
   PowerIcon,
   RefreshCwIcon,
@@ -9,11 +10,20 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { PROTOCOL_LABELS, protocolIsSecure } from "@/features/connections/schema"
 import { remoteScope } from "@/features/files/api"
 import { DirectoryBrowser } from "@/features/files/directory-browser"
 import { FilePane } from "@/features/files/file-pane"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
+import { copyText } from "@/lib/clipboard"
 import type { SessionInfo } from "@/lib/ipc/bindings"
 import { useSessionStore } from "@/stores/session-store"
 
@@ -62,38 +72,85 @@ export function RemotePane() {
             const selected = session.id === active.id
             const sessionLost = Boolean(lost[session.id])
             return (
-              <div
-                key={session.id}
-                className={cn(
-                  "flex h-6 shrink-0 items-center rounded-md border text-2xs transition-colors",
-                  selected
-                    ? "border-border bg-background text-foreground"
-                    : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                )}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setActiveSession(session.id)}
-                  className="flex h-full max-w-44 items-center gap-1.5 rounded-l-md px-2 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                >
-                  {sessionLost ? (
-                    <WifiOffIcon className="size-3 shrink-0 text-warning" />
-                  ) : (
-                    <ServerIcon className="size-3 shrink-0" />
-                  )}
-                  <span className="truncate">{session.name}</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Disconnect ${session.name}`}
-                  onClick={() => void disconnect(session.id)}
-                  className="mr-0.5 flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              </div>
+              <ContextMenu key={session.id}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    className={cn(
+                      "flex h-6 shrink-0 items-center rounded-md border text-2xs transition-colors",
+                      selected
+                        ? "border-border bg-background text-foreground"
+                        : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setActiveSession(session.id)}
+                      className="flex h-full max-w-44 items-center gap-1.5 rounded-l-md px-2 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    >
+                      {sessionLost ? (
+                        <WifiOffIcon className="size-3 shrink-0 text-warning" />
+                      ) : (
+                        <ServerIcon className="size-3 shrink-0" />
+                      )}
+                      <span className="truncate">{session.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Disconnect ${session.name}`}
+                      onClick={() => void disconnect(session.id)}
+                      className="mr-0.5 flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  </div>
+                </ContextMenuTrigger>
+
+                <ContextMenuContent className="w-52">
+                  <ContextMenuLabel className="max-w-48 truncate font-normal">
+                    {session.name}
+                  </ContextMenuLabel>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    disabled={!sessionLost}
+                    onSelect={() => void reconnect(session.id)}
+                  >
+                    <RefreshCwIcon />
+                    Reconnect
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => void disconnect(session.id)}>
+                    <PowerIcon />
+                    Disconnect
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onSelect={() => void copyText(`${session.host}:${session.port}`, "Host copied")}
+                  >
+                    <CopyIcon />
+                    Copy host
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onSelect={() =>
+                      void copyText(
+                        `${session.username}@${session.host}:${session.port}`,
+                        "Login copied",
+                      )
+                    }
+                  >
+                    <CopyIcon />
+                    Copy login
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onSelect={() =>
+                      void copyText(paths[session.id] ?? session.initialPath, "Path copied")
+                    }
+                  >
+                    <CopyIcon />
+                    Copy current path
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             )
           })}
         </div>

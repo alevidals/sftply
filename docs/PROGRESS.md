@@ -1002,19 +1002,20 @@ which is only correct for local client connections. See
 
 - Real >4 GiB transfer run against the local Docker stack when convenient; the counters and ETA math are already covered.
 
-### 2026-11-13 — Session 28: transfer row context menus
+### 2026-11-13 — Session 28: transfer and tab context menus
 
 **Changed**
 
 - Every transfer row now has a context menu: cancel, retry, copy source path, copy target path, copy both paths, and clear finished transfers.
 - Cancel and retry stay visible but disabled when the row's status does not allow them, so the menu explains the capability instead of hiding it. Clear finished is disabled when the queue has no terminal rows.
-- Path copies reuse the clipboard conventions from the file browser: a toast confirms the copy, and a failure is reported without leaking anything.
-- The menu works for both the plain list and the virtualized list; the trigger wraps the row content, so the inline hover actions and the row layout are unchanged.
+- Remote session tabs now have a context menu too: reconnect (only enabled when the session is lost), disconnect, copy host, copy login and copy the current path.
+- Path copies go through a small `copyText` helper that reuses the file browser's toast conventions and never includes the copied value in an error.
+- The transfer menu works for both the plain list and the virtualized list; the trigger wraps the row content, so the inline hover actions and the row layout are unchanged.
 
 **Verified**
 
-- `bun run check` (typecheck, Biome, 152 tests in 24 files, production build). New component tests cover cancelling from the menu, disabled states for a completed row, copying both paths, and clearing finished rows from the menu.
+- `bun run check` (typecheck, Biome, 154 tests in 24 files, production build). New component tests cover cancelling from the transfer menu, disabled states for a completed row, copying both paths, clearing finished rows, copying tab connection details and enabling reconnect only on a lost tab.
 
 **Next**
 
-- Continue Phase 5: context menus for tabs and panes, then the full command palette and keyboard scope map.
+- Continue Phase 5: pane/sidebar context menus, then the full command palette and keyboard scope map.

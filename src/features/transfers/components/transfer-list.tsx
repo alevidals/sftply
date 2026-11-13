@@ -29,6 +29,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { transfersApi } from "@/features/transfers/api"
+import { copyText } from "@/lib/clipboard"
 import { errorMessage } from "@/lib/errors"
 import { formatBytes, formatEta } from "@/lib/format"
 import type { TransferItem_Serialize, TransferStatus } from "@/lib/ipc/bindings"
@@ -246,13 +247,7 @@ function TransferRow({
   }
 
   const copyPaths = (label: string, value: string) => {
-    navigator.clipboard.writeText(value).then(
-      () => toast.success(`${label} copied`),
-      (error) =>
-        toast.error(`Could not copy the ${label.toLowerCase()}`, {
-          description: errorMessage(error),
-        }),
-    )
+    void copyText(value, `${label} copied`)
   }
 
   return (
