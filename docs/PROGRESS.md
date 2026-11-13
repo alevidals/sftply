@@ -203,10 +203,10 @@ These were recommended in the architecture package. Implementation proceeds with
 ## Phase 5 — Polish and productivity
 
 - [x] Shortcuts reference in Settings
-- [ ] Full command palette + `?` shortcut sheet
+- [x] Full command palette + `?` shortcut sheet
 - [ ] Complete keyboard map and scopes
 - [ ] Context menus everywhere + disabled reasons
-- [ ] Tabs polish (overflow, reorder, close behavior)
+- [x] Tabs polish (overflow, reorder, close behavior)
 - [ ] All empty/loading/error/first-run states
 - [x] Density/column/date/size preferences
 - [ ] Accessibility audit (keyboard, labels, contrast, reduced motion)
@@ -1086,3 +1086,21 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: contrast review and the remaining command-palette coverage.
+
+### 2026-11-13 — Session 33: complete command palette
+
+**Changed**
+
+- Added **Disconnect active session** to the Connections group, disabled when no session is active.
+- Added a **Files** group: copy local path, copy remote path and a toggle for hidden files. The toggle label and icon reflect the current setting.
+- Added a **Transfers** group with **Clear finished transfers**, disabled while every row is still queued or running.
+- Added **Show transfer history** under Navigate, which switches the bottom panel to the history tab.
+- Fixed a real crash: `CommandDialog` rendered its children without the `<Command>` provider, so opening the palette threw `Cannot read properties of undefined (reading 'subscribe')`. The wrapper is restored.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 166 tests in 25 files, production build). The new palette tests cover disconnecting the active session, copying the remote path, clearing finished transfers, and the disabled clear command.
+
+**Next**
+
+- Continue Phase 5: contrast review, remaining empty/error states and packaging metadata.
