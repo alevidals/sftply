@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
@@ -270,7 +270,11 @@ impl TransferManager {
 
     /// Requeue a failed or cancelled transfer with a fresh id. The original job
     /// snapshot is reused, so credentials never round-trip through the UI.
-    pub fn retry(self: &Arc<Self>, app: &AppHandle, id: &str) -> Result<TransferItem, AppError> {
+    pub fn retry<R: Runtime>(
+        self: &Arc<Self>,
+        app: &AppHandle<R>,
+        id: &str,
+    ) -> Result<TransferItem, AppError> {
         let (status, job) = {
             let items = self.items.read().expect("transfer lock poisoned");
             let item = items.get(id).ok_or_else(|| {
@@ -327,7 +331,7 @@ impl TransferManager {
         items
     }
 
-    pub fn publish(&self, app: &AppHandle, item: &TransferItem) {
+    pub fn publish<R: Runtime>(&self, app: &AppHandle<R>, item: &TransferItem) {
         self.items
             .write()
             .expect("transfer lock poisoned")
@@ -349,7 +353,7 @@ impl TransferManager {
         }
     }
 
-    pub fn clear_finished(&self, app: &AppHandle) -> Vec<String> {
+    pub fn clear_finished<R: Runtime>(&self, app: &AppHandle<R>) -> Vec<String> {
         let removed: Vec<String> = {
             let mut items = self.items.write().expect("transfer lock poisoned");
             let finished: Vec<String> = items
@@ -394,7 +398,11 @@ impl TransferManager {
     }
 }
 
-pub fn emit_delta(app: &AppHandle, upserts: Vec<TransferItem>, removed: Vec<String>) {
+pub fn emit_delta<R: Runtime>(
+    app: &AppHandle<R>,
+    upserts: Vec<TransferItem>,
+    removed: Vec<String>,
+) {
     if let Err(error) = (TransferDeltaEvent { upserts, removed }).emit(app) {
         tracing::warn!(%error, "could not emit transfer delta");
     }
@@ -403,8 +411,8 @@ pub fn emit_delta(app: &AppHandle, upserts: Vec<TransferItem>, removed: Vec<Stri
 /// Start a transfer task. The task waits for a concurrency slot, opens its own
 /// protocol connection when needed, streams 64 KiB chunks and finalizes the
 /// writer before reporting completion.
-pub fn spawn_transfer(
-    app: AppHandle,
+pub fn spawn_transfer<R: Runtime>(
+    app: AppHandle<R>,
     manager: Arc<TransferManager>,
     mut job: TransferJob,
 ) -> TransferItem {
@@ -449,7 +457,11 @@ pub fn spawn_transfer(
     item
 }
 
-fn finish_cancelled(app: &AppHandle, manager: &TransferManager, item: &mut TransferItem) {
+fn finish_cancelled<R: Runtime>(
+    app: &AppHandle<R>,
+    manager: &TransferManager,
+    item: &mut TransferItem,
+) {
     item.status = TransferStatus::Cancelled;
     item.error = Some("The transfer was cancelled.".into());
     item.eta_ms = None;
@@ -457,7 +469,12 @@ fn finish_cancelled(app: &AppHandle, manager: &TransferManager, item: &mut Trans
     manager.publish(app, item);
 }
 
-fn fail(app: &AppHandle, manager: &TransferManager, item: &mut TransferItem, error: AppError) {
+fn fail<R: Runtime>(
+    app: &AppHandle<R>,
+    manager: &TransferManager,
+    item: &mut TransferItem,
+    error: AppError,
+) {
     tracing::warn!(transfer = %item.id, code = ?error.code, detail = ?error.detail, "transfer failed");
     item.status = TransferStatus::Failed;
     item.error = Some(error.message);
@@ -466,8 +483,8 @@ fn fail(app: &AppHandle, manager: &TransferManager, item: &mut TransferItem, err
     manager.publish(app, item);
 }
 
-async fn run_job(
-    app: &AppHandle,
+async fn run_job<R: Runtime>(
+    app: &AppHandle<R>,
     manager: &TransferManager,
     item: &mut TransferItem,
     job: &TransferJob,
@@ -552,8 +569,8 @@ pub(crate) async fn ensure_remote_dir(
     Ok(())
 }
 
-async fn download(
-    app: &AppHandle,
+async fn download<R: Runtime>(
+    app: &AppHandle<R>,
     manager: &TransferManager,
     item: &mut TransferItem,
     client: &mut Box<dyn RemoteFs>,
@@ -599,8 +616,8 @@ async fn download(
     Ok(())
 }
 
-async fn upload(
-    app: &AppHandle,
+async fn upload<R: Runtime>(
+    app: &AppHandle<R>,
     manager: &TransferManager,
     item: &mut TransferItem,
     client: &mut Box<dyn RemoteFs>,
@@ -719,8 +736,8 @@ pub(crate) async fn replace_remote_file(
     }
 }
 
-async fn copy_stream(
-    app: &AppHandle,
+async fn copy_stream<R: Runtime>(
+    app: &AppHandle<R>,
     manager: &TransferManager,
     item: &mut TransferItem,
     reader: &mut dyn FileReader,
@@ -1495,5 +1512,464 @@ mod tests {
             temp_download_path(&second.target_path, &second.id)
         );
         assert_eq!(first.target_path, second.target_path);
+    }
+
+    use std::collections::HashSet;
+
+    #[derive(Default)]
+    struct ScriptState {
+        files: HashMap<String, Vec<u8>>,
+        dirs: HashSet<String>,
+        read_fail_after: Option<usize>,
+        write_fail_after: Option<usize>,
+        chunk_delay: Option<Duration>,
+    }
+
+    struct ScriptedRemote {
+        state: Arc<Mutex<ScriptState>>,
+    }
+
+    impl ScriptedRemote {
+        fn new(files: &[(&str, &[u8])]) -> (Self, Arc<Mutex<ScriptState>>) {
+            let mut state = ScriptState::default();
+            state.dirs.insert("/".into());
+            for (path, data) in files {
+                state.files.insert((*path).to_string(), data.to_vec());
+            }
+            let state = Arc::new(Mutex::new(state));
+            (
+                Self {
+                    state: state.clone(),
+                },
+                state,
+            )
+        }
+    }
+
+    struct ScriptedReader {
+        data: Vec<u8>,
+        position: usize,
+        state: Arc<Mutex<ScriptState>>,
+    }
+
+    #[async_trait]
+    impl FileReader for ScriptedReader {
+        async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
+            let (delay, fail_after) = {
+                let state = self.state.lock().expect("script lock poisoned");
+                (state.chunk_delay, state.read_fail_after)
+            };
+            if let Some(delay) = delay {
+                tokio::time::sleep(delay).await;
+            }
+            if let Some(limit) = fail_after
+                && self.position >= limit
+            {
+                return Err(AppError::new(ErrorCode::Network, "The connection dropped."));
+            }
+
+            let remaining = self.data.len().saturating_sub(self.position);
+            if remaining == 0 {
+                return Ok(0);
+            }
+            let mut count = remaining.min(buf.len());
+            if let Some(limit) = fail_after {
+                count = count.min(limit - self.position);
+            }
+            buf[..count].copy_from_slice(&self.data[self.position..self.position + count]);
+            self.position += count;
+            Ok(count)
+        }
+
+        async fn finish(self: Box<Self>) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    struct ScriptedWriter {
+        path: String,
+        buffer: Vec<u8>,
+        state: Arc<Mutex<ScriptState>>,
+    }
+
+    #[async_trait]
+    impl FileWriter for ScriptedWriter {
+        async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
+            let fail_after = self
+                .state
+                .lock()
+                .expect("script lock poisoned")
+                .write_fail_after;
+            if let Some(limit) = fail_after {
+                if self.buffer.len() >= limit {
+                    return Err(AppError::new(ErrorCode::Network, "The connection dropped."));
+                }
+                let allowed = (limit - self.buffer.len()).min(buf.len());
+                self.buffer.extend_from_slice(&buf[..allowed]);
+                if allowed < buf.len() {
+                    return Err(AppError::new(ErrorCode::Network, "The connection dropped."));
+                }
+                return Ok(allowed);
+            }
+            self.buffer.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
+            self.state
+                .lock()
+                .expect("script lock poisoned")
+                .files
+                .insert(self.path.clone(), std::mem::take(&mut self.buffer));
+            Ok(())
+        }
+
+        async fn abort(self: Box<Self>) -> Result<(), AppError> {
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl RemoteFs for ScriptedRemote {
+        async fn list(&mut self, _path: &str) -> Result<crate::domain::fs::Listing, AppError> {
+            unimplemented!("not used by the transfer pipeline tests")
+        }
+
+        async fn stat(&mut self, path: &str) -> Result<FsEntry, AppError> {
+            let state = self.state.lock().expect("script lock poisoned");
+            if let Some(data) = state.files.get(path) {
+                return Ok(mock_entry(path, data.len()));
+            }
+            if state.dirs.contains(path) {
+                return Ok(FsEntry {
+                    kind: EntryKind::Directory,
+                    ..mock_entry(path, 0)
+                });
+            }
+            Err(AppError::new(
+                ErrorCode::NotFound,
+                "That item does not exist.",
+            ))
+        }
+
+        async fn mkdir(&mut self, parent: &str, name: &str) -> Result<FsEntry, AppError> {
+            let path = join_remote(parent, name)?;
+            self.state
+                .lock()
+                .expect("script lock poisoned")
+                .dirs
+                .insert(path.clone());
+            Ok(FsEntry {
+                kind: EntryKind::Directory,
+                ..mock_entry(&path, 0)
+            })
+        }
+
+        async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError> {
+            let parent = remote_parent(path)?.unwrap_or_else(|| "/".to_string());
+            let target = join_remote(&parent, new_name)?;
+            let mut state = self.state.lock().expect("script lock poisoned");
+            let Some(data) = state.files.remove(path) else {
+                return Err(AppError::new(
+                    ErrorCode::NotFound,
+                    "That item does not exist.",
+                ));
+            };
+            let size = data.len();
+            state.files.insert(target.clone(), data);
+            Ok(mock_entry(&target, size))
+        }
+
+        async fn delete(&mut self, path: &str, recursive: bool) -> Result<(), AppError> {
+            let mut state = self.state.lock().expect("script lock poisoned");
+            if state.files.remove(path).is_some() {
+                return Ok(());
+            }
+            if state.dirs.remove(path) {
+                if recursive {
+                    let prefix = format!("{path}/");
+                    state.files.retain(|key, _| !key.starts_with(&prefix));
+                    state.dirs.retain(|key| !key.starts_with(&prefix));
+                }
+                return Ok(());
+            }
+            Err(AppError::new(
+                ErrorCode::NotFound,
+                "That item does not exist.",
+            ))
+        }
+
+        async fn chmod(&mut self, _path: &str, _mode: u32) -> Result<(), AppError> {
+            unimplemented!("not used by the transfer pipeline tests")
+        }
+
+        async fn open_read(
+            &mut self,
+            path: &str,
+            offset: u64,
+        ) -> Result<Box<dyn FileReader>, AppError> {
+            let data = self
+                .state
+                .lock()
+                .expect("script lock poisoned")
+                .files
+                .get(path)
+                .cloned()
+                .ok_or_else(|| AppError::new(ErrorCode::NotFound, "That item does not exist."))?;
+            let position = usize::try_from(offset)
+                .map_err(|_| AppError::invalid_input("The offset is too large."))?;
+            Ok(Box::new(ScriptedReader {
+                data,
+                position,
+                state: self.state.clone(),
+            }))
+        }
+
+        async fn open_write(
+            &mut self,
+            path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn FileWriter>, AppError> {
+            Ok(Box::new(ScriptedWriter {
+                path: path.to_string(),
+                buffer: Vec::new(),
+                state: self.state.clone(),
+            }))
+        }
+
+        async fn disconnect(&mut self) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> crate::domain::fs::FsCapabilities {
+            crate::domain::fs::FsCapabilities::local()
+        }
+    }
+
+    /// Build an app handle whose event registry knows about the transfer delta
+    /// event, so `publish` behaves like it does in the real app.
+    fn mock_handle() -> tauri::AppHandle<tauri::test::MockRuntime> {
+        let app = tauri::test::mock_app();
+        tauri_specta::Builder::<tauri::test::MockRuntime>::new()
+            .events(tauri_specta::collect_events![
+                crate::domain::transfer::TransferDeltaEvent
+            ])
+            .mount_events(&app);
+        app.handle().clone()
+    }
+
+    fn pipeline_item(
+        direction: TransferDirection,
+        source: &str,
+        target: &str,
+        size: f64,
+    ) -> TransferItem {
+        TransferItem {
+            id: "pipeline-1".into(),
+            direction,
+            status: TransferStatus::Running,
+            source_path: source.into(),
+            target_path: target.into(),
+            source_label: "Local".into(),
+            target_label: "Remote".into(),
+            name: "report.bin".into(),
+            size,
+            transferred: 0.0,
+            bytes_per_sec: 0.0,
+            eta_ms: None,
+            error: None,
+            started_at: 0.0,
+            finished_at: None,
+        }
+    }
+
+    fn partial_files(dir: &Path) -> Vec<String> {
+        std::fs::read_dir(dir)
+            .expect("read the target folder")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .filter(|name| name.contains(".sftply-part-"))
+            .collect()
+    }
+
+    fn leftover_remote_keys(state: &ScriptState) -> Vec<String> {
+        state
+            .files
+            .keys()
+            .filter(|key| key.contains(".sftply-"))
+            .cloned()
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_broken_download_keeps_the_existing_target_and_removes_the_partial() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("report.bin");
+        tokio::fs::write(&target, b"old contents").await.unwrap();
+
+        let source = vec![b'x'; 4096];
+        let (mock, state) = ScriptedRemote::new(&[("/remote/report.bin", source.as_slice())]);
+        state.lock().unwrap().read_fail_after = Some(1024);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Download,
+            "/remote/report.bin",
+            target.to_str().unwrap(),
+            source.len() as f64,
+        );
+        let token = CancellationToken::new();
+        let error = download(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect_err("the broken stream must fail");
+
+        assert_eq!(error.code, ErrorCode::Network);
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"old contents");
+        assert!(
+            partial_files(dir.path()).is_empty(),
+            "a partial download was left behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelling_a_download_keeps_the_target_and_removes_the_partial() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("report.bin");
+        tokio::fs::write(&target, b"old contents").await.unwrap();
+
+        let source = vec![b'x'; 256 * 1024];
+        let (mock, state) = ScriptedRemote::new(&[("/remote/report.bin", source.as_slice())]);
+        state.lock().unwrap().chunk_delay = Some(Duration::from_millis(50));
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Download,
+            "/remote/report.bin",
+            target.to_str().unwrap(),
+            source.len() as f64,
+        );
+        let token = CancellationToken::new();
+        let cancel = token.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(60)).await;
+            cancel.cancel();
+        });
+
+        let error = download(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect_err("the cancelled download must stop");
+
+        assert_eq!(error.code, ErrorCode::Cancelled);
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"old contents");
+        assert!(
+            partial_files(dir.path()).is_empty(),
+            "a cancelled download left a partial file"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_broken_upload_keeps_the_previous_remote_file() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("report.bin");
+        tokio::fs::write(&source, vec![b'n'; 4096]).await.unwrap();
+
+        let (mock, state) = ScriptedRemote::new(&[("/dir/report.bin", b"old contents")]);
+        state.lock().unwrap().write_fail_after = Some(1024);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Upload,
+            source.to_str().unwrap(),
+            "/dir/report.bin",
+            4096.0,
+        );
+        let token = CancellationToken::new();
+        let error = upload(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect_err("the broken stream must fail");
+
+        assert_eq!(error.code, ErrorCode::Network);
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.files.get("/dir/report.bin").map(Vec::as_slice),
+            Some(&b"old contents"[..])
+        );
+        assert!(
+            leftover_remote_keys(&state).is_empty(),
+            "a partial or backup upload was left behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_completed_upload_replaces_the_remote_file_without_leftovers() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("report.bin");
+        tokio::fs::write(&source, vec![b'n'; 4096]).await.unwrap();
+
+        let (mock, state) = ScriptedRemote::new(&[("/dir/report.bin", b"old contents")]);
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Upload,
+            source.to_str().unwrap(),
+            "/dir/report.bin",
+            4096.0,
+        );
+        let token = CancellationToken::new();
+        upload(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect("the upload must complete");
+
+        assert_eq!(item.transferred, 4096.0);
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.files.get("/dir/report.bin").map(Vec::as_slice),
+            Some(&vec![b'n'; 4096][..])
+        );
+        assert!(
+            leftover_remote_keys(&state).is_empty(),
+            "a partial or backup upload was left behind"
+        );
     }
 }

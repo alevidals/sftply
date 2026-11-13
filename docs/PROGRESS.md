@@ -180,6 +180,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4c: atomic uploads (hidden temp + rename, backup/restore on overwrite) and download temp cleanup
 - [x] 4c: stalled sockets time out after 60 s idle and cancellation interrupts stalled reads/writes
 - [x] 4c: retry uses a fresh id and partial file, then replaces the same target (no duplicate copy)
+- [x] 4c: end-to-end pipeline tests cover success, cancel and broken connections with an in-memory remote
 - [ ] 4c: remaining hardening (>4 GiB transfers, disk-full/auth expiry/permission-change matrix, event-rate profiling)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
@@ -929,6 +930,23 @@ which is only correct for local client connections. See
 **Verified**
 
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (90 passed, 18 ignored). New tests cover the retryable-status rule, the fresh id and counter reset, unchanged source/target, an untouched original snapshot, and distinct partial paths across two retries.
+
+**Next**
+
+- Continue Phase 4c: the remaining server matrix (disk-full, auth expiry, permission changes) and event-rate profiling.
+
+### 2026-11-13 — Session 24: end-to-end transfer pipeline tests
+
+**Added**
+
+- The real `download` and `upload` functions now have end-to-end tests that run the whole pipeline — open, chunk loop, finish, atomic replace, cleanup — against a scripted in-memory remote and a mock Tauri app handle. No Docker, no window and no network are involved.
+- The scripted remote can delay each read, fail a read after a byte count, and fail a write after a byte count. It implements `stat`, `mkdir`, `rename` and `delete`, so the atomic upload path (hidden partial, rename, backup) runs exactly as in production.
+- The transfer module is generic over `tauri::Runtime`, and `emit_delta`, `publish`, `spawn_transfer` and the internal pipeline functions accept `AppHandle<R>`. Production still uses the Wry runtime; tests use `MockRuntime` with the `TransferDeltaEvent` registry mounted, so publishing behaves like the real app.
+
+**Verified**
+
+- New tests prove that: a broken download keeps the existing local file and removes the partial; cancelling while a read is delayed keeps the target and removes the partial; a broken upload keeps the previous remote file with no partial or backup; a completed upload replaces the target with no leftovers.
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (94 passed, 18 ignored).
 
 **Next**
 
