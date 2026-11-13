@@ -776,7 +776,7 @@ async fn copy_stream<R: Runtime>(
         // Reserve bandwidth before sleeping, and publish progress first so a
         // slow limit does not leave the row frozen for the whole wait.
         let wait = manager.bandwidth.reserve(written);
-        if wait >= PROGRESS_INTERVAL || last_emit.elapsed() >= PROGRESS_INTERVAL {
+        if should_publish_progress(wait, last_emit.elapsed()) {
             update_progress(item, started);
             manager.publish(app, item);
             last_emit = Instant::now();
@@ -787,6 +787,13 @@ async fn copy_stream<R: Runtime>(
     update_progress(item, started);
     manager.publish(app, item);
     Ok(())
+}
+
+/// Progress events are capped at one per interval per transfer: eight
+/// concurrent transfers emit at most ~80 events/second instead of one per
+/// 64 KiB chunk.
+fn should_publish_progress(wait: Duration, since_last: Duration) -> bool {
+    wait >= PROGRESS_INTERVAL || since_last >= PROGRESS_INTERVAL
 }
 
 fn update_progress(item: &mut TransferItem, started: Instant) {
@@ -1115,6 +1122,32 @@ mod tests {
         update_progress(&mut item, Instant::now());
         assert!(item.bytes_per_sec > 0.0);
         assert!(item.eta_ms.is_some());
+    }
+
+    #[test]
+    fn progress_events_are_capped_per_interval() {
+        assert!(!should_publish_progress(
+            Duration::ZERO,
+            Duration::from_millis(99)
+        ));
+        assert!(should_publish_progress(Duration::ZERO, PROGRESS_INTERVAL));
+        assert!(should_publish_progress(PROGRESS_INTERVAL, Duration::ZERO));
+    }
+
+    #[test]
+    fn progress_handles_files_larger_than_four_gibibytes() {
+        let gib = 1024.0 * 1024.0 * 1024.0;
+        let mut item = pipeline_item(TransferDirection::Download, "/r", "/l", 5.0 * gib);
+        item.transferred = 2.5 * gib;
+        update_progress(&mut item, Instant::now() - Duration::from_secs(10));
+
+        assert!(item.bytes_per_sec > 0.0);
+        let eta = item
+            .eta_ms
+            .expect("a partially transferred file has an eta");
+        assert!(eta.is_finite() && eta > 0.0);
+        // 2.5 GiB left at ~268 MB/s is roughly ten seconds, not a wrapped value.
+        assert!((9_000.0..11_000.0).contains(&eta), "unexpected eta {eta}");
     }
 
     #[test]
@@ -1522,6 +1555,7 @@ mod tests {
         dirs: HashSet<String>,
         read_fail_after: Option<usize>,
         write_fail_after: Option<usize>,
+        deny_rename: bool,
         chunk_delay: Option<Duration>,
     }
 
@@ -1669,6 +1703,12 @@ mod tests {
             let parent = remote_parent(path)?.unwrap_or_else(|| "/".to_string());
             let target = join_remote(&parent, new_name)?;
             let mut state = self.state.lock().expect("script lock poisoned");
+            if state.deny_rename {
+                return Err(AppError::new(
+                    ErrorCode::PermissionDenied,
+                    "You do not have permission for that item.",
+                ));
+            }
             let Some(data) = state.files.remove(path) else {
                 return Err(AppError::new(
                     ErrorCode::NotFound,
@@ -1929,6 +1969,48 @@ mod tests {
         assert!(
             leftover_remote_keys(&state).is_empty(),
             "a partial or backup upload was left behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_upload_blocked_by_permissions_keeps_the_previous_remote_file() {
+        let handle = mock_handle();
+        let manager = manager_with_concurrency(1);
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("report.bin");
+        tokio::fs::write(&source, vec![b'n'; 4096]).await.unwrap();
+
+        let (mock, state) = ScriptedRemote::new(&[("/dir/report.bin", b"old contents")]);
+        state.lock().unwrap().deny_rename = true;
+        let mut client: Box<dyn RemoteFs> = Box::new(mock);
+
+        let mut item = pipeline_item(
+            TransferDirection::Upload,
+            source.to_str().unwrap(),
+            "/dir/report.bin",
+            4096.0,
+        );
+        let token = CancellationToken::new();
+        let error = upload(
+            &handle,
+            &manager,
+            &mut item,
+            &mut client,
+            ConflictPolicy::Overwrite,
+            &token,
+        )
+        .await
+        .expect_err("a denied rename must fail the upload");
+
+        assert_eq!(error.code, ErrorCode::PermissionDenied);
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.files.get("/dir/report.bin").map(Vec::as_slice),
+            Some(&b"old contents"[..])
+        );
+        assert!(
+            leftover_remote_keys(&state).is_empty(),
+            "a partial upload was left behind"
         );
     }
 

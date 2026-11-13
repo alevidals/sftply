@@ -182,7 +182,8 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] 4c: retry uses a fresh id and partial file, then replaces the same target (no duplicate copy)
 - [x] 4c: end-to-end pipeline tests cover success, cancel and broken connections with an in-memory remote
 - [x] 4c: disk-full errors map to an honest local/server message
-- [ ] 4c: remaining hardening (>4 GiB transfer run, auth expiry/permission-change matrix, event-rate profiling)
+- [x] 4c: progress events capped per transfer, >4 GiB counters verified, denied finalization preserves the old file
+- [ ] 4c: remaining hardening (>4 GiB transfer run, auth expiry matrix)
 - [x] 4c: 1,000-item queue stays responsive (virtualized transfer panel)
 - [x] Transfer panel UI + status bar aggregation
 - [x] Integration tests across protocols (single-file binary streaming + CRUD)
@@ -968,3 +969,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 4c: auth expiry/permission-change matrix and event-rate profiling.
+
+### 2026-11-13 — Session 26: progress rate, large counters and denied finalization
+
+**Changed**
+
+- Extracted the progress-publication policy into `should_publish_progress`. Progress is emitted at most once per 100 ms per transfer, or immediately when a bandwidth reservation is at least 100 ms. Eight concurrent transfers therefore stay around 80 events/second instead of emitting one event per 64 KiB chunk.
+- Added coverage for counters above 4 GiB: a 5 GiB item with 2.5 GiB transferred produces a finite positive speed and an ETA near ten seconds, with no 32-bit wrap.
+- Added an end-to-end permission failure: when the server denies the final rename, the upload fails with `PERMISSION_DENIED`, the previous remote file stays intact, and the hidden partial is removed.
+
+**Verified**
+
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (99 passed, 18 ignored).
+
+**Next**
+
+- Continue Phase 4c: a real >4 GiB transfer run and the auth-expiry matrix.
