@@ -110,6 +110,9 @@ and Linux before publishing a build, using the same checklist for each.
   opposite pane highlights as a drop target, the transfer starts and both
   listings refresh when it finishes. Dragging inside the same pane shows no
   drop affordance.
+- [ ] **Edit text…** opens a local or remote UTF-8 file, `⌘S`/`Ctrl+S` saves it,
+  the listing refreshes, and editing the same file outside the app produces the
+  conflict banner with working **Reload** and **Overwrite** actions.
 - [ ] Reduced motion disables spinners and transition-heavy effects.
 - [ ] Native file dialogs, keychain prompts and the "reveal in file manager"
   action open the expected OS UI.

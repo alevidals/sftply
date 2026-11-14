@@ -59,6 +59,7 @@ function renderTable(
     selection?: SelectionState
     renamingPath?: string | null
     dragScope?: FsScope
+    canEdit?: boolean
     onDropPayload?: (payload: TransferDragPayload, directory: FsEntry) => void
   } = {},
 ) {
@@ -83,6 +84,7 @@ function renderTable(
       rowHeight={28}
       renamingPath={overrides.renamingPath ?? null}
       canChmod
+      canEdit={overrides.canEdit ?? true}
       allowOpen
       allowReveal
       canTransfer
@@ -206,6 +208,49 @@ describe("FileTable context menu", () => {
     expect(item).not.toHaveAttribute("aria-disabled")
     await user.click(item)
     expect(handlers.onAction).toHaveBeenCalledWith("permissions")
+  })
+
+  it("opens the text editor for a regular file", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const { handlers } = renderTable({ selection: selection(0, ["/tmp/alpha.txt"]) })
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("row", { name: /alpha/ }),
+    })
+    const item = await screen.findByRole("menuitem", { name: /Edit text/ })
+
+    expect(item).not.toHaveAttribute("aria-disabled")
+    await user.click(item)
+    expect(handlers.onAction).toHaveBeenCalledWith("edit")
+  })
+
+  it("disables the text editor for folders and when unsupported", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    renderTable({ selection: selection(1, ["/tmp/beta"]) })
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("row", { name: /beta/ }),
+    })
+    expect(await screen.findByRole("menuitem", { name: /Edit text/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
+  })
+
+  it("disables the text editor when the pane cannot read text", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    renderTable({ selection: selection(0, ["/tmp/alpha.txt"]), canEdit: false })
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("row", { name: /alpha/ }),
+    })
+    expect(await screen.findByRole("menuitem", { name: /Edit text/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
   })
 })
 

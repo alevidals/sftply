@@ -221,7 +221,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Permissions editor: octal + symbolic, multi-select
 - [ ] Recursive permission changes with explicit confirmation
 - [x] Remote bookmarks + recent paths
-- [ ] Remote text editor (size/binary/encoding limits, conflict detection)
+- [x] Remote text editor (size/binary/encoding limits, conflict detection)
 - [ ] Remote previews (safe rendering)
 - [ ] Import/export without credentials
 - [ ] File comparison
@@ -1266,7 +1266,7 @@ which is only correct for local client connections. See
 
 - Manual check on the running app: drag several files across panes and confirm the badge, the single valid highlight and the transfer count.
 
-### 2026-11-14 — Session 43 (in progress): remote text editor, backend + dialog
+### 2026-11-14 — Session 43: remote text editor
 
 **Done**
 
@@ -1277,21 +1277,15 @@ which is only correct for local client connections. See
 - Local and FTP/SFTP capabilities now report `textRead: true` and `textWrite: true`.
 - Regenerated specta bindings and added `ipc.fsReadText` / `ipc.fsWriteText`, plus `filesApi(scope).readText()` / `.writeText()`.
 - Added `src/features/files/model/text.ts` (size guard, line/byte stats) and `TextEditorDialog` with loading/error states, read-only mode, dirty tracking, `⌘S`/`Ctrl+S`, discard confirmation, and a conflict banner offering **Reload** or **Overwrite**.
-- Rust tests cover UTF-8 decoding, binary/invalid UTF-8 rejection, size limits, local read/write round-trip, stale-token conflict, forced overwrite and missing-file creation.
+- Wired the editor into the file browser: **Edit text…** in the row context menu and the pane actions menu, enabled only for regular files under the size limit in panes that report `textRead`. Double-clicking a remote file opens the editor instead of the old "download first" notice. Saving invalidates the listing so size and modification time refresh.
+- Rust tests cover UTF-8 decoding, binary/invalid UTF-8 rejection, size limits, local read/write round-trip, stale-token conflict, forced overwrite and missing-file creation. Frontend tests cover loading, saving with the load-time version, conflict/overwrite, read-only mode, discard confirmation, load-error retry, and the context-menu enablement rules.
 
 **Verified**
 
-- `bun run check` (typecheck, Biome, 219 tests in 33 files, production build).
+- `bun run check` (typecheck, Biome, 227 tests in 34 files, production build).
 - `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (111 passed, 18 ignored).
 
-**Remaining — wire the editor into the file browser**
+**Next**
 
-1. `src/features/files/components/file-table.tsx`: add `"edit"` to `FileAction`, a `canEdit` prop, an `actionDisabled("edit")` case (`file` kind + capability) and an **Edit text…** context-menu item with `FileTextIcon`.
-2. `src/features/files/directory-browser.tsx`: derive `canEdit` from `listing.capabilities.textRead`; add `editorOpen`/`editorTarget` state; handle `"edit"` in `handleAction`; open the editor on remote file double-click when editable; pass `canEdit` to `FileTable` and `ActionsMenu`; render `TextEditorDialog` with `scope`, `canWrite={listing.capabilities.textWrite}`, and an `onSaved` that invalidates the listing and records activity. Check `isEditableTextSize(entry.size)` before opening.
-3. Add the **Edit text…** item to `ActionsMenu`.
-4. Tests: `text-editor-dialog.test.tsx` (mock `filesApi`, cover load/save/conflict/read-only/discard), the context-menu item, and the action wiring.
-5. Mark the Phase 6 item complete, add a release-QA line, and run the loopback FTP/SFTP manual check. Rust changed, so restart `bun run tauri -- dev`.
-
-**Note**
-
-- The tree is green and committed at this point, but the editor dialog is not reachable from the UI yet. That is the next step.
+- Manual loopback FTP/SFTP check: open, edit, save and force a conflict. Rust changed, so restart `bun run tauri -- dev`.
+- Phase 6 continues with safe remote previews, import/export without credentials, file comparison and synchronization.

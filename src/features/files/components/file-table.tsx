@@ -4,6 +4,7 @@ import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
   CopyIcon,
+  FileTextIcon,
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
@@ -25,6 +26,7 @@ import { FileEntryIcon } from "@/features/files/components/file-entry-icon"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
 import { entryNameError } from "@/features/files/model/names"
 import type { SelectionMode, SelectionState } from "@/features/files/model/selection"
+import { isEditableTextSize } from "@/features/files/model/text"
 import { useFormatPreferences } from "@/features/settings/settings-context"
 import {
   canDropTransfer,
@@ -42,6 +44,7 @@ import { shortcutLabel } from "@/lib/shortcuts"
 
 export type FileAction =
   | "open"
+  | "edit"
   | "rename"
   | "delete"
   | "reveal"
@@ -57,6 +60,8 @@ interface FileTableProps {
   rowHeight: number
   renamingPath: string | null
   canChmod: boolean
+  /** Whether regular files in this pane can be opened in the text editor. */
+  canEdit: boolean
   /** Whether non-directory entries can be opened. Remote panes only navigate. */
   allowOpen: boolean
   /** Whether items can be revealed in the OS file manager (local only). */
@@ -88,6 +93,7 @@ export function FileTable({
   rowHeight,
   renamingPath,
   canChmod,
+  canEdit,
   allowOpen,
   allowReveal,
   canTransfer,
@@ -149,6 +155,8 @@ export function FileTable({
     switch (action) {
       case "open":
         return !activeEntry || (activeEntry.kind !== "directory" && !allowOpen)
+      case "edit":
+        return activeEntry?.kind !== "file" || !canEdit || !isEditableTextSize(activeEntry.size)
       case "rename":
       case "reveal":
         return !activeEntry
@@ -419,6 +427,10 @@ export function FileTable({
           <ArrowDownToLineIcon />
           Open
           <ContextMenuShortcut>{shortcutLabel("open")}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem disabled={actionDisabled("edit")} onSelect={() => onAction("edit")}>
+          <FileTextIcon />
+          Edit text…
         </ContextMenuItem>
         <ContextMenuItem
           disabled={actionDisabled("transfer")}

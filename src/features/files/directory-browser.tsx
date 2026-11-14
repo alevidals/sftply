@@ -8,6 +8,7 @@ import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
+  FileTextIcon,
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
@@ -50,6 +51,7 @@ import {
 import { type FileAction, FileTable } from "@/features/files/components/file-table"
 import { PaneEmpty } from "@/features/files/components/pane-empty"
 import { PathBar } from "@/features/files/components/path-bar"
+import { TextEditorDialog } from "@/features/files/components/text-editor-dialog"
 import { useFsListing } from "@/features/files/hooks/use-fs-listing"
 import { usePathNavigation } from "@/features/files/hooks/use-path-navigation"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
@@ -68,6 +70,7 @@ import {
   selectRow,
 } from "@/features/files/model/selection"
 import { DEFAULT_SORT, nextSort, type SortState, sortEntries } from "@/features/files/model/sort"
+import { isEditableTextSize } from "@/features/files/model/text"
 import { useSettings } from "@/features/settings/settings-context"
 import { TransferConflictDialog } from "@/features/transfers/components/transfer-conflict-dialog"
 import {
@@ -82,7 +85,7 @@ import { useTransferDrag } from "@/features/transfers/use-transfer-drag"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
-import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
+import type { FsEntry, FsScope, TextFile } from "@/lib/ipc/bindings"
 import { shortcutLabel } from "@/lib/shortcuts"
 import { recordActivity } from "@/stores/activity-store"
 import { useUiStore } from "@/stores/ui-store"
@@ -156,6 +159,8 @@ export function DirectoryBrowser({
   const [permissionsOpen, setPermissionsOpen] = useState(false)
   const [permissionsTargets, setPermissionsTargets] = useState<FsEntry[]>([])
   const [bookmarksOpen, setBookmarksOpen] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorTarget, setEditorTarget] = useState<FsEntry | null>(null)
   const [dropActive, setDropActive] = useState(false)
   const transferDrag = useTransferDrag()
   const dragTarget: "none" | "valid" | "blocked" = transferDrag
@@ -169,6 +174,8 @@ export function DirectoryBrowser({
   const canMkdir = listing?.capabilities.mkdir ?? false
   const canRename = listing?.capabilities.rename ?? false
   const canRemove = listing?.capabilities.remove ?? false
+  const canEdit = listing?.capabilities.textRead ?? false
+  const canWriteText = listing?.capabilities.textWrite ?? false
 
   const entries = useMemo(() => {
     const source = listing?.entries ?? []
@@ -198,6 +205,21 @@ export function DirectoryBrowser({
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ["fs", scopeKey(scope)] }),
     [queryClient, scope],
+  )
+
+  const canEditEntry = useCallback(
+    (entry: FsEntry | null): entry is FsEntry =>
+      Boolean(entry && entry.kind === "file" && canEdit && isEditableTextSize(entry.size)),
+    [canEdit],
+  )
+
+  const openEditor = useCallback(
+    (entry: FsEntry) => {
+      if (!canEditEntry(entry)) return
+      setEditorTarget(entry)
+      setEditorOpen(true)
+    },
+    [canEditEntry],
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset transient UI state when the folder changes
@@ -257,6 +279,10 @@ export function DirectoryBrowser({
         return
       }
       if (!allowOpenFile) {
+        if (canEditEntry(entry)) {
+          openEditor(entry)
+          return
+        }
         toast.info("Remote files cannot be opened here yet. Download the file first.")
         return
       }
@@ -264,7 +290,7 @@ export function DirectoryBrowser({
         reportError(`Could not open “${entry.name}”`, error)
       })
     },
-    [allowOpenFile, navigate, reportError],
+    [allowOpenFile, canEditEntry, navigate, openEditor, reportError],
   )
 
   const revealEntry = useCallback(
@@ -282,6 +308,9 @@ export function DirectoryBrowser({
       switch (action) {
         case "open":
           if (activeEntry) openEntry(activeEntry)
+          break
+        case "edit":
+          if (activeEntry) openEditor(activeEntry)
           break
         case "rename":
           if (activeEntry) setRenamingPath(activeEntry.path)
@@ -327,6 +356,7 @@ export function DirectoryBrowser({
       allowReveal,
       canChmod,
       listing,
+      openEditor,
       openEntry,
       reportError,
       revealEntry,
@@ -414,6 +444,14 @@ export function DirectoryBrowser({
       reportError("Could not refresh the folder", error)
     })
   }
+
+  const handleTextSaved = useCallback(
+    (saved: TextFile) => {
+      void invalidate()
+      recordActivity("success", `Saved “${editorTarget?.name ?? saved.path}”`)
+    },
+    [editorTarget, invalidate],
+  )
 
   const toggleHidden = () => {
     updateSettings({ showHiddenFiles: !settings.showHiddenFiles }).catch((error) => {
@@ -624,6 +662,7 @@ export function DirectoryBrowser({
           ) : null}
           <ActionsMenu
             canOpen={Boolean(activeEntry) && (activeEntry?.kind === "directory" || allowOpenFile)}
+            canEdit={canEditEntry(activeEntry)}
             canRename={Boolean(activeEntry) && canRename}
             canDelete={selectedEntries.length > 0 && canRemove}
             canPermissions={selectedEntries.length > 0 && canChmod}
@@ -775,6 +814,7 @@ export function DirectoryBrowser({
           rowHeight={rowHeight}
           renamingPath={renamingPath}
           canChmod={canChmod}
+          canEdit={canEdit}
           allowOpen={allowOpenFile}
           allowReveal={allowReveal}
           canTransfer={canTransfer}
@@ -842,6 +882,14 @@ export function DirectoryBrowser({
         onOpenChange={setPermissionsOpen}
         onConfirm={applyPermissions}
       />
+      <TextEditorDialog
+        open={editorOpen}
+        entry={editorTarget}
+        scope={scope}
+        canWrite={canWriteText}
+        onOpenChange={setEditorOpen}
+        onSaved={handleTextSaved}
+      />
       {bookmarkKey ? (
         <BookmarksDialog
           open={bookmarksOpen}
@@ -908,6 +956,7 @@ function ToolbarButton({
 
 function ActionsMenu({
   canOpen,
+  canEdit,
   canRename,
   canDelete,
   canPermissions,
@@ -918,6 +967,7 @@ function ActionsMenu({
   onAction,
 }: {
   canOpen: boolean
+  canEdit: boolean
   canRename: boolean
   canDelete: boolean
   canPermissions: boolean
@@ -942,6 +992,10 @@ function ActionsMenu({
           <ArrowDownToLineIcon />
           Open
           <DropdownMenuShortcut>{shortcutLabel("open")}</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!canEdit} onSelect={() => onAction("edit")}>
+          <FileTextIcon />
+          Edit text…
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!canTransfer} onSelect={() => onAction("transfer")}>
           <TransferIcon />
