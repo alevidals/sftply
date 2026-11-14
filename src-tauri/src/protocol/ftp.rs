@@ -274,44 +274,12 @@ impl FtpRemote {
 
     async fn entries(&mut self, path: &str) -> Result<(Vec<FsEntry>, Vec<String>), AppError> {
         let path = normalize_remote(path)?;
-        let mut warnings = Vec::new();
-        let mut entries = Vec::new();
-
-        if self.mlsd {
-            let lines =
-                on_client!(&mut self.client, mlsd(Some(path.as_str()))).map_err(map_ftp_error)?;
-            for line in lines {
-                match ListParser::parse_mlsd(&line) {
-                    Ok(file) => match map_file(&file, &path) {
-                        Ok(Some(entry)) => entries.push(entry),
-                        Ok(None) => {}
-                        Err(message) => warnings.push(message),
-                    },
-                    Err(error) => {
-                        warnings.push(format!("A server entry could not be read: {error}"))
-                    }
-                }
-            }
+        let lines = if self.mlsd {
+            on_client!(&mut self.client, mlsd(Some(path.as_str()))).map_err(map_ftp_error)?
         } else {
-            let lines =
-                on_client!(&mut self.client, list(Some(path.as_str()))).map_err(map_ftp_error)?;
-            for line in lines {
-                let parsed =
-                    ListParser::parse_posix(&line).or_else(|_| ListParser::parse_dos(&line));
-                match parsed {
-                    Ok(file) => match map_file(&file, &path) {
-                        Ok(Some(entry)) => entries.push(entry),
-                        Ok(None) => {}
-                        Err(message) => warnings.push(message),
-                    },
-                    Err(error) => {
-                        warnings.push(format!("A server entry could not be read: {error}"))
-                    }
-                }
-            }
-        }
-
-        Ok((entries, warnings))
+            on_client!(&mut self.client, list(Some(path.as_str()))).map_err(map_ftp_error)?
+        };
+        Ok(parse_listing(self.mlsd, &lines, &path))
     }
 
     async fn delete_inner(&mut self, path: &str) -> Result<(), AppError> {
@@ -494,6 +462,33 @@ impl RemoteFs for FtpRemote {
 
 fn feature_present(features: &HashMap<String, Option<String>>, name: &str) -> bool {
     features.keys().any(|key| key.eq_ignore_ascii_case(name))
+}
+
+/// Turn raw `MLSD`/`LIST` lines into entries. Kept free of I/O so hostile
+/// server output can be property-tested without a connection.
+fn parse_listing(mlsd: bool, lines: &[String], directory: &str) -> (Vec<FsEntry>, Vec<String>) {
+    let mut warnings = Vec::new();
+    let mut entries = Vec::new();
+
+    for line in lines {
+        let parsed = if mlsd {
+            ListParser::parse_mlsd(line).map_err(|error| error.to_string())
+        } else {
+            ListParser::parse_posix(line)
+                .or_else(|_| ListParser::parse_dos(line))
+                .map_err(|error| error.to_string())
+        };
+        match parsed {
+            Ok(file) => match map_file(&file, directory) {
+                Ok(Some(entry)) => entries.push(entry),
+                Ok(None) => {}
+                Err(message) => warnings.push(message),
+            },
+            Err(error) => warnings.push(format!("A server entry could not be read: {error}")),
+        }
+    }
+
+    (entries, warnings)
 }
 
 fn map_file(file: &FtpFile, parent: &str) -> Result<Option<FsEntry>, String> {
@@ -1414,5 +1409,72 @@ mod integration {
     #[ignore = "requires tests/integration/docker-compose.yml"]
     async fn implicit_ftps_atomic_replace_keeps_no_leftovers() {
         exercise_atomic_replace(ConnectionProtocol::FtpsImplicit, 2990, true).await;
+    }
+}
+
+#[cfg(test)]
+mod listing_properties {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        /// Hostile or garbage listings must never panic, never produce more
+        /// entries than lines, and never place an entry outside the folder.
+        #[test]
+        fn arbitrary_listings_stay_inside_the_folder(
+            lines in prop::collection::vec("\\PC{0,200}", 0..30),
+        ) {
+            for mlsd in [false, true] {
+                let (entries, warnings) = parse_listing(mlsd, &lines, "/srv/dir");
+                prop_assert!(entries.len() <= lines.len());
+                prop_assert!(warnings.len() <= lines.len());
+                for entry in entries {
+                    prop_assert!(entry.path.starts_with("/srv/dir/"));
+                    prop_assert!(!entry.path.contains("/../"));
+                    prop_assert!(!entry.name.contains('/'));
+                    prop_assert!(!entry.name.contains('\0'));
+                    prop_assert!(entry.name.len() <= 255);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hostile_names_are_dropped() {
+        let lines = vec![
+            "type=file;size=1;modify=20200101120000; ../escape".to_string(),
+            "type=file;size=1;modify=20200101120000; a/b".to_string(),
+            format!(
+                "type=file;size=1;modify=20200101120000; {}",
+                "x".repeat(300)
+            ),
+            "type=file;size=1;modify=20200101120000; nul\0byte".to_string(),
+            "-rw-r--r-- 1 0 0 1 Jan 1 2020 ../escape".to_string(),
+            "-rw-r--r-- 1 0 0 1 Jan 1 2020 name with spaces".to_string(),
+            "total 42".to_string(),
+            String::new(),
+        ];
+
+        for mlsd in [false, true] {
+            let (entries, _) = parse_listing(mlsd, &lines, "/srv/dir");
+            for entry in &entries {
+                assert!(!entry.name.contains('/'), "separator leaked into a name");
+                assert!(!entry.name.contains('\0'));
+                assert!(entry.name.len() <= 255);
+                assert!(entry.path.starts_with("/srv/dir/"));
+            }
+        }
+    }
+
+    #[test]
+    fn a_very_long_line_is_bounded() {
+        let line = format!(
+            "type=file;size=1;modify=20200101120000; {}",
+            "y".repeat(1_000_000)
+        );
+        let (entries, warnings) = parse_listing(true, &[line], "/srv/dir");
+        assert!(entries.is_empty());
+        assert!(warnings.len() <= 1);
     }
 }

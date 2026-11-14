@@ -170,3 +170,32 @@ mod tests {
         assert_eq!(remote_leaf("/a/b").unwrap(), "b");
     }
 }
+
+#[cfg(test)]
+mod properties {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        /// Whatever a user or server sends, a normalized path is absolute,
+        /// has no dot segments and never climbs above the root.
+        #[test]
+        fn normalized_paths_never_climb_or_repeat(input in "/[ -~]{0,120}") {
+            if let Ok(path) = normalize_remote(&input) {
+                prop_assert!(path.starts_with('/'));
+                prop_assert!(!path.contains("//"));
+                prop_assert!(!path.split('/').any(|part| part == ".." || part == "."));
+                prop_assert!(path.len() <= 4096);
+            }
+        }
+
+        #[test]
+        fn joined_children_stay_under_the_parent(name in "[a-zA-Z0-9._ -]{1,40}") {
+            if let Ok(child) = join_remote("/a/b", &name) {
+                prop_assert!(child.starts_with("/a/b/"));
+                prop_assert!(!child.contains("/../"));
+            }
+        }
+    }
+}

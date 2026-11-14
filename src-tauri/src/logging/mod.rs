@@ -51,10 +51,51 @@ pub fn redact_secret(_value: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
 
     #[test]
     fn secrets_are_redacted() {
         assert_eq!(redact_secret("hunter2"), "[redacted]");
+    }
+
+    /// Static guard: no log or console call may interpolate a credential.
+    #[test]
+    fn logging_never_mentions_credentials() {
+        fn visit(dir: &Path, hits: &mut Vec<String>) {
+            let entries = std::fs::read_dir(dir).expect("read source directory");
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    visit(&path, hits);
+                    continue;
+                }
+                if path.extension().and_then(|value| value.to_str()) != Some("rs") {
+                    continue;
+                }
+                let source = std::fs::read_to_string(&path).expect("read source file");
+                for (index, line) in source.lines().enumerate() {
+                    let lower = line.to_lowercase();
+                    let logs = lower.contains("tracing::")
+                        || lower.contains("println!")
+                        || lower.contains("eprintln!");
+                    let credential = ["password", "passphrase", "secret"]
+                        .iter()
+                        .any(|word| lower.contains(word));
+                    if logs && credential {
+                        hits.push(format!("{}:{}", path.display(), index + 1));
+                    }
+                }
+            }
+        }
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut hits = Vec::new();
+        visit(&root, &mut hits);
+        assert!(
+            hits.is_empty(),
+            "log calls must not interpolate credentials: {hits:?}"
+        );
     }
 }
