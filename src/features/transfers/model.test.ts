@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest"
 import {
   canDropTransfer,
   clearTransferDrag,
+  getTransferDrag,
   isTransferDrag,
   joinLocalPath,
   joinRemotePath,
   readTransferDrag,
+  subscribeTransferDrag,
   transferableEntries,
   unsupportedEntryCount,
   writeTransferDrag,
@@ -128,5 +130,28 @@ describe("transfer drag payloads", () => {
     const opaque = { ...transfer, types: [], getData: () => "" } as unknown as DataTransfer
     expect(isTransferDrag(opaque)).toBe(false)
     expect(readTransferDrag(opaque)).toBeNull()
+  })
+
+  it("does not treat plain text drags as file transfers", () => {
+    const transfer = dataTransfer()
+    transfer.setData("text/plain", "some selected text")
+
+    expect(isTransferDrag(transfer)).toBe(false)
+  })
+
+  it("notifies subscribers when a drag starts and ends", () => {
+    const events: Array<ReturnType<typeof getTransferDrag>> = []
+    const unsubscribe = subscribeTransferDrag(() => events.push(getTransferDrag()))
+    const payload = {
+      scope: { kind: "local" as const },
+      entries: [entry("a.txt")],
+    }
+
+    writeTransferDrag(dataTransfer(), payload)
+    clearTransferDrag()
+    unsubscribe()
+    writeTransferDrag(dataTransfer(), payload)
+
+    expect(events).toEqual([payload, null])
   })
 })

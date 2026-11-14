@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileTable } from "@/features/files/components/file-table"
 import type { SelectionState } from "@/features/files/model/selection"
-import type { TransferDragPayload } from "@/features/transfers/model"
-import type { FsEntry } from "@/lib/ipc/bindings"
+import { clearTransferDrag, type TransferDragPayload } from "@/features/transfers/model"
+import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
 
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: () => number }) => ({
@@ -58,6 +58,7 @@ function renderTable(
   overrides: {
     selection?: SelectionState
     renamingPath?: string | null
+    dragScope?: FsScope
     onDropPayload?: (payload: TransferDragPayload, directory: FsEntry) => void
   } = {},
 ) {
@@ -87,7 +88,7 @@ function renderTable(
       canTransfer
       transferLabel="Download to local"
       transferDirection="download"
-      dragScope={{ kind: "remote", sessionId: "s1" }}
+      dragScope={overrides.dragScope ?? { kind: "remote", sessionId: "s1" }}
       {...handlers}
     />,
   )
@@ -209,6 +210,8 @@ describe("FileTable context menu", () => {
 })
 
 describe("FileTable drag and drop", () => {
+  afterEach(clearTransferDrag)
+
   it("drags the selection and drops it on a folder row", () => {
     const onDropPayload = vi.fn()
     const transfer = dataTransfer()
@@ -252,6 +255,17 @@ describe("FileTable drag and drop", () => {
     fireEvent.click(alpha)
 
     expect(handlers.onSelect).toHaveBeenLastCalledWith(0, "replace")
+  })
+
+  it("does not offer a folder as a drop target for a same-pane drag", () => {
+    const transfer = dataTransfer()
+    renderTable({ selection: selection(0, ["/tmp/alpha.txt"]) })
+
+    fireEvent.dragStart(screen.getByTitle("/tmp/alpha.txt"), { dataTransfer: transfer })
+    const folder = screen.getByTitle("/tmp/beta")
+    fireEvent.dragOver(folder, { dataTransfer: transfer })
+
+    expect(folder.className).not.toContain("bg-primary/10")
   })
 })
 

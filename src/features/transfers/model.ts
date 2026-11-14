@@ -41,9 +41,31 @@ export interface TransferDragPayload {
  * fall back to this in-memory copy. It is cleared when the drag ends.
  */
 let activeDrag: TransferDragPayload | null = null
+const dragListeners = new Set<() => void>()
+
+function notifyDragChange(): void {
+  for (const listener of dragListeners) listener()
+}
+
+/**
+ * Subscribe to transfer drag start/end. Used by the drag overlay and by drop
+ * targets that need to know whether a drag is allowed before it reaches them.
+ */
+export function subscribeTransferDrag(listener: () => void): () => void {
+  dragListeners.add(listener)
+  return () => {
+    dragListeners.delete(listener)
+  }
+}
+
+/** Snapshot of the in-app drag in progress, for `useSyncExternalStore`. */
+export function getTransferDrag(): TransferDragPayload | null {
+  return activeDrag
+}
 
 export function writeTransferDrag(dataTransfer: DataTransfer, payload: TransferDragPayload): void {
   activeDrag = payload
+  notifyDragChange()
   const encoded = JSON.stringify(payload)
   dataTransfer.setData(TRANSFER_DRAG_MIME, encoded)
   // Some WebViews do not expose custom MIME types during dragover. A plain
@@ -54,7 +76,9 @@ export function writeTransferDrag(dataTransfer: DataTransfer, payload: TransferD
 
 /** Forget the in-flight payload once the drag ends or is dropped. */
 export function clearTransferDrag(): void {
+  if (activeDrag === null) return
   activeDrag = null
+  notifyDragChange()
 }
 
 /** Payload of the in-app drag in progress, if any. */
@@ -63,7 +87,14 @@ export function currentTransferDrag(): TransferDragPayload | null {
 }
 
 export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayload | null {
-  const raw = dataTransfer.getData(TRANSFER_DRAG_MIME) || dataTransfer.getData("text/plain")
+  let raw = ""
+  try {
+    // WebKit can throw when data is read outside a drop event, so fall back to
+    // the in-memory payload instead of failing the drag.
+    raw = dataTransfer.getData(TRANSFER_DRAG_MIME) || dataTransfer.getData("text/plain")
+  } catch {
+    raw = ""
+  }
   if (!raw) return activeDrag
   try {
     const parsed = JSON.parse(raw) as Partial<TransferDragPayload>
@@ -75,13 +106,13 @@ export function readTransferDrag(dataTransfer: DataTransfer): TransferDragPayloa
   }
 }
 
-/** Whether a drag event may carry an in-app transfer payload. */
+/**
+ * Whether a drag event may carry an in-app transfer payload. Only the in-memory
+ * payload and the private MIME count: `text/plain` is also used by ordinary
+ * text drags, which must not light up the panes.
+ */
 export function isTransferDrag(dataTransfer: DataTransfer): boolean {
-  return (
-    activeDrag !== null ||
-    dataTransfer.types.includes(TRANSFER_DRAG_MIME) ||
-    dataTransfer.types.includes("text/plain")
-  )
+  return activeDrag !== null || dataTransfer.types.includes(TRANSFER_DRAG_MIME)
 }
 
 /** Transfers only run between the local pane and one remote pane. */

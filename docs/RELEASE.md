@@ -106,8 +106,10 @@ and Linux before publishing a build, using the same checklist for each.
 - [ ] Shortcut hints show `⌘` on macOS and `Ctrl` on Windows/Linux.
 - [ ] Copy/paste works in path, filter and credential fields, and text is not
   accidentally selectable elsewhere.
-- [ ] Drag a file between panes: the drop overlay appears, the transfer starts
-  and both listings refresh when it finishes.
+- [ ] Drag a file between panes: a count badge follows the cursor, only the
+  opposite pane highlights as a drop target, the transfer starts and both
+  listings refresh when it finishes. Dragging inside the same pane shows no
+  drop affordance.
 - [ ] Reduced motion disables spinners and transition-heavy effects.
 - [ ] Native file dialogs, keychain prompts and the "reveal in file manager"
   action open the expected OS UI.

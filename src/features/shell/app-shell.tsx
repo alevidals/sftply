@@ -9,6 +9,7 @@ import { Sidebar } from "@/features/shell/sidebar"
 import { StatusBar } from "@/features/shell/status-bar"
 import { TitleBar } from "@/features/shell/title-bar"
 import { Workspace } from "@/features/shell/workspace"
+import { TransferDragOverlay } from "@/features/transfers/components/transfer-drag-overlay"
 import { useActivityBridge } from "@/hooks/use-activity-bridge"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
@@ -139,6 +140,7 @@ export function AppShell() {
       ) : null}
       <QuickConnectDialog />
       <HostKeyDialog />
+      <TransferDragOverlay />
     </div>
   )
 }

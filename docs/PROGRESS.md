@@ -1246,3 +1246,22 @@ which is only correct for local client connections. See
 **Next**
 
 - Manual check on the running app: select several files, drag one of them to the other pane, confirm every selected file transfers.
+
+### 2026-11-14 — Session 42: drag feedback and honest drop targets
+
+**Changed**
+
+- Added a pointer-following badge while an in-app transfer drag is active: it shows the file name for one entry and the count for several. It is `pointer-events-none` and rendered through a portal, so it never interferes with hit testing.
+- The transfer drag model now has a small subscription (`subscribeTransferDrag` / `getTransferDrag`) consumed through `useSyncExternalStore`, so panes and the overlay react to drag start/end without polling.
+- Drop targets are validated during `dragover`, not only on drop. A pane only calls `preventDefault` and shows the "Drop here to upload/download" affordance when `canDropTransfer` accepts the payload; the source pane shows nothing and the browser renders its own not-allowed cursor. Folder rows follow the same rule.
+- The valid opposite pane gets a subtle ring and a hint pill as soon as the drag starts; hovering it switches to the stronger overlay with the item count.
+- `isTransferDrag` no longer treats `text/plain` as a file transfer, so dragging selected text in an input does not light up the panes. `readTransferDrag` tolerates WebKit throwing when data is read outside a drop event.
+- Updated the manual visual QA checklist for the new drag affordances.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome with no warnings, 217 tests in 32 files, production build). New tests cover the overlay, drag subscriptions, text-only drags and the same-pane drop rejection.
+
+**Next**
+
+- Manual check on the running app: drag several files across panes and confirm the badge, the single valid highlight and the transfer count.

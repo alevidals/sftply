@@ -27,7 +27,9 @@ import { entryNameError } from "@/features/files/model/names"
 import type { SelectionMode, SelectionState } from "@/features/files/model/selection"
 import { useFormatPreferences } from "@/features/settings/settings-context"
 import {
+  canDropTransfer,
   clearTransferDrag,
+  currentTransferDrag,
   isTransferDrag,
   readTransferDrag,
   type TransferDragPayload,
@@ -322,6 +324,8 @@ export function FileTable({
                   onDragOver={(event) => {
                     if (entry.kind !== "directory") return
                     if (!isTransferDrag(event.dataTransfer)) return
+                    const payload = currentTransferDrag() ?? readTransferDrag(event.dataTransfer)
+                    if (!payload || !canDropTransfer(payload, dragScope)) return
                     event.preventDefault()
                     event.stopPropagation()
                     event.dataTransfer.dropEffect = "copy"

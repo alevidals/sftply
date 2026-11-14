@@ -78,6 +78,7 @@ import {
   type TransferDragPayload,
 } from "@/features/transfers/model"
 import { useTransferActions } from "@/features/transfers/use-transfer-actions"
+import { useTransferDrag } from "@/features/transfers/use-transfer-drag"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
@@ -156,6 +157,12 @@ export function DirectoryBrowser({
   const [permissionsTargets, setPermissionsTargets] = useState<FsEntry[]>([])
   const [bookmarksOpen, setBookmarksOpen] = useState(false)
   const [dropActive, setDropActive] = useState(false)
+  const transferDrag = useTransferDrag()
+  const dragTarget: "none" | "valid" | "blocked" = transferDrag
+    ? canDropTransfer(transferDrag, scope)
+      ? "valid"
+      : "blocked"
+    : "none"
 
   const rowHeight = settings.density === "comfortable" ? 38 : 30
   const canChmod = listing?.capabilities.chmod ?? false
@@ -516,6 +523,14 @@ export function DirectoryBrowser({
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     if (!isTransferDrag(event.dataTransfer)) return
+    // Only a pane on the other side can accept the drop. Leaving the event
+    // unprevented makes the browser show its own "not allowed" cursor instead
+    // of our drop affordance.
+    const payload = readTransferDrag(event.dataTransfer)
+    if (!payload || !canDropTransfer(payload, scope)) {
+      setDropActive(false)
+      return
+    }
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
     setDropActive(true)
@@ -550,15 +565,31 @@ export function DirectoryBrowser({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      data-drop-target={dragTarget}
       className={cn(
         "relative flex h-full min-h-0 flex-col bg-background outline-none",
         "data-[active=true]:ring-1 data-[active=true]:ring-primary/15 data-[active=true]:ring-inset",
+        "data-[drop-target=valid]:ring-2 data-[drop-target=valid]:ring-primary/25 data-[drop-target=valid]:ring-inset",
       )}
     >
+      {dragTarget === "valid" && !dropActive ? (
+        <div className="pointer-events-none absolute inset-x-0 top-10 z-10 flex justify-center">
+          <span className="rounded-full border border-dashed border-primary/40 bg-popover/90 px-3 py-1 text-2xs font-medium text-primary shadow-sm">
+            Drop here to {pane === "local" ? "download" : "upload"}
+          </span>
+        </div>
+      ) : null}
       {dropActive ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-primary/5 ring-2 ring-primary/40 ring-inset">
-          <span className="rounded-md border border-primary/40 bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
-            Drop to {pane === "local" ? "download" : "upload"}
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-primary/10 ring-2 ring-primary/50 ring-inset">
+          <span className="flex items-center gap-2 rounded-md border border-primary/40 bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+            {pane === "local" ? (
+              <ArrowDownToLineIcon className="size-3.5 text-primary" />
+            ) : (
+              <ArrowUpFromLineIcon className="size-3.5 text-primary" />
+            )}
+            {transferDrag && transferDrag.entries.length > 1
+              ? `Drop ${transferDrag.entries.length} items to ${pane === "local" ? "download" : "upload"}`
+              : `Drop to ${pane === "local" ? "download" : "upload"}`}
           </span>
         </div>
       ) : null}
