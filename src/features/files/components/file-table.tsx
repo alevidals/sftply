@@ -517,10 +517,26 @@ function RenameField({
   const [error, setError] = useState<string | null>(null)
   const done = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Menus restore focus to their trigger when they close. That can happen after
+  // this input mounts, so focus is retried briefly; the blur handler below waits
+  // for the same window before deciding the user really left.
   useEffect(() => {
-    inputRef.current?.focus()
-    inputRef.current?.select()
+    const focus = () => {
+      const input = inputRef.current
+      if (!input || document.activeElement === input) return
+      input.focus()
+      input.select()
+    }
+    focus()
+    const frame = requestAnimationFrame(focus)
+    const timer = setTimeout(focus, 60)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(timer)
+      if (blurTimer.current) clearTimeout(blurTimer.current)
+    }
   }, [])
 
   const commit = () => {
@@ -559,11 +575,20 @@ function RenameField({
             onCancel()
           }
         }}
+        onFocus={() => {
+          if (blurTimer.current) {
+            clearTimeout(blurTimer.current)
+            blurTimer.current = null
+          }
+        }}
         onBlur={() => {
-          if (!done.current) {
+          if (done.current) return
+          if (blurTimer.current) clearTimeout(blurTimer.current)
+          blurTimer.current = setTimeout(() => {
+            if (done.current || document.activeElement === inputRef.current) return
             done.current = true
             onCancel()
-          }
+          }, 120)
         }}
         onClick={(event) => event.stopPropagation()}
         aria-label="New name"

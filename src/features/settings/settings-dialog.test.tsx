@@ -134,7 +134,7 @@ describe("SettingsDialog", () => {
     )
   })
 
-  it("keeps the submit button width stable while saving", () => {
+  it("delays the saving spinner so a fast save does not flash it", async () => {
     const { rerender } = render(<SettingsDialog />)
     const button = screen.getByRole("button", { name: "Save changes" })
     const label = button.querySelector('[data-slot="submit-label"]')
@@ -143,11 +143,17 @@ describe("SettingsDialog", () => {
     expect(label).not.toHaveClass("opacity-0")
     expect(button.querySelector('[data-slot="spinner"]')).not.toBeInTheDocument()
 
-    // The label stays in the layout (only transparent) so the right-aligned
-    // button cannot change width when the spinner appears.
     state.saving = true
     rerender(<SettingsDialog />)
-    expect(label).toHaveClass("opacity-0")
+
+    // For the first frame the label stays visible: most saves finish before
+    // the delay, and a one-frame spinner reads as a glitch.
+    expect(label).not.toHaveClass("opacity-0")
+    expect(button.querySelector('[data-slot="spinner"]')).not.toBeInTheDocument()
+
+    // The label stays in the layout (only transparent) so the right-aligned
+    // button cannot change width when the spinner appears.
+    await waitFor(() => expect(label).toHaveClass("opacity-0"))
     expect(button.querySelector('[data-slot="spinner"]')).toBeInTheDocument()
     expect(button).toHaveAttribute("aria-busy", "true")
   })

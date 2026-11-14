@@ -48,6 +48,7 @@ import {
   toConnectionInput,
   valuesFromProfile,
 } from "@/features/connections/schema"
+import { useDelayedFlag } from "@/hooks/use-delayed-flag"
 import { errorMessage } from "@/lib/errors"
 import type { ConnectionProfile_Serialize, ConnectionProtocol } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
@@ -66,6 +67,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   })
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const showSaving = useDelayedFlag(saving)
   const [error, setError] = useState<string | null>(null)
   const secretStatus = useSecretStatus(connection?.id ?? null, open)
   const authKind = form.watch("authKind")
@@ -557,7 +559,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
               Cancel
             </Button>
             <Button type="submit" disabled={saving || testing}>
-              {saving ? "Saving…" : connection ? "Save changes" : "Save connection"}
+              {showSaving ? "Saving…" : connection ? "Save changes" : "Save connection"}
             </Button>
           </DialogFooter>
         </form>

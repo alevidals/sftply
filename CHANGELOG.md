@@ -14,6 +14,12 @@ All notable changes to sftply. The format follows
 
 ### Fixed
 
+- Save buttons flashed a spinner for a few milliseconds, because a settings or
+  connection save finishes faster than the frame that shows it. The spinner now
+  waits 200 ms before appearing; quick saves keep the label.
+- Renaming from the menu still lost focus to the row. The inline input retries
+  focus for a short window and ignores the transient blur caused by the menu
+  restoring focus, so the rename stays open and selected.
 - The transfer queue re-sorted every row on each progress event. With hundreds
   of files and eight concurrent transfers the window froze and cancelling became
   impossible. Rows now reorder only when they appear or disappear, and the

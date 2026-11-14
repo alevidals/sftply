@@ -24,6 +24,7 @@ import { useSettings } from "@/features/settings/settings-context"
 import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
 import { UpdateCheck } from "@/features/settings/update-check"
 import { useAppInfo } from "@/hooks/use-app-info"
+import { useDelayedFlag } from "@/hooks/use-delayed-flag"
 import { errorMessage } from "@/lib/errors"
 import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
 import { isMacPlatform } from "@/lib/shortcuts"
@@ -82,6 +83,7 @@ export function SettingsDialog() {
   const tab = useUiStore((state) => state.settingsTab)
   const setTab = useUiStore((state) => state.setSettingsTab)
   const wasOpen = useRef(false)
+  const showSaving = useDelayedFlag(saving)
   const isMac = isMacPlatform(appInfo.data?.platform)
 
   const form = useForm<SettingsFormValues>({
@@ -493,10 +495,10 @@ export function SettingsDialog() {
                   so the button keeps its exact width. The spinner overlays it
                   instead of being inserted, which would widen the right-aligned
                   button and shift both footer buttons. */}
-              <span data-slot="submit-label" className={saving ? "opacity-0" : undefined}>
+              <span data-slot="submit-label" className={showSaving ? "opacity-0" : undefined}>
                 Save changes
               </span>
-              {saving ? (
+              {showSaving ? (
                 <span className="absolute inset-0 flex items-center justify-center">
                   <Spinner aria-hidden className="size-3.5" />
                 </span>

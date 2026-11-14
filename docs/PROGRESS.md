@@ -1718,3 +1718,22 @@ which is only correct for local client connections. See
 - Store tests: snapshot sorting, stable order on updates, prepend on insert,
   removal, and duplicate upserts in one batch.
 - Rust 133 tests, clippy clean, 246 frontend tests, production build.
+
+### 2026-11-14 — Session 56: save spinner and rename focus
+
+**Fixed**
+
+- **Spinner flash.** Settings and connection saves complete in a few
+  milliseconds, so the button swapped to a spinner for one frame. `useDelayedFlag`
+  keeps the label for the first 200 ms and only then shows progress; `aria-busy`
+  still reflects the real state.
+- **Rename focus.** Menu close restores focus to the trigger after the inline
+  input mounts, and the input's blur handler treated that as "user left" and
+  cancelled the rename. The field now retries focus on the next frame and after
+  60 ms, and its blur handler waits 120 ms and re-checks `activeElement` before
+  cancelling.
+
+**Verified**
+
+- Settings dialog test updated to assert the first frame has no spinner and the
+  delayed frame does. Frontend 246 tests, typecheck, lint and build green.
