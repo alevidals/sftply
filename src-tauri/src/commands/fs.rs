@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_opener::{open_path, reveal_item_in_dir};
 
 use crate::app_state::AppState;
-use crate::domain::fs::{FsEntry, FsScope, Listing};
+use crate::domain::fs::{EntryKind, FsEntry, FsScope, Listing};
 use crate::domain::text::{MAX_TEXT_FILE_BYTES, TextFile, text_version};
 use crate::domain::transfer::ConflictPolicy;
 use crate::error::{AppError, ErrorCode};
@@ -35,6 +35,19 @@ fn operation_timeout(state: &AppState) -> Duration {
     Duration::from_secs(state.settings.get().operation_timeout_seconds.into())
 }
 
+/// List a remote folder and reject the "empty stream for a missing path" answer
+/// some FTP servers give, so a bad path never looks like an empty folder.
+async fn list_remote(client: &mut Box<dyn RemoteFs>, path: String) -> Result<Listing, AppError> {
+    let listing = client.list(&path).await?;
+    if listing.entries.is_empty() {
+        let entry = client.stat(&listing.path).await?;
+        if entry.kind != EntryKind::Directory {
+            return Err(AppError::invalid_input("That path is not a folder."));
+        }
+    }
+    Ok(listing)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn fs_list(
@@ -49,7 +62,7 @@ pub async fn fs_list(
         FsScope::Remote { .. } => {
             let session = remote_session(&state, &scope)?;
             let result = run_operation(&session, operation_timeout(&state), |client| {
-                Box::pin(async move { client.list(&path).await })
+                Box::pin(list_remote(client, path))
             })
             .await;
             match result {
@@ -390,4 +403,132 @@ pub async fn local_reveal(path: String) -> Result<(), AppError> {
             AppError::new(ErrorCode::Internal, "Could not reveal the item.")
                 .with_detail(error.to_string())
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use async_trait::async_trait;
+
+    use super::*;
+    use crate::domain::fs::{FsCapabilities, FsEntry};
+
+    struct FakeRemote {
+        entries: Vec<FsEntry>,
+        stat: Option<Result<FsEntry, AppError>>,
+    }
+
+    #[async_trait]
+    impl RemoteFs for FakeRemote {
+        async fn list(&mut self, path: &str) -> Result<Listing, AppError> {
+            Ok(Listing {
+                path: path.to_string(),
+                parent: None,
+                entries: self.entries.clone(),
+                capabilities: FsCapabilities::local(),
+                read_at: 0.0,
+                warnings: Vec::new(),
+            })
+        }
+
+        async fn stat(&mut self, _path: &str) -> Result<FsEntry, AppError> {
+            self.stat
+                .take()
+                .expect("stat must only run for an empty listing")
+        }
+
+        async fn mkdir(&mut self, _parent: &str, _name: &str) -> Result<FsEntry, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn rename(&mut self, _path: &str, _new_name: &str) -> Result<FsEntry, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn delete(&mut self, _path: &str, _recursive: bool) -> Result<(), AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn chmod(&mut self, _path: &str, _mode: u32) -> Result<(), AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn open_read(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn crate::fs::FileReader>, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn open_write(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn crate::fs::FileWriter>, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn disconnect(&mut self) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> FsCapabilities {
+            FsCapabilities::local()
+        }
+    }
+
+    fn directory_entry(path: &str) -> FsEntry {
+        FsEntry {
+            name: "folder".to_string(),
+            path: path.to_string(),
+            kind: EntryKind::Directory,
+            size: 0.0,
+            modified_at: None,
+            permissions: None,
+            owner: None,
+            group: None,
+            link_target: None,
+            hidden: false,
+            metadata_complete: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_listing_of_a_missing_folder_is_an_error() {
+        let mut client: Box<dyn RemoteFs> = Box::new(FakeRemote {
+            entries: Vec::new(),
+            stat: Some(Err(AppError::not_found("That remote item does not exist."))),
+        });
+
+        let error = list_remote(&mut client, "/missing".to_string())
+            .await
+            .expect_err("a missing folder must not look empty");
+        assert_eq!(error.code, ErrorCode::NotFound);
+    }
+
+    #[tokio::test]
+    async fn empty_listing_of_a_real_folder_is_allowed() {
+        let mut client: Box<dyn RemoteFs> = Box::new(FakeRemote {
+            entries: Vec::new(),
+            stat: Some(Ok(directory_entry("/empty"))),
+        });
+
+        let listing = list_remote(&mut client, "/empty".to_string())
+            .await
+            .expect("an empty folder is still a folder");
+        assert!(listing.entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn non_empty_listings_skip_the_extra_stat() {
+        let mut client: Box<dyn RemoteFs> = Box::new(FakeRemote {
+            entries: vec![directory_entry("/full/folder")],
+            stat: None,
+        });
+
+        let listing = list_remote(&mut client, "/full".to_string())
+            .await
+            .expect("non-empty listing");
+        assert_eq!(listing.entries.len(), 1);
+    }
 }

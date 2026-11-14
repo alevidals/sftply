@@ -15,6 +15,14 @@ All notable changes to sftply. The format follows
 - A manual **Check for updates** button in Settings → About. It makes one
   request to the public GitHub releases API, compares versions and offers the
   release page. Nothing is downloaded or installed automatically.
+- **Test connection** in the new-connection and quick-connect dialogs. It opens a
+  throwaway connection, lists the initial folder and reports latency and entry
+  count; nothing is saved and no session is created.
+- Folder autocomplete while editing the path, with arrow-key selection. It
+  suggests real folders listed from the parent being typed.
+- A home button in the local pane's path bar.
+- Stronger active-pane indicator: an accent line on top and a tinted header, in
+  addition to the pane ring.
 - Weekly dependency audits (`cargo audit`, `bun audit --production`) on CI.
 
 ### Changed
@@ -23,6 +31,21 @@ All notable changes to sftply. The format follows
 - `shadcn` moved to `devDependencies`; it is only needed to build the CSS.
 - The production bundle is split into long-lived vendor chunks instead of a
   single 888 kB file.
+- Deleting a connection no longer reports failure when the keychain cleanup
+  fails after the profile is already gone; it logs the problem instead.
+
+### Fixed
+
+- `⌘L`/`Ctrl+L` edited the remote path regardless of which pane was active. Both
+  panes mounted the same global shortcut.
+- Opening a folder that does not exist showed an empty listing when the server
+  answered `LIST` with an empty stream. The listing now verifies the path and
+  reports the server error.
+- Right-clicking outside a text field showed the webview menu ("Reload", "Back").
+  The desktop context menu is suppressed everywhere except editable fields.
+- The connect icon in a connection row sat inside the space reserved for the
+  hover-only actions button; the actions button now comes first so the connect
+  icon stays at the right edge.
 
 ### Security
 

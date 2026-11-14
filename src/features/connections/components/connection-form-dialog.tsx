@@ -1,7 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useQueryClient } from "@tanstack/react-query"
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog"
-import { FolderOpenIcon, KeyRoundIcon, LockKeyholeIcon, ServerIcon } from "lucide-react"
+import {
+  FolderOpenIcon,
+  KeyRoundIcon,
+  LockKeyholeIcon,
+  PlugZapIcon,
+  ServerIcon,
+} from "lucide-react"
 import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -59,6 +65,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
     defaultValues: emptyConnectionValues(),
   })
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const secretStatus = useSecretStatus(connection?.id ?? null, open)
   const authKind = form.watch("authKind")
@@ -136,6 +143,31 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
       setSaving(false)
     }
   })
+
+  const runTest = async () => {
+    if (!(await form.trigger())) return
+    const values = form.getValues()
+    setTesting(true)
+    setError(null)
+    try {
+      const result = await connectionsApi.test(
+        toConnectionInput(values),
+        connection?.id ?? null,
+        values.secret || null,
+      )
+      toast.success(`Connected in ${Math.max(1, Math.round(result.latencyMs))} ms`, {
+        description: `${result.entryCount} items in ${result.path}`,
+      })
+      recordActivity(
+        "success",
+        `Tested ${values.host.trim() || "the server"} (${Math.round(result.latencyMs)} ms)`,
+      )
+    } catch (cause) {
+      setError(errorMessage(cause))
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const removeSecret = async () => {
     if (!connection) return
@@ -506,13 +538,23 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
           <DialogFooter>
             <Button
               type="button"
+              variant="ghost"
+              className="mr-auto"
+              disabled={saving || testing}
+              onClick={() => void runTest()}
+            >
+              <PlugZapIcon />
+              {testing ? "Testing…" : "Test connection"}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
-              disabled={saving}
+              disabled={saving || testing}
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving || testing}>
               {saving ? "Saving…" : connection ? "Save changes" : "Save connection"}
             </Button>
           </DialogFooter>

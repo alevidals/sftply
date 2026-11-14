@@ -7,6 +7,7 @@ import {
   type ConnectionImportSummary,
   type ConnectionInput_Deserialize,
   type ConnectionProfile_Serialize,
+  type ConnectionTestResult,
   commands,
   type FsEntry,
   type FsScope,
@@ -165,6 +166,14 @@ export const ipc = {
 
   connectionSecretStatus(id: string): Promise<SecretStatus> {
     return invoke(commands.connectionSecretStatus(id)).then((result) => unwrap(result))
+  },
+
+  connectionTest(
+    input: ConnectionInput_Deserialize,
+    id: string | null,
+    secret: string | null,
+  ): Promise<ConnectionTestResult> {
+    return invoke(commands.connectionTest(input, id, secret)).then((result) => unwrap(result))
   },
 
   connectionsExport(path: string): Promise<ConnectionExportSummary> {

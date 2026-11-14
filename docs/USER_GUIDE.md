@@ -33,8 +33,14 @@ Verify `SHA256SUMS` before running a file from a mirror you do not control.
 The password or passphrase is written to the operating system keychain, never to
 `connections.json`. Deleting a connection deletes its keychain entries.
 
+**Test connection** probes the values you have typed: it opens a throwaway
+connection, lists the initial folder and reports the latency and how many items
+the folder contains. Nothing is saved and no session is opened. For SFTP, an
+unknown host key still fails the probe, because the key must be reviewed first.
+
 **Quick connect** (`⌘K`/`Ctrl+K` from the sidebar, or the bolt button) opens a
-temporary session without saving anything.
+temporary session without saving anything, and has the same **Test connection**
+button.
 
 ### Key authentication (SFTP)
 
@@ -63,8 +69,13 @@ Only disable certificate validation for a host you control and understand.
 
 ## Browsing
 
-- `⌘1` / `⌘2` (`Ctrl+1` / `Ctrl+2`) focus the local and remote panes.
-- `⌘L` edits the path, `⌘F` filters the current folder, `⌘R` refreshes.
+- `⌘1` / `⌘2` (`Ctrl+1` / `Ctrl+2`) focus the local and remote panes. The active
+  pane has an accent line and a tinted header.
+- `⌘L` edits the path of the active pane only.
+- While editing a path, matching folders from the parent directory appear as you
+  type; `↑`/`↓` choose, `Enter` opens, `Esc` cancels.
+- The house icon in the local path bar jumps to your home folder.
+- `⌘F` filters the current folder, `⌘R` refreshes.
 - Arrow keys move, `Shift` extends, `Space` toggles, `Enter` opens, `F2` renames.
 - `⌘A` selects everything, `Esc` clears the selection.
 - Drag a selection between panes to transfer; the destination refreshes when the

@@ -13,6 +13,7 @@ import { TransferDragOverlay } from "@/features/transfers/components/transfer-dr
 import { useActivityBridge } from "@/hooks/use-activity-bridge"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
+import { useDesktopContextMenu } from "@/hooks/use-desktop-context-menu"
 import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
 import { useStartupReport } from "@/hooks/use-startup-report"
 import { useTransferBridge } from "@/hooks/use-transfer-bridge"
@@ -54,6 +55,7 @@ export function AppShell() {
   useSessionBridge()
   useTransferBridge()
   useGlobalShortcuts()
+  useDesktopContextMenu()
 
   useEffect(() => {
     if (!appInfo.data || readyLogged.current) return

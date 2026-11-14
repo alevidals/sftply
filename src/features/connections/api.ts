@@ -34,6 +34,10 @@ export const connectionsApi = {
     return ipc.connectionSetFavorite(id, favorite)
   },
 
+  test(input: ConnectionInput_Deserialize, id: string | null, secret: string | null) {
+    return ipc.connectionTest(input, id, secret)
+  },
+
   reorder(ids: string[]): Promise<ConnectionProfile_Serialize[]> {
     return ipc.connectionReorder(ids)
   },

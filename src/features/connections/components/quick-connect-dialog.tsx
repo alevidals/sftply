@@ -1,8 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog"
-import { FolderOpenIcon, KeyRoundIcon, LockKeyholeIcon, ServerIcon, ZapIcon } from "lucide-react"
+import {
+  FolderOpenIcon,
+  KeyRoundIcon,
+  LockKeyholeIcon,
+  PlugZapIcon,
+  ServerIcon,
+  ZapIcon,
+} from "lucide-react"
 import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { connectionsApi } from "@/features/connections/api"
 import {
   defaultPort,
   emptyQuickConnectValues,
@@ -35,6 +44,7 @@ import {
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
 import { errorMessage } from "@/lib/errors"
 import type { ConnectionProtocol } from "@/lib/ipc/bindings"
+import { recordActivity } from "@/stores/activity-store"
 import { useUiStore } from "@/stores/ui-store"
 
 /**
@@ -50,6 +60,7 @@ export function QuickConnectDialog() {
     defaultValues: emptyQuickConnectValues(),
   })
   const [connecting, setConnecting] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const authKind = form.watch("authKind")
   const protocol = form.watch("protocol")
@@ -94,6 +105,31 @@ export function QuickConnectDialog() {
     })
     if (typeof selected === "string") {
       form.setValue("tlsCaFile", selected, { shouldValidate: true })
+    }
+  }
+
+  const runTest = async () => {
+    if (!(await form.trigger())) return
+    const values = form.getValues()
+    setTesting(true)
+    setError(null)
+    try {
+      const result = await connectionsApi.test(
+        toQuickConnectInput(values),
+        null,
+        values.secret || null,
+      )
+      toast.success(`Connected in ${Math.max(1, Math.round(result.latencyMs))} ms`, {
+        description: `${result.entryCount} items in ${result.path}`,
+      })
+      recordActivity(
+        "success",
+        `Tested ${values.host.trim() || "the server"} (${Math.round(result.latencyMs)} ms)`,
+      )
+    } catch (cause) {
+      setError(errorMessage(cause))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -453,13 +489,23 @@ export function QuickConnectDialog() {
           <DialogFooter>
             <Button
               type="button"
+              variant="ghost"
+              className="mr-auto"
+              disabled={connecting || testing}
+              onClick={() => void runTest()}
+            >
+              <PlugZapIcon />
+              {testing ? "Testing…" : "Test connection"}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
-              disabled={connecting}
+              disabled={connecting || testing}
               onClick={() => setOpen(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={connecting}>
+            <Button type="submit" disabled={connecting || testing}>
               <ServerIcon />
               {connecting ? "Connecting…" : "Connect"}
             </Button>

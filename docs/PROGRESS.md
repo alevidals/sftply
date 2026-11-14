@@ -1509,3 +1509,53 @@ which is only correct for local client connections. See
 
 - Real-machine QA of the new menu and the update check before tagging 0.2.0.
 - Remote previews, diff and sync stay in 1.1.
+
+### 2026-11-14 — Session 50: bug fixes from real use
+
+**Fixed**
+
+- **`⌘L` always edited the remote path.** Every `PathBar` mounted the same
+  window-level shortcut, so both panes entered edit mode and the last mount won.
+  The handler now checks `activePane === pane`.
+- **Missing folders looked empty.** pure-ftpd (and other servers) answer `LIST`
+  for a nonexistent path with an empty data stream instead of an error. The
+  remote list command now stats the path when the listing is empty and returns
+  the server error otherwise, so the pane shows its error state. Typed paths are
+  also validated before navigation: the listing is fetched first and the path is
+  committed only when it succeeds.
+- **Webview context menu.** Right-clicking outside a field offered "Reload" and
+  "Back". A document-level handler now suppresses `contextmenu` everywhere except
+  inputs, textareas, selects and contenteditable elements.
+- **Connect icon spacing.** The hover-only actions button came after the connect
+  button and reserved space to its right, so the power icon looked off-centre.
+  The actions button now precedes it and the connect icon sits at the row edge.
+- **Keychain cleanup** on delete is confirmed: `connection_delete` removes both
+  secret kinds after the profile is deleted. A keychain failure is now logged
+  instead of reporting the deletion as failed, because the row is already gone.
+
+**Added**
+
+- **Test connection** (`connection_test`) in the connection form and quick
+  connect. It normalizes the input, resolves the secret from the form, the
+  keychain (by connection id) or anonymous FTP, connects with the shared
+  `connect_client`, lists the initial path, disconnects, and returns latency and
+  entry count. Unknown SFTP host keys still fail, by design.
+- **Path autocomplete.** The path bar asks the active pane for folders matching
+  the leaf being typed from the parent directory, debounced at 160 ms with stale
+  responses dropped. Arrow keys move through the list and `Enter` navigates.
+- **Home button** in the local path bar, backed by the existing home path.
+- **Active pane indicator**: a 2 px accent line at the top of the pane plus a
+  tinted header, on top of the existing ring.
+
+**Verified**
+
+- Rust: 125 passed, 19 ignored; clippy clean. New tests cover the empty-listing
+  guard (missing folder errors, real empty folder succeeds, non-empty skips the
+  extra stat).
+- Frontend: 241 tests in 38 files, including `⌘L` per active pane, context-menu
+  suppression, home button, autocomplete selection and the quick-connect probe.
+- `bun run typecheck`, `bun run lint`, production build.
+
+**Next**
+
+- Real-machine check of the new interactions, then tag 0.2.0.

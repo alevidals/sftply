@@ -52,7 +52,7 @@ import { type FileAction, FileTable } from "@/features/files/components/file-tab
 import { PaneEmpty } from "@/features/files/components/pane-empty"
 import { PathBar } from "@/features/files/components/path-bar"
 import { TextEditorDialog } from "@/features/files/components/text-editor-dialog"
-import { useFsListing } from "@/features/files/hooks/use-fs-listing"
+import { fsListingKey, useFsListing } from "@/features/files/hooks/use-fs-listing"
 import { usePathNavigation } from "@/features/files/hooks/use-path-navigation"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
 import { addBookmark, addRecentPath, removeBookmark } from "@/features/files/model/navigation"
@@ -489,6 +489,53 @@ export function DirectoryBrowser({
       .catch((error) => reportError("Could not clear recent folders", error))
   }
 
+  const suggestPaths = useCallback(
+    async (value: string) => {
+      const trimmed = value.trim()
+      const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"))
+      if (slash < 0) return []
+      const parent = slash === 0 ? "/" : trimmed.slice(0, slash)
+      const separator = trimmed.includes("\\") && !trimmed.startsWith("/") ? "\\" : "/"
+      const stem = trimmed.slice(slash + 1).toLowerCase()
+
+      try {
+        const listed = await filesApi(scope).list(parent, settings.showHiddenFiles)
+        const base =
+          listed.path.endsWith("/") || listed.path.endsWith("\\")
+            ? listed.path.slice(0, -1)
+            : listed.path
+        return listed.entries
+          .filter(
+            (entry) => entry.kind === "directory" && entry.name.toLowerCase().startsWith(stem),
+          )
+          .slice(0, 8)
+          .map((entry) => `${base}${separator}${entry.name}`)
+      } catch {
+        // A folder that cannot be listed simply offers no completions.
+        return []
+      }
+    },
+    [scope, settings.showHiddenFiles],
+  )
+
+  const navigateFromPathBar = async (target: string) => {
+    try {
+      // List first and only then commit the path: an invalid or unreadable
+      // folder must not leave the pane showing an empty listing.
+      const fetched = await queryClient.fetchQuery({
+        queryKey: fsListingKey(scope, target, settings.showHiddenFiles),
+        queryFn: () => filesApi(scope).list(target, settings.showHiddenFiles),
+        retry: false,
+        staleTime: 5_000,
+      })
+      navigate(fetched.path)
+    } catch (cause) {
+      const normalized = normalizeError(cause)
+      toast.error("That folder could not be opened", { description: normalized.message })
+      recordActivity("error", `Open folder failed: ${normalized.message}`)
+    }
+  }
+
   const shortcutActions = useRef({
     refresh,
     back,
@@ -606,10 +653,16 @@ export function DirectoryBrowser({
       data-drop-target={dragTarget}
       className={cn(
         "relative flex h-full min-h-0 flex-col bg-background outline-none",
-        "data-[active=true]:ring-1 data-[active=true]:ring-primary/15 data-[active=true]:ring-inset",
+        "data-[active=true]:ring-1 data-[active=true]:ring-primary/25 data-[active=true]:ring-inset",
         "data-[drop-target=valid]:ring-2 data-[drop-target=valid]:ring-primary/25 data-[drop-target=valid]:ring-inset",
       )}
     >
+      {isActive ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 bg-primary/80"
+        />
+      ) : null}
       {dragTarget === "valid" && !dropActive ? (
         <div className="pointer-events-none absolute inset-x-0 top-10 z-10 flex justify-center">
           <span className="rounded-full border border-dashed border-primary/40 bg-popover/90 px-3 py-1 text-2xs font-medium text-primary shadow-sm">
@@ -631,7 +684,10 @@ export function DirectoryBrowser({
           </span>
         </div>
       ) : null}
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/70 bg-panel-header px-3">
+      <div
+        data-active={isActive}
+        className="flex h-10 shrink-0 items-center gap-2 border-b border-border/70 bg-panel-header px-3 data-[active=true]:bg-primary/[0.06]"
+      >
         <PaneIcon className={cn("size-3.5", isActive ? "text-primary" : "text-muted-foreground")} />
         <span className="min-w-0 truncate text-xs font-semibold text-foreground">{title}</span>
         <Badge variant="secondary" className="h-4.5 px-1.5 text-[10px] font-medium">
@@ -677,6 +733,7 @@ export function DirectoryBrowser({
 
       {path ? (
         <PathBar
+          pane={pane}
           path={path}
           canBack={canBack}
           canForward={canForward}
@@ -684,7 +741,10 @@ export function DirectoryBrowser({
           onBack={back}
           onForward={forward}
           onUp={() => parent && navigate(parent)}
+          onHome={homePath ? goHome : undefined}
           onNavigate={navigate}
+          onSubmitPath={navigateFromPathBar}
+          suggestPath={suggestPaths}
         >
           {bookmarkKey ? (
             <ToolbarButton

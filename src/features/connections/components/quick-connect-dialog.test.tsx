@@ -9,6 +9,10 @@ const actions = vi.hoisted(() => ({
   quickConnect: vi.fn(),
 }))
 
+const api = vi.hoisted(() => ({
+  test: vi.fn(),
+}))
+
 vi.mock("@/features/sessions/hooks/use-session-actions", () => ({
   useSessionActions: () => actions,
 }))
@@ -17,8 +21,13 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }))
 
+vi.mock("@/features/connections/api", () => ({
+  connectionsApi: api,
+}))
+
 beforeEach(() => {
   actions.quickConnect.mockReset()
+  api.test.mockReset()
   actions.quickConnect.mockResolvedValue(undefined)
   useUiStore.setState({ quickConnectOpen: true })
 })
@@ -44,6 +53,25 @@ describe("QuickConnectDialog", () => {
       false,
     )
     expect(useUiStore.getState().quickConnectOpen).toBe(false)
+  })
+
+  it("tests the connection without saving or opening a session", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    api.test.mockResolvedValue({ latencyMs: 42, entryCount: 7, path: "/" })
+    renderDialog()
+
+    await user.type(screen.getByLabelText("Host"), "ftp.example.com")
+    await user.type(screen.getByLabelText("Username"), "ada")
+    await user.type(screen.getByLabelText("Password"), "s3cret")
+    await user.click(screen.getByRole("button", { name: "Test connection" }))
+
+    await waitFor(() => expect(api.test).toHaveBeenCalledTimes(1))
+    expect(api.test).toHaveBeenCalledWith(
+      expect.objectContaining({ host: "ftp.example.com", username: "ada" }),
+      null,
+      "s3cret",
+    )
+    expect(actions.quickConnect).not.toHaveBeenCalled()
   })
 
   it("requires a name before saving a connection", async () => {

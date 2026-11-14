@@ -354,49 +354,13 @@ export function ConnectionRow({
             </span>
           </button>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={
-                  connecting
-                    ? `Connecting to ${connection.name}`
-                    : session
-                      ? `Disconnect from ${connection.name}`
-                      : `Connect to ${connection.name}`
-                }
-                disabled={connecting}
-                onClick={() => (session ? onDisconnect(session.id) : onConnect())}
-                className={cn(
-                  "shrink-0 text-muted-foreground",
-                  session && "text-success",
-                  !session &&
-                    !connecting &&
-                    "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-                )}
-              >
-                {connecting ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : session ? (
-                  <PowerIcon />
-                ) : (
-                  <PlayIcon />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={6}>
-              {connecting ? "Connecting…" : session ? "Disconnect" : "Connect"}
-            </TooltipContent>
-          </Tooltip>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label={`Actions for ${connection.name}`}
-                className="mr-1 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                className="shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <MoreHorizontalIcon />
               </Button>
@@ -441,6 +405,42 @@ export function ConnectionRow({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={
+                  connecting
+                    ? `Connecting to ${connection.name}`
+                    : session
+                      ? `Disconnect from ${connection.name}`
+                      : `Connect to ${connection.name}`
+                }
+                disabled={connecting}
+                onClick={() => (session ? onDisconnect(session.id) : onConnect())}
+                className={cn(
+                  "mr-1 shrink-0 text-muted-foreground",
+                  session && "text-success",
+                  !session &&
+                    !connecting &&
+                    "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                )}
+              >
+                {connecting ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : session ? (
+                  <PowerIcon />
+                ) : (
+                  <PlayIcon />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={6}>
+              {connecting ? "Connecting…" : session ? "Disconnect" : "Connect"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </ContextMenuTrigger>
 

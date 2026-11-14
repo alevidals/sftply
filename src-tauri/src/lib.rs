@@ -56,6 +56,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::connections::connection_secret_status,
             commands::connections::connections_export,
             commands::connections::connections_import,
+            commands::connections::connection_test,
             commands::connections::known_hosts_list,
             commands::connections::known_host_trust,
             commands::connections::known_host_remove,

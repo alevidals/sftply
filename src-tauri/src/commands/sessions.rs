@@ -327,7 +327,9 @@ async fn open_session(
 }
 
 /// Read the credentials for a saved connection from the OS keychain.
-async fn resolve_credentials(profile: &ConnectionProfile) -> Result<SessionCredentials, AppError> {
+pub(crate) async fn resolve_credentials(
+    profile: &ConnectionProfile,
+) -> Result<SessionCredentials, AppError> {
     match &profile.auth {
         ConnectionAuth::Password => {
             let password = credentials::get_secret(&profile.id, SecretKind::Password).await?;

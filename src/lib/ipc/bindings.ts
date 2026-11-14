@@ -35,6 +35,7 @@ export const commands = {
 	connectionSecretStatus: (id: string) => typedError<SecretStatus, AppError_Serialize>(__TAURI_INVOKE("connection_secret_status", { id })),
 	connectionsExport: (path: string) => typedError<ConnectionExportSummary, AppError_Serialize>(__TAURI_INVOKE("connections_export", { path })),
 	connectionsImport: (path: string) => typedError<ConnectionImportSummary, AppError_Serialize>(__TAURI_INVOKE("connections_import", { path })),
+	connectionTest: (input: ConnectionInput_Deserialize, id: string | null, secret: string | null) => typedError<ConnectionTestResult, AppError_Serialize>(__TAURI_INVOKE("connection_test", { input, id, secret })),
 	knownHostsList: () => __TAURI_INVOKE<KnownHost[]>("known_hosts_list"),
 	knownHostTrust: (host: string, port: number, keyType: string, fingerprint: string) => typedError<KnownHost, AppError_Serialize>(__TAURI_INVOKE("known_host_trust", { host, port, keyType, fingerprint })),
 	knownHostRemove: (host: string, port: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("known_host_remove", { host, port })),
@@ -305,6 +306,14 @@ export type ConnectionProfile_Serialize = {
 };
 
 export type ConnectionProtocol = "ftp" | "ftpsExplicit" | "ftpsImplicit" | "sftp";
+
+/**  Result of a connection probe. Nothing is saved and no session is created. */
+export type ConnectionTestResult = {
+	latencyMs: number,
+	entryCount: number,
+	/**  Path that was listed, already normalized by the server adapter. */
+	path: string,
+};
 
 /**  How file modification timestamps are displayed. */
 export type DateFormat = "friendly" | "iso";
