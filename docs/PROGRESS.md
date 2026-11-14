@@ -1414,10 +1414,13 @@ which is only correct for local client connections. See
 - Headless screenshots of the full page in dark and light at 1440 px and in dark
   at 390 px: single column on mobile, no overflow, both themes legible.
 - `bun run lint` and the root `bun run check` stay green.
+- Pages was enabled with `build_type: workflow`; run `43594374807` built in 20 s
+  and deployed in 10 s. `https://alevidals.github.io/sftply/` returns 200, the
+  hashed CSS loads, and the live render matches the local one. The repository
+  homepage now points at the site.
 
 **Next**
 
-- Enable Pages (Settings → Pages → Source: GitHub Actions) and confirm the first
-  deploy.
-- Add a signed Developer ID before pointing a custom domain at the site, and
-  decide the license the footer currently calls out as undecided.
+- Buy or point a custom domain, then set `SITE_URL`, `SITE_BASE=/` and the Pages
+  custom domain.
+- Decide the license before inviting downloads from the site itself.
