@@ -820,6 +820,17 @@ kbd {
   color: var(--fg-subtle);
 }
 
+.footer-note a {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.footer-note a:hover {
+  color: var(--fg-muted);
+  text-decoration-color: var(--primary);
+}
+
 /* --------------------------------------------------------------- responsive */
 
 @media (max-width: 860px) {

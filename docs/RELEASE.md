@@ -125,11 +125,35 @@ Point the project at the `web/` root directory and use `bun run build` with
 
 ## Licensing
 
-The repository and the published binaries currently have no license file. Public
-visibility is not a grant of rights: without a license, others may not legally
-use, modify or redistribute the app. Add a `LICENSE` before asking anyone to
-download it for real use, and align the text with whichever model is chosen
-(permissive, copyleft or source-available).
+sftply is MIT licensed (`LICENSE`). Anyone may use, modify, redistribute and sell
+it, provided the copyright notice and permission notice are kept. That matches
+the intent: free to use, easy to contribute to, no adoption friction.
+
+Third-party dependencies keep their own licenses. `cargo deny`/`cargo license`
+would be the next step if the app is ever distributed commercially.
+
+## Unsigned distribution
+
+There is no Apple Developer ID certificate and no Windows code-signing
+certificate, so **no release is OS-signed**. This is a permanent constraint of the
+project, not a pending task, and the documentation says so everywhere a user
+might look:
+
+- `README.md` and the landing page explain the first-launch prompts.
+- `SECURITY.md` states the trade-off and points at `SHA256SUMS`.
+- Release notes repeat it.
+
+What users see:
+
+| Platform | Effect                                                                         | Workaround                                          |
+| -------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
+| macOS    | Gatekeeper blocks the first launch; ad-hoc signature keeps Apple Silicon happy | Right-click → Open, or clear `com.apple.quarantine` |
+| Windows  | SmartScreen warns until the download gains reputation                          | "More info" → "Run anyway"                          |
+
+Integrity still comes from `SHA256SUMS`, which is generated per release. Do not
+add signing instructions to the docs until there is a certificate; the workflow
+already accepts `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` and
+`APPLE_TEAM_ID` the day that changes.
 
 ## Version bump
 

@@ -77,4 +77,8 @@ cargo test
 
 ## License
 
-Not decided yet. See the licensing note in [Release and packaging](docs/RELEASE.md).
+MIT. See [LICENSE](LICENSE).
+
+Releases are not OS-signed: macOS asks for confirmation on first launch and
+Windows shows a SmartScreen warning. Verify `SHA256SUMS` and see
+[SECURITY.md](SECURITY.md) for the reasoning.

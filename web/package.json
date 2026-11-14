@@ -2,6 +2,7 @@
   "name": "sftply-web",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

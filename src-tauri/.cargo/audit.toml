@@ -1,0 +1,18 @@
+# cargo-audit configuration. CI runs `cargo audit` with this file.
+
+[advisories]
+# russh 0.65.1 (still the latest release) pins `rsa = "=0.10.0-rc.18"`, and
+# ssh-key inherits the same version. The fix ships in rsa 0.10.0, released a few
+# days after russh 0.65.1, so it cannot be resolved without replacing the
+# dependency or waiting for upstream.
+#
+# Accepted risk: RUSTSEC-2023-0071 is a timing side channel in RSA decryption.
+# It requires local timing measurements against a key in use. sftply keeps keys
+# in the OS keychain, does not expose a decrypt oracle, and only uses rsa through
+# russh for key authentication.
+#
+# Remove this entry as soon as a russh release accepts rsa >= 0.10.0.
+ignore = ["RUSTSEC-2023-0071"]
+
+[output]
+quiet = false

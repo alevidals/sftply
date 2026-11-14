@@ -1424,3 +1424,44 @@ which is only correct for local client connections. See
 - Buy or point a custom domain, then set `SITE_URL`, `SITE_BASE=/` and the Pages
   custom domain.
 - Decide the license before inviting downloads from the site itself.
+
+### 2026-11-14 — Session 48: license, audits and the unsigned policy
+
+**Changed**
+
+- The project is now MIT licensed: `LICENSE`, `license` fields in both
+  `package.json` files and `Cargo.toml`, the README, the docs and the landing
+  footer. Free use, modification and redistribution were the explicit goal, so
+  MIT beat Apache-2.0 (extra patent ceremony) and AGPL (adoption friction).
+- Added `SECURITY.md`: supported versions, private vulnerability reporting,
+  scope, the unsigned-build trade-off and the dependency-audit policy.
+- Added `.github/workflows/security.yml`: weekly `cargo audit` plus
+  `bun audit --production` for the app and the landing, and the same on any
+  change to a lockfile or the audit config.
+- Moved `shadcn` to `devDependencies`. It is a CLI whose only production use is
+  the Tailwind CSS import resolved at build time, and it was the sole source of
+  the two `bun audit` findings. The production audit is now clean.
+- `cargo audit` found one real advisory and seven unmaintained-crate warnings.
+  RUSTSEC-2023-0071 (rsa timing side channel) cannot be fixed: russh 0.65.1, the
+  latest release, pins `rsa = "=0.10.0-rc.18"` and the fix only landed in
+  rsa 0.10.0 a few days later. It is recorded in
+  `src-tauri/.cargo/audit.toml` with the reasoning and the removal condition.
+- Docs now treat unsigned distribution as a permanent constraint instead of a
+  pending task: table of what each OS shows, the workarounds, and the note that
+  the release workflow already reads Apple signing secrets if they ever exist.
+  The roadmap's release row drops "signed installers" and asks for an in-app
+  "check for updates" link instead.
+
+**Verified**
+
+- `bun audit --production` reports no vulnerabilities (105 production packages).
+- `cargo audit` exits 0 with the accepted advisory ignored and seven
+  unmaintained-crate warnings visible in the log.
+- `bun run lint`, `bun run check` (227 tests) and the landing `astro check` and
+  build stay green with `shadcn` as a dev dependency.
+
+**Next**
+
+- 0.2.0: import/export of connections, the update check, `CHANGELOG.md` and a
+  user guide.
+- Real-machine QA matrix before any 0.9 beta; no OS signing is planned.

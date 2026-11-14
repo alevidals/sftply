@@ -218,14 +218,14 @@ Split into three reviewable increments.
 
 ## Phase 7 — Release hardening
 
-| Area             | Deliverable                                                                                                 |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| Security         | Final threat-model review, dependency audit, fuzz listing parsers, secret-leak audit, CSP/capability review |
-| Reliability      | Soak tests (long transfers, reconnects, thousands of files), fault injection, crash recovery                |
-| Test matrix      | OpenSSH, vsftpd, ProFTPD, FileZilla Server, Synology; IPv6, non-ASCII, >4 GiB, LIST-only                    |
-| Docs             | User guide, connection setup, key/host-key explanations, troubleshooting, architecture links                |
-| Release          | Versioning, changelog, signed installers, checksums, release notes                                          |
-| Post-1.0 backlog | Auto-update, SSH agent auth, shared sessions, bandwidth schedules, custom themes                            |
+| Area             | Deliverable                                                                                                                      |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Security         | Final threat-model review, dependency audit, fuzz listing parsers, secret-leak audit, CSP/capability review                      |
+| Reliability      | Soak tests (long transfers, reconnects, thousands of files), fault injection, crash recovery                                     |
+| Test matrix      | OpenSSH, vsftpd, ProFTPD, FileZilla Server, Synology; IPv6, non-ASCII, >4 GiB, LIST-only                                         |
+| Docs             | User guide, connection setup, key/host-key explanations, troubleshooting, architecture links                                     |
+| Release          | Versioning, changelog, checksums, release notes, unsigned-build documentation, in-app "check for updates" link (no auto-install) |
+| Post-1.0 backlog | Auto-update, SSH agent auth, shared sessions, bandwidth schedules, custom themes                                                 |
 
 ---
 

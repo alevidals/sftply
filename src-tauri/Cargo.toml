@@ -3,6 +3,7 @@ name = "sftply"
 version = "0.1.0"
 description = "A modern FTP, FTPS and SFTP desktop client"
 authors = ["sftply"]
+license = "MIT"
 edition = "2024"
 # Keep the bindings exporter in `examples/`, never in `src/bin/`: Tauri's
 # universal macOS bundler copies every binary target and only `lipo`s the app.
