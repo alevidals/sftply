@@ -11,7 +11,7 @@ import {
   PencilIcon,
   Trash2Icon,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -121,6 +121,9 @@ export function FileTable({
   const [contextIndex, setContextIndex] = useState<number | null>(null)
   const [dropPath, setDropPath] = useState<string | null>(null)
   const { sizeFormat, dateFormat } = useFormatPreferences()
+  // One string for every row: building it inside the row map costs a string
+  // concatenation per visible row on every render.
+  const gridTemplate = useMemo(() => fileGridTemplate(columns), [columns])
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -357,7 +360,7 @@ export function FileTable({
                   style={{
                     height: `${rowHeight}px`,
                     transform: `translateY(${virtualRow.start}px)`,
-                    gridTemplateColumns: fileGridTemplate(columns),
+                    gridTemplateColumns: gridTemplate,
                   }}
                   className={cn(
                     "absolute top-0 left-0 grid w-full cursor-default items-center gap-3 px-3 text-xs select-none",

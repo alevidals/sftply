@@ -11,11 +11,19 @@ export function useDebouncedSettingsPatch() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pending = useRef<Partial<AppSettings_Serialize>>({})
 
+  // Flush instead of dropping: a pane that unmounts mid-debounce must not lose
+  // the last path or layout change.
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current)
+      timer.current = null
+      const merged = pending.current
+      pending.current = {}
+      if (Object.keys(merged).length > 0) {
+        updateSettings(merged).catch(() => undefined)
+      }
     },
-    [],
+    [updateSettings],
   )
 
   return useCallback(

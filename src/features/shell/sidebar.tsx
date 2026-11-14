@@ -1,11 +1,12 @@
 import { Settings2Icon } from "lucide-react"
+import { memo } from "react"
 import { Kbd } from "@/components/kbd"
 import { Button } from "@/components/ui/button"
 import { ConnectionsPanel } from "@/features/connections/components/connections-panel"
 import { shortcutLabel } from "@/lib/shortcuts"
 import { useUiStore } from "@/stores/ui-store"
 
-export function Sidebar() {
+function SidebarImpl() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
 
   return (
@@ -27,3 +28,5 @@ export function Sidebar() {
     </aside>
   )
 }
+
+export const Sidebar = memo(SidebarImpl)

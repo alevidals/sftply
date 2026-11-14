@@ -11,6 +11,7 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react"
+import { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -31,7 +32,7 @@ const LEVEL_META: Record<ActivityLevel, { icon: LucideIcon; className: string }>
   error: { icon: OctagonXIcon, className: "text-destructive" },
 }
 
-export function BottomPanel() {
+function BottomPanelImpl() {
   const { updateSettings } = useSettings()
   const bottomTab = useUiStore((state) => state.bottomTab)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
@@ -214,3 +215,5 @@ function EmptyState({
     </div>
   )
 }
+
+export const BottomPanel = memo(BottomPanelImpl)

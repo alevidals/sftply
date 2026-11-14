@@ -1,10 +1,11 @@
+import { memo } from "react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { LocalBrowser } from "@/features/files/local-browser"
 import { RemotePane } from "@/features/sessions/components/remote-pane"
 import { useSettings } from "@/features/settings/settings-context"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 
-export function Workspace() {
+function WorkspaceImpl() {
   const { settings } = useSettings()
   const persistLayout = useDebouncedSettingsPatch()
 
@@ -31,3 +32,5 @@ export function Workspace() {
     </ResizablePanelGroup>
   )
 }
+
+export const Workspace = memo(WorkspaceImpl)

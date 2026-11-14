@@ -1,5 +1,5 @@
 import { CircleDotIcon, SearchIcon, Settings2Icon } from "lucide-react"
-import { Fragment } from "react"
+import { Fragment, memo } from "react"
 import { toast } from "sonner"
 import { BrandMark } from "@/components/brand"
 import { Kbd } from "@/components/kbd"
@@ -21,7 +21,7 @@ import { shortcutLabel } from "@/lib/shortcuts"
 import { THEME_OPTIONS, themeOption } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
-export function TitleBar() {
+function TitleBarImpl() {
   const { settings, updateSettings } = useSettings()
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
@@ -111,3 +111,5 @@ export function TitleBar() {
     </header>
   )
 }
+
+export const TitleBar = memo(TitleBarImpl)

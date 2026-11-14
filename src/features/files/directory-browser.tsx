@@ -22,7 +22,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { tinykeys } from "tinykeys"
 import { Badge } from "@/components/ui/badge"
@@ -177,14 +177,18 @@ export function DirectoryBrowser({
   const canEdit = listing?.capabilities.textRead ?? false
   const canWriteText = listing?.capabilities.textWrite ?? false
 
+  // Filtering and sorting thousands of rows is the expensive part of typing;
+  // the deferred value keeps the input responsive and lets React skip the
+  // intermediate renders while keys arrive in a burst.
+  const deferredFilter = useDeferredValue(filter)
   const entries = useMemo(() => {
     const source = listing?.entries ?? []
-    const needle = filter.trim().toLocaleLowerCase()
+    const needle = deferredFilter.trim().toLocaleLowerCase()
     const filtered = needle
       ? source.filter((entry) => entry.name.toLocaleLowerCase().includes(needle))
       : source
     return sortEntries(filtered, sort)
-  }, [listing, filter, sort])
+  }, [listing, deferredFilter, sort])
 
   const activeEntry = selection.active === null ? null : (entries[selection.active] ?? null)
   const selectedEntries = useMemo(
@@ -222,14 +226,18 @@ export function DirectoryBrowser({
     [canEditEntry],
   )
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset transient UI state when the folder changes
-  useEffect(() => {
+  // Reset transient UI as soon as the folder changes. Doing it during render
+  // avoids one committed frame where the selection still points at the previous
+  // folder's rows, which could be acted on with Enter.
+  const [lastPath, setLastPath] = useState(path)
+  if (lastPath !== path) {
+    setLastPath(path)
     setSelection(EMPTY_SELECTION)
     setFilter("")
     setFilterOpen(false)
     setRenamingPath(null)
     setPermissionsTargets([])
-  }, [path])
+  }
 
   useEffect(() => {
     setSelection((current) => pruneSelection(entries, current))

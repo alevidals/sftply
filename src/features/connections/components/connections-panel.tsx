@@ -53,7 +53,7 @@ import { useSessionActions } from "@/features/sessions/hooks/use-session-actions
 import { errorMessage } from "@/lib/errors"
 import type { ConnectionProfile_Serialize, SessionInfo } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
-import { sessionForConnection, useSessionStore } from "@/stores/session-store"
+import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
 
 export function ConnectionsPanel() {
@@ -77,6 +77,15 @@ export function ConnectionsPanel() {
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     })
   }, [connections])
+
+  // One pass instead of a linear scan per rendered row.
+  const sessionByConnection = useMemo(() => {
+    const byConnection = new Map<string, SessionInfo>()
+    for (const session of Object.values(sessions)) {
+      byConnection.set(session.connectionId, session)
+    }
+    return byConnection
+  }, [sessions])
 
   const openCreate = () => {
     setEditing(null)
@@ -208,7 +217,7 @@ export function ConnectionsPanel() {
             </div>
           ) : (
             sorted.map((connection) => {
-              const session = sessionForConnection(sessions, connection.id)
+              const session = sessionByConnection.get(connection.id) ?? null
               return (
                 <ConnectionRow
                   key={connection.id}

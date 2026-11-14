@@ -5,6 +5,7 @@ import {
   PanelBottomIcon,
   ServerIcon,
 } from "lucide-react"
+import { memo } from "react"
 import { toast } from "sonner"
 import { Kbd } from "@/components/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -24,7 +25,7 @@ import {
 } from "@/stores/transfer-store"
 import { useUiStore } from "@/stores/ui-store"
 
-export function StatusBar() {
+function StatusBarImpl() {
   const { settings, updateSettings } = useSettings()
   const appInfo = useAppInfo()
   const activityCount = useActivityStore((state) => state.entries.length)
@@ -169,3 +170,5 @@ function StatusButton({
     </button>
   )
 }
+
+export const StatusBar = memo(StatusBarImpl)

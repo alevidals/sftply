@@ -129,8 +129,10 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
         await connectionsApi.setSecret(saved.id, secretKindFor(values), values.secret)
       }
 
-      await queryClient.invalidateQueries({ queryKey: connectionsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: secretStatusQueryKey(saved.id) })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: connectionsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: secretStatusQueryKey(saved.id) }),
+      ])
       recordActivity(
         "success",
         connection ? `Updated connection “${saved.name}”` : `Saved connection “${saved.name}”`,
