@@ -1219,6 +1219,7 @@ which is only correct for local client connections. See
 - Recent folders are recorded on navigation through the existing debounced settings writer, newest first; revisiting a path moves it to the front instead of duplicating it.
 - Deleting a connection now prunes its bookmarks and recents as best effort. A cleanup failure is logged and does not turn a successful connection deletion into an error.
 - Added `src/features/files/model/navigation.ts` with bookmark/recent list helpers and tests, plus a dialog test suite covering navigation, toggling, removal, clearing and empty states.
+- Fixed the row context menu so **Permissions…** is enabled for a multi-row selection; it still required exactly one row after the dialog gained multi-select. Added a regression test.
 - Regenerated the specta bindings for the new settings fields.
 
 **Verified**

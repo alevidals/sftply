@@ -189,6 +189,23 @@ describe("FileTable context menu", () => {
 
     expect(handlers.onAction).toHaveBeenCalledWith("copy-path")
   })
+
+  it("allows permissions for a multi-row selection", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const { handlers } = renderTable({
+      selection: selection(1, ["/tmp/alpha.txt", "/tmp/beta"]),
+    })
+
+    await user.pointer({
+      keys: "[MouseRight]",
+      target: screen.getByRole("row", { name: /beta/ }),
+    })
+    const item = await screen.findByRole("menuitem", { name: /Permissions/ })
+
+    expect(item).not.toHaveAttribute("aria-disabled")
+    await user.click(item)
+    expect(handlers.onAction).toHaveBeenCalledWith("permissions")
+  })
 })
 
 describe("FileTable drag and drop", () => {

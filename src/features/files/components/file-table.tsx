@@ -154,7 +154,7 @@ export function FileTable({
       case "transfer":
         return !canTransfer || !hasSelection
       case "permissions":
-        return !activeEntry || !canChmod || selection.selected.size !== 1
+        return !hasSelection || !canChmod
       case "new-folder":
         return false
       case "copy-path":
