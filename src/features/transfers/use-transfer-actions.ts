@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useState } from "react"
 import { toast } from "sonner"
 import { LOCAL_SCOPE, remoteScope } from "@/features/files/api"
@@ -48,6 +49,7 @@ interface TransferActions {
  * current folder, so the user never has to type a path.
  */
 export function useTransferActions(pane: "local" | "remote", scope: FsScope): TransferActions {
+  const queryClient = useQueryClient()
   const { settings, updateSettings } = useSettings()
   const localPath = useUiStore((state) => state.localSummary.path)
   const remotePath = useUiStore((state) => state.remoteSummary.path)
@@ -129,6 +131,9 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
             "info",
             `Created ${directories} folder${directories === 1 ? "" : "s"} in ${scopeLabel(pending.targetScope)}`,
           )
+          // Empty folders are created during enqueue and produce no transfer
+          // rows, so no terminal delta triggers the usual listing refresh.
+          void queryClient.invalidateQueries({ queryKey: ["fs"] })
         } else {
           toast.info("Nothing to transfer", {
             description: "Every selected file already exists and was skipped.",
@@ -147,7 +152,7 @@ export function useTransferActions(pane: "local" | "remote", scope: FsScope): Tr
         reportError("Could not queue the transfer", error)
       }
     },
-    [openTransfers, reportError, scopeLabel],
+    [openTransfers, queryClient, reportError, scopeLabel],
   )
 
   const transferBetween = useCallback(

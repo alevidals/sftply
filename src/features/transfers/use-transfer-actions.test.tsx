@@ -7,6 +7,11 @@ import { useUiStore } from "@/stores/ui-store"
 
 const planMock = vi.fn()
 const enqueueTreeMock = vi.fn()
+const invalidateQueries = vi.fn().mockResolvedValue(undefined)
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries }),
+}))
 
 vi.mock("@/features/transfers/api", () => ({
   transfersApi: {

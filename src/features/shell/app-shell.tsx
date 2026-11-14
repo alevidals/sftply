@@ -15,6 +15,7 @@ import { useAppInfo } from "@/hooks/use-app-info"
 import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { useDesktopContextMenu } from "@/hooks/use-desktop-context-menu"
 import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
+import { useSessionNames } from "@/hooks/use-session-names"
 import { useStartupReport } from "@/hooks/use-startup-report"
 import { useTransferBridge } from "@/hooks/use-transfer-bridge"
 import { recordActivity } from "@/stores/activity-store"
@@ -56,6 +57,7 @@ export function AppShell() {
   useTransferBridge()
   useGlobalShortcuts()
   useDesktopContextMenu()
+  useSessionNames()
 
   useEffect(() => {
     if (!appInfo.data || readyLogged.current) return

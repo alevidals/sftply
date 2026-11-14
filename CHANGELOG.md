@@ -6,7 +6,24 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The permissions action says **Not supported** when the pane cannot change modes,
+  for example local files on Windows or an FTP server without `SITE CHMOD`.
+
+### Fixed
+
+- Renaming a saved connection now updates the open session's tab, pane header and
+  status bar instead of keeping the name captured at connect time.
+- Deleting a connection closes any session opened from it, so no tab is left
+  pointing at a profile that no longer exists.
+- Transferring a tree that only contains empty folders created the folders but
+  did not refresh the destination pane. It now invalidates the listing.
+- Right-clicking a row without a previous selection left every action disabled.
+  The menu now selects the row under the cursor when it opens.
+- FTP and FTPS connections without a saved password attempt an empty password
+  instead of refusing to connect, so duplicated anonymous connections work.
+  Quick connect no longer demands a password for the `anonymous` or `ftp` users.
 
 ## [0.4.1] - 2026-11-14
 

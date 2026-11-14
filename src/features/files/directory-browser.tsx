@@ -730,6 +730,7 @@ export function DirectoryBrowser({
             canRename={Boolean(activeEntry) && canRename}
             canDelete={selectedEntries.length > 0 && canRemove}
             canPermissions={selectedEntries.length > 0 && canChmod}
+            chmodSupported={canChmod}
             canReveal={allowReveal}
             canTransfer={canTransfer && selectedEntries.length > 0}
             transferLabel={transferLabel}
@@ -1029,6 +1030,7 @@ function ActionsMenu({
   canRename,
   canDelete,
   canPermissions,
+  chmodSupported,
   canReveal,
   canTransfer,
   transferLabel,
@@ -1040,6 +1042,7 @@ function ActionsMenu({
   canRename: boolean
   canDelete: boolean
   canPermissions: boolean
+  chmodSupported: boolean
   canReveal: boolean
   canTransfer: boolean
   transferLabel: string
@@ -1117,6 +1120,9 @@ function ActionsMenu({
         <DropdownMenuItem disabled={!canPermissions} onSelect={() => onAction("permissions")}>
           <InfoIcon />
           Permissions…
+          {!chmodSupported ? (
+            <span className="ml-auto text-2xs text-muted-foreground">Not supported</span>
+          ) : null}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

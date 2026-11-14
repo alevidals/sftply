@@ -1753,3 +1753,33 @@ which is only correct for local client connections. See
 **Verified**
 
 - Typecheck, lint, 246 frontend tests and the production build.
+
+### 2026-11-14 — Session 58: session and menu fixes
+
+**Fixed**
+
+- **Renaming a connection** did not reach an open session: the backend snapshots
+  the name in `SessionInfo` at connect time. `useSessionNames` now patches the
+  session store whenever the connection list changes, which updates the tab, the
+  pane header, the status bar and later toasts.
+- **Deleting a connection** left its session open. `connection_delete` now asks
+  `SessionManager::for_connection`, removes each session, disconnects it and
+  emits a `disconnected` event so the tab closes.
+- **Empty folder trees**: directories are created during enqueue and produce no
+  transfer rows, so no terminal delta refreshed the pane. The dirs-only branch
+  now invalidates the `fs` queries.
+- **Context menu with no selection**: the menu opened with every action disabled
+  until the selection state caught up. It now selects the row under the cursor on
+  open and derives enablement from that row.
+- **Anonymous connections**: FTP/FTPS connections with no saved password now
+  attempt an empty password instead of failing early, and quick connect no longer
+  requires a secret for `anonymous` or `ftp`.
+
+**Changed**
+
+- The permissions menu item reports **Not supported** when the capability is
+  missing (local files on Windows, FTP without `SITE CHMOD`).
+
+**Verified**
+
+- Rust 134 tests, clippy clean, 242 frontend tests, typecheck, lint, build.

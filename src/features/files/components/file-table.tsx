@@ -155,17 +155,20 @@ export function FileTable({
   )
 
   const activeEntry = selection.active === null ? null : entries[selection.active]
+  // The context menu targets the row under the cursor, even if the selection
+  // has not caught up yet.
+  const menuEntry = contextIndex === null ? activeEntry : (entries[contextIndex] ?? activeEntry)
   const hasSelection = selection.selected.size > 0
 
   const actionDisabled = (action: FileAction): boolean => {
     switch (action) {
       case "open":
-        return !activeEntry || (activeEntry.kind !== "directory" && !allowOpen)
+        return !menuEntry || (menuEntry.kind !== "directory" && !allowOpen)
       case "edit":
-        return activeEntry?.kind !== "file" || !canEdit || !isEditableTextSize(activeEntry.size)
+        return menuEntry?.kind !== "file" || !canEdit || !isEditableTextSize(menuEntry.size)
       case "rename":
       case "reveal":
-        return !activeEntry
+        return !menuEntry
       case "delete":
         return !hasSelection
       case "transfer":
@@ -258,7 +261,11 @@ export function FileTable({
   }
 
   return (
-    <ContextMenu>
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (open && contextIndex !== null) onSelect(contextIndex, "replace")
+      }}
+    >
       <ContextMenuTrigger asChild>
         <div
           ref={scrollRef}

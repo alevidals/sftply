@@ -255,6 +255,17 @@ impl SessionManager {
             .cloned()
     }
 
+    /// Every open session that belongs to a saved connection.
+    pub fn for_connection(&self, connection_id: &str) -> Vec<Arc<Session>> {
+        self.sessions
+            .read()
+            .expect("session lock poisoned")
+            .values()
+            .filter(|session| session.info.connection_id == connection_id)
+            .cloned()
+            .collect()
+    }
+
     pub fn remove(&self, session_id: &str) -> Option<Arc<Session>> {
         self.sessions
             .write()

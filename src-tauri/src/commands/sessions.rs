@@ -338,7 +338,12 @@ pub(crate) async fn resolve_credentials(
                 // Anonymous FTP has no secret. The profile stores the
                 // conventional "anonymous" username, so reconnect works
                 // without a keychain entry.
-                None if profile.username.eq_ignore_ascii_case("anonymous") => {
+                // Anonymous FTP has no secret, and some FTP servers accept any
+                // user with an empty password. Let the server decide instead of
+                // blocking the connect; SFTP still needs a real credential.
+                None if profile.username.eq_ignore_ascii_case("anonymous")
+                    || profile.protocol != crate::domain::connection::ConnectionProtocol::Sftp =>
+                {
                     Ok(SessionCredentials::Password(String::new()))
                 }
                 None => Err(AppError::new(

@@ -1,4 +1,6 @@
-use tauri::State;
+use std::time::Duration;
+
+use tauri::{AppHandle, State};
 
 use crate::app_state::AppState;
 use crate::config::connection_bundle;
@@ -6,6 +8,7 @@ use crate::credentials;
 use crate::domain::connection::{ConnectionInput, ConnectionProfile};
 use crate::domain::credentials::{SecretKind, SecretStatus};
 use crate::domain::host_key::KnownHost;
+use crate::domain::session::SessionState;
 use crate::error::{AppError, ErrorCode};
 
 use serde::Serialize;
@@ -38,8 +41,24 @@ pub async fn connection_update(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn connection_delete(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+pub async fn connection_delete(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), AppError> {
     state.connections.delete(&id).await?;
+
+    // A deleted connection cannot be reconnected, so close anything still open
+    // on it instead of leaving a tab pointing at a profile that no longer exists.
+    for session in state.sessions.for_connection(&id) {
+        let session_id = session.info.id.clone();
+        if state.sessions.remove(&session_id).is_none() {
+            continue;
+        }
+        session.mark_unusable();
+        let _ = tokio::time::timeout(Duration::from_secs(5), session.disconnect()).await;
+        crate::session::emit_state(&app, &session_id, &id, SessionState::Disconnected, None);
+    }
 
     // Bookmarks and recents are keyed by connection id. Drop them after the
     // metadata deletion succeeds, but do not fail the delete if this cleanup

@@ -25,6 +25,8 @@ interface SessionStoreState {
   clearLost: (sessionId: string) => void
   setReconnecting: (sessionId: string, value: boolean) => void
   setPath: (sessionId: string, path: string) => void
+  /** Rename open sessions when their saved connection is renamed. */
+  syncConnectionNames: (connections: readonly { id: string; name: string }[]) => void
 }
 
 export const useSessionStore = create<SessionStoreState>((set) => ({
@@ -141,6 +143,21 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
     set((state) =>
       state.paths[sessionId] === path ? state : { paths: { ...state.paths, [sessionId]: path } },
     ),
+
+  syncConnectionNames: (connections) =>
+    set((state) => {
+      const names = new Map(connections.map((connection) => [connection.id, connection.name]))
+      let changed = false
+      const sessions = { ...state.sessions }
+      for (const [id, session] of Object.entries(sessions)) {
+        const name = names.get(session.connectionId)
+        if (name && name !== session.name) {
+          sessions[id] = { ...session, name }
+          changed = true
+        }
+      }
+      return changed ? { sessions } : {}
+    }),
 }))
 
 export function activeSession(): SessionInfo | null {

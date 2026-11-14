@@ -182,11 +182,12 @@ export const quickConnectSchema = z
         message: "A name is required to save the connection.",
       })
     }
+    const anonymous = ["anonymous", "ftp"].includes(values.username.trim().toLowerCase())
     if (
       values.save &&
       values.authKind === "password" &&
       !values.secret &&
-      (values.protocol === "sftp" || values.username.trim())
+      (values.protocol === "sftp" || (values.username.trim() && !anonymous))
     ) {
       ctx.addIssue({
         code: "custom",
