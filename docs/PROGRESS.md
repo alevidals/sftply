@@ -1352,3 +1352,28 @@ which is only correct for local client connections. See
 
 - Tag `v0.1.0` to validate the draft release, `SHA256SUMS` and the download page.
 - Run the portable builds on real machines (the QA checklist in `docs/RELEASE.md`).
+
+### 2026-11-14 — Session 46: v0.1.0 draft release
+
+**Changed**
+
+- Tagged `v0.1.0` on `f899696`. The tag run `43590084820` built macOS universal
+  (6m20s), Linux (5m6s) and Windows (6m37s), then created the draft release with
+  six artifacts plus `SHA256SUMS`.
+- Rewrote the draft notes with a per-platform download table, checksum
+  instructions and the portable caveats, replacing the auto-generated body that
+  only linked the changelog.
+
+**Verified**
+
+- `gh release view v0.1.0` lists `.AppImage`, `.deb`, `.dmg`, the macOS portable
+  zip, the Windows portable zip, the NSIS setup and `SHA256SUMS`.
+- Downloaded the Windows portable zip from the release and checked it against
+  `SHA256SUMS`: OK.
+- The release stays a draft until it is reviewed and published manually.
+
+**Next**
+
+- Publish the draft after the real-machine QA pass.
+- Decide whether `v0.1.0` should be marked as a prerelease while the product is
+  still pre-1.0 in behaviour.
