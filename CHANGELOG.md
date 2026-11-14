@@ -8,6 +8,40 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [0.3.0] - 2026-11-14
+
+### Added
+
+- Skip link, main landmark and hidden heading for keyboard and screen-reader
+  users.
+- Property-based tests for the FTP listing parsers and remote path normalization,
+  plus a guard that fails when a log call mentions a credential.
+- README with the app icon, release, CI, license and platform badges.
+
+### Changed
+
+- Performance pass on the React tree: folder filtering is deferred so typing
+  stays responsive, pane state resets during render instead of in an effect, the
+  file grid template is computed once per render, the shell sections are
+  memoized, the per-row session lookup uses a map, and two cache invalidations
+  run in parallel.
+- Documentation and interface copy follow the writing guidelines: sentence-case
+  headings, no em dashes, ellipses instead of three dots, units with a space,
+  and error messages that say what to try next.
+- `theme-color` matches the app surface, overlays contain overscroll, headings
+  balance, and interactive elements use `touch-action: manipulation`.
+- The landing page no longer claims that packages are signed; it says they ship
+  with a checksum.
+- CI documents the extra Pages environment rule that lets a release tag deploy
+  the site.
+
+### Fixed
+
+- Debounced settings writes were dropped when the component unmounted within the
+  debounce window; they now flush.
+- The Docker integration suite created identical folder names in parallel tests
+  and failed intermittently.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
@@ -31,11 +65,6 @@ Nothing yet.
 
 ### Changed
 
-- Documentation and interface copy follow the writing guidelines: sentence-case
-  headings, no em dashes, ellipses instead of three dots, and units with a
-  space. Error messages now say what to try next.
-- The landing page no longer claims that packages are signed; it says they ship
-  with a checksum.
 - The project is MIT licensed.
 - `shadcn` moved to `devDependencies`; it is only needed to build the CSS.
 - The production bundle is split into long-lived vendor chunks instead of a
@@ -87,6 +116,7 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alevidals/sftply/releases/tag/v0.3.0
 [0.2.0]: https://github.com/alevidals/sftply/releases/tag/v0.2.0
 [0.1.0]: https://github.com/alevidals/sftply/releases/tag/v0.1.0
