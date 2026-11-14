@@ -7,6 +7,7 @@ use futures_util::stream::{self, StreamExt};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use crate::domain::fs::{EntryKind, FsCapabilities, FsEntry, Listing};
+use crate::domain::text::{TextFile, text_version};
 use crate::error::{AppError, ErrorCode};
 use crate::fs::path::{join_child, normalize_absolute, validate_mode};
 use crate::fs::{FileReader, FileWriter};
@@ -205,6 +206,121 @@ pub fn chmod(input: &str, mode: u32) -> Result<(), AppError> {
 async fn stat_path(path: &Path) -> Result<FsEntry, AppError> {
     let path = path_to_string(path)?;
     stat(&path).await
+}
+
+/// Load a UTF-8 text file for the editor. Symlinks are followed so editing a
+/// link to a text file behaves like editing the target, and the backend rejects
+/// binary or oversized files instead of truncating them.
+pub async fn read_text(input: &str) -> Result<TextFile, AppError> {
+    let path = normalize_absolute(input)?;
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|error| io_error(error, "read", &path))?;
+    if !metadata.is_file() {
+        return Err(AppError::invalid_input(
+            "Only regular files can be edited as text.",
+        ));
+    }
+    let entry = text_entry(&path, &metadata)?;
+    crate::fs::text::check_size(entry.size as u64)?;
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|error| io_error(error, "read", &path))?;
+    crate::fs::text::decode(bytes, &entry)
+}
+
+/// Replace a text file atomically: write a hidden sibling, keep the original
+/// permissions when possible, then rename it into place.
+pub async fn write_text(
+    input: &str,
+    content: &str,
+    expected_version: Option<String>,
+    force: bool,
+) -> Result<TextFile, AppError> {
+    let path = normalize_absolute(input)?;
+    crate::fs::text::check_content_size(content)?;
+
+    if !force && let Some(expected) = expected_version {
+        match tokio::fs::metadata(&path).await {
+            Ok(metadata) => {
+                let current = text_version(metadata.len() as f64, modified_ms(&metadata));
+                if current != expected {
+                    return Err(crate::fs::text::conflict_error());
+                }
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                return Err(crate::fs::text::conflict_error());
+            }
+            Err(error) => return Err(io_error(error, "inspect", &path)),
+        }
+    }
+
+    let parent = path
+        .parent()
+        .ok_or_else(|| AppError::invalid_input("That path has no parent folder."))?;
+    let temp = parent.join(format!(".sftply-edit-{}", uuid::Uuid::new_v4().simple()));
+
+    if let Err(error) = tokio::fs::write(&temp, content.as_bytes()).await {
+        let _ = tokio::fs::remove_file(&temp).await;
+        return Err(io_error(error, "write", &path));
+    }
+
+    // The temp file is created with the process umask; keep the mode the user
+    // already had on the original instead of silently widening or narrowing it.
+    #[cfg(unix)]
+    if let Ok(metadata) = tokio::fs::metadata(&path).await {
+        let _ = tokio::fs::set_permissions(&temp, metadata.permissions()).await;
+    }
+
+    if let Err(error) = rename_replace(&temp, &path).await {
+        let _ = tokio::fs::remove_file(&temp).await;
+        return Err(io_error(error, "replace", &path));
+    }
+
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|error| io_error(error, "inspect", &path))?;
+    let entry = text_entry(&path, &metadata)?;
+    Ok(TextFile {
+        path: entry.path,
+        content: content.to_string(),
+        size: entry.size,
+        modified_at: entry.modified_at,
+        version: text_version(entry.size, entry.modified_at),
+    })
+}
+
+fn text_entry(path: &Path, metadata: &std::fs::Metadata) -> Result<FsEntry, AppError> {
+    Ok(FsEntry {
+        name: path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+            .or_else(|| path.to_str().map(str::to_string))
+            .ok_or_else(|| AppError::invalid_input("The path is not valid UTF-8."))?,
+        path: path_to_string(path)?,
+        kind: EntryKind::File,
+        size: metadata.len() as f64,
+        modified_at: modified_ms(metadata),
+        permissions: permissions_of(metadata),
+        owner: None,
+        group: None,
+        link_target: None,
+        hidden: is_hidden(path, metadata),
+        metadata_complete: true,
+    })
+}
+
+async fn rename_replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    match tokio::fs::rename(from, to).await {
+        Ok(()) => Ok(()),
+        #[cfg(windows)]
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            tokio::fs::remove_file(to).await?;
+            tokio::fs::rename(from, to).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 async fn entry_to_fs_entry(entry: tokio::fs::DirEntry) -> Option<FsEntry> {
@@ -587,5 +703,97 @@ mod tests {
             elapsed < std::time::Duration::from_secs(5),
             "listing 10k entries took {elapsed:?}, over the 5s test budget"
         );
+    }
+
+    #[tokio::test]
+    async fn reads_and_writes_text_with_conflict_detection() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("notes.txt");
+        write(&path, "first line\n");
+
+        let loaded = read_text(path.to_str().unwrap()).await.unwrap();
+        assert_eq!(loaded.content, "first line\n");
+        assert_eq!(loaded.version, text_version(11.0, loaded.modified_at));
+
+        let saved = write_text(
+            path.to_str().unwrap(),
+            "second line\n",
+            Some(loaded.version.clone()),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.content, "second line\n");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "second line\n");
+
+        // The old token is now stale: an external edit must be reported.
+        let error = write_text(
+            path.to_str().unwrap(),
+            "third\n",
+            Some(loaded.version),
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::Conflict);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "second line\n");
+
+        // Explicit overwrite bypasses the stale token.
+        write_text(path.to_str().unwrap(), "third\n", None, true)
+            .await
+            .unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "third\n");
+    }
+
+    #[tokio::test]
+    async fn refuses_binary_and_oversized_text_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = dir.path().join("image.bin");
+        fs::write(&binary, [0x89, b'P', 0, b'N']).unwrap();
+        assert_eq!(
+            read_text(binary.to_str().unwrap()).await.unwrap_err().code,
+            ErrorCode::Unsupported
+        );
+
+        let invalid = dir.path().join("latin1.txt");
+        fs::write(&invalid, [0x63, 0x61, 0x66, 0xe9]).unwrap();
+        assert_eq!(
+            read_text(invalid.to_str().unwrap()).await.unwrap_err().code,
+            ErrorCode::Unsupported
+        );
+
+        let huge = dir.path().join("huge.txt");
+        fs::write(
+            &huge,
+            vec![b'x'; crate::domain::text::MAX_TEXT_FILE_BYTES as usize + 1],
+        )
+        .unwrap();
+        assert_eq!(
+            read_text(huge.to_str().unwrap()).await.unwrap_err().code,
+            ErrorCode::InvalidInput
+        );
+    }
+
+    #[tokio::test]
+    async fn editing_a_missing_file_requires_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("new.txt");
+
+        let error = write_text(
+            missing.to_str().unwrap(),
+            "hello",
+            Some("0:0".to_string()),
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::Conflict);
+        assert!(!missing.exists());
+
+        let saved = write_text(missing.to_str().unwrap(), "hello", None, true)
+            .await
+            .unwrap();
+        assert_eq!(saved.content, "hello");
+        assert_eq!(fs::read_to_string(&missing).unwrap(), "hello");
     }
 }

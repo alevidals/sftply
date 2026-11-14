@@ -279,8 +279,8 @@ impl SftpRemote {
                 resume_upload: ResumeSupport::Supported,
                 server_side_move: true,
                 server_side_copy: false,
-                text_read: false,
-                text_write: false,
+                text_read: true,
+                text_write: true,
             },
         })
     }

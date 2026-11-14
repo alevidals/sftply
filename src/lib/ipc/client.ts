@@ -14,6 +14,7 @@ import {
   type SecretStatus,
   type SessionInfo,
   type StartupReport,
+  type TextFile,
   type TransferConflict,
   type TransferHistoryEntry_Serialize,
   type TransferItem,
@@ -80,6 +81,22 @@ export const ipc = {
     return invoke(commands.fsChmod(scope, path, mode)).then((result) => {
       unwrap(result)
     })
+  },
+
+  fsReadText(scope: FsScope, path: string): Promise<TextFile> {
+    return invoke(commands.fsReadText(scope, path)).then((result) => unwrap(result))
+  },
+
+  fsWriteText(
+    scope: FsScope,
+    path: string,
+    content: string,
+    expectedVersion: string | null,
+    force: boolean,
+  ): Promise<TextFile> {
+    return invoke(commands.fsWriteText(scope, path, content, expectedVersion, force)).then(
+      (result) => unwrap(result),
+    )
   },
 
   localOpen(path: string): Promise<void> {

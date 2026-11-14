@@ -1,4 +1,4 @@
-import type { FsEntry, FsScope, Listing } from "@/lib/ipc/bindings"
+import type { FsEntry, FsScope, Listing, TextFile } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 
 export const LOCAL_SCOPE: FsScope = { kind: "local" }
@@ -37,6 +37,19 @@ export function filesApi(scope: FsScope) {
 
     chmod(path: string, mode: number): Promise<void> {
       return ipc.fsChmod(scope, path, mode)
+    },
+
+    readText(path: string): Promise<TextFile> {
+      return ipc.fsReadText(scope, path)
+    },
+
+    writeText(
+      path: string,
+      content: string,
+      expectedVersion: string | null,
+      force: boolean,
+    ): Promise<TextFile> {
+      return ipc.fsWriteText(scope, path, content, expectedVersion, force)
     },
   }
 }

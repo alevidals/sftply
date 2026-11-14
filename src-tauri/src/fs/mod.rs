@@ -1,5 +1,6 @@
 pub mod local;
 pub mod path;
+pub mod text;
 
 use async_trait::async_trait;
 

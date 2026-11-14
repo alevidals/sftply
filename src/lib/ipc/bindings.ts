@@ -18,6 +18,8 @@ export const commands = {
 	fsRename: (scope: FsScope, path: string, newName: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_rename", { scope, path, newName })),
 	fsDelete: (scope: FsScope, path: string, recursive: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_delete", { scope, path, recursive })),
 	fsChmod: (scope: FsScope, path: string, mode: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_chmod", { scope, path, mode })),
+	fsReadText: (scope: FsScope, path: string) => typedError<TextFile_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_read_text", { scope, path })),
+	fsWriteText: (scope: FsScope, path: string, content: string, expectedVersion: string | null, force: boolean) => typedError<TextFile_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_write_text", { scope, path, content, expectedVersion, force })),
 	localOpen: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_open", { path })),
 	localReveal: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_reveal", { path })),
 	connectionsList: () => __TAURI_INVOKE<ConnectionProfile_Serialize[]>("connections_list"),
@@ -515,6 +517,29 @@ export type SizeFormat = "binary" | "decimal";
  */
 export type StartupReport = {
 	warnings: string[],
+};
+
+/**  A UTF-8 text file loaded for editing. */
+export type TextFile = TextFile_Serialize | TextFile_Deserialize;
+
+/**  A UTF-8 text file loaded for editing. */
+export type TextFile_Deserialize = {
+	path: string,
+	content: string,
+	size: number,
+	modifiedAt?: number | null,
+	/**  Opaque token used to detect an external edit between load and save. */
+	version: string,
+};
+
+/**  A UTF-8 text file loaded for editing. */
+export type TextFile_Serialize = {
+	path: string,
+	content: string,
+	size: number,
+	modifiedAt: number | null,
+	/**  Opaque token used to detect an external edit between load and save. */
+	version: string,
 };
 
 export type ThemeMode = "system" | "dark" | "light" | "oneDark" | "gruvboxDark" | "gruvboxLight" | "nord" | "dracula" | "solarizedLight" | "tokyoNight" | "catppuccinMocha";

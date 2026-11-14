@@ -6,6 +6,7 @@ pub mod host_key;
 pub mod remote_path;
 pub mod session;
 pub mod settings;
+pub mod text;
 pub mod transfer;
 
 use serde::{Deserialize, Serialize};

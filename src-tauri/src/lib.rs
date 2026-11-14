@@ -38,6 +38,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::fs::fs_rename,
             commands::fs::fs_delete,
             commands::fs::fs_chmod,
+            commands::fs::fs_read_text,
+            commands::fs::fs_write_text,
             commands::fs::local_open,
             commands::fs::local_reveal,
             commands::connections::connections_list,

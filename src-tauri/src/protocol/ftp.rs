@@ -261,8 +261,8 @@ impl FtpRemote {
             resume_upload: crate::domain::fs::ResumeSupport::Supported,
             server_side_move: false,
             server_side_copy: false,
-            text_read: false,
-            text_write: false,
+            text_read: true,
+            text_write: true,
         };
 
         Ok(Self {

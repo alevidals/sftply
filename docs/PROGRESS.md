@@ -1265,3 +1265,33 @@ which is only correct for local client connections. See
 **Next**
 
 - Manual check on the running app: drag several files across panes and confirm the badge, the single valid highlight and the transfer count.
+
+### 2026-11-14 — Session 43 (in progress): remote text editor, backend + dialog
+
+**Done**
+
+- Added `fs_read_text` / `fs_write_text` to the typed IPC surface, for local, FTP and SFTP scopes.
+- Backend limits are enforced before reading: regular files only, UTF-8 only, no NUL bytes, 2 MiB maximum. Oversized and binary files return a clear `UNSUPPORTED`/`INVALID_INPUT` error instead of being truncated.
+- Conflict detection uses a version token built from size + modification time. Saving with a stale token returns `CONFLICT`; `force: true` overwrites explicitly. Local saves preserve the original Unix mode.
+- Remote saves write a hidden sibling partial file and rename it into place through the existing atomic-upload helper, so a failed save never truncates the original. The temporary file is removed best effort on failure.
+- Local and FTP/SFTP capabilities now report `textRead: true` and `textWrite: true`.
+- Regenerated specta bindings and added `ipc.fsReadText` / `ipc.fsWriteText`, plus `filesApi(scope).readText()` / `.writeText()`.
+- Added `src/features/files/model/text.ts` (size guard, line/byte stats) and `TextEditorDialog` with loading/error states, read-only mode, dirty tracking, `⌘S`/`Ctrl+S`, discard confirmation, and a conflict banner offering **Reload** or **Overwrite**.
+- Rust tests cover UTF-8 decoding, binary/invalid UTF-8 rejection, size limits, local read/write round-trip, stale-token conflict, forced overwrite and missing-file creation.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 219 tests in 33 files, production build).
+- `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (111 passed, 18 ignored).
+
+**Remaining — wire the editor into the file browser**
+
+1. `src/features/files/components/file-table.tsx`: add `"edit"` to `FileAction`, a `canEdit` prop, an `actionDisabled("edit")` case (`file` kind + capability) and an **Edit text…** context-menu item with `FileTextIcon`.
+2. `src/features/files/directory-browser.tsx`: derive `canEdit` from `listing.capabilities.textRead`; add `editorOpen`/`editorTarget` state; handle `"edit"` in `handleAction`; open the editor on remote file double-click when editable; pass `canEdit` to `FileTable` and `ActionsMenu`; render `TextEditorDialog` with `scope`, `canWrite={listing.capabilities.textWrite}`, and an `onSaved` that invalidates the listing and records activity. Check `isEditableTextSize(entry.size)` before opening.
+3. Add the **Edit text…** item to `ActionsMenu`.
+4. Tests: `text-editor-dialog.test.tsx` (mock `filesApi`, cover load/save/conflict/read-only/discard), the context-menu item, and the action wiring.
+5. Mark the Phase 6 item complete, add a release-QA line, and run the loopback FTP/SFTP manual check. Rust changed, so restart `bun run tauri -- dev`.
+
+**Note**
+
+- The tree is green and committed at this point, but the editor dialog is not reachable from the UI yet. That is the next step.
