@@ -63,8 +63,10 @@ jobs:
           # Universal macOS needs both architectures; the other runners build
           # natively.
           target: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-          cache: true
-          cache-workspaces: src-tauri -> target
+          # Release builds run once per tag. Caching the release target dir
+          # costs about 600 MB per runner (three of them) and filled the
+          # repository's 10 GB cache budget, so these builds start cold.
+          cache: false
       - name: Build macOS bundles
         if: runner.os == 'macOS'
         env:

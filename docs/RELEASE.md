@@ -20,6 +20,20 @@ on demand:
   explicit FTPS, implicit FTPS and SFTP stack. It runs on `main` and on demand,
   not on pull requests, because it builds four Docker images.
 
+## Cache budget
+
+GitHub gives a repository 10 GB of Actions cache and evicts the least recently
+used entries above that. The Rust toolchain cache stores the whole `target`
+directory, roughly 350 MB per check job and 600 MB per release runner, so two
+rules keep the budget under control:
+
+- Release builds do not use the Rust cache. They run once per tag and start cold.
+- CI restores the cache on `main`, but pull requests never write it
+  (`cache-save-if: github.ref == 'refs/heads/main'`).
+
+Delete everything with `gh cache delete --all` when the budget looks wrong. The
+next run rebuilds it.
+
 ## Downloadable builds
 
 `.github/workflows/release.yml` builds on every `v*` tag. A manual

@@ -77,6 +77,9 @@ jobs:
         with:
           cache: true
           cache-workspaces: src-tauri -> target
+          # Pull requests restore the main cache but do not write a new one, so
+          # each PR cannot add ~1.5 GB to the repository cache budget.
+          cache-save-if: github.ref == 'refs/heads/main'
       - name: Format
         run: cargo fmt --check
         working-directory: src-tauri
@@ -136,6 +139,9 @@ jobs:
         with:
           cache: true
           cache-workspaces: src-tauri -> target
+          # Pull requests restore the main cache but do not write a new one, so
+          # each PR cannot add ~1.5 GB to the repository cache budget.
+          cache-save-if: github.ref == 'refs/heads/main'
       - name: Check all targets
         run: cargo check --all-targets
         working-directory: src-tauri
@@ -167,5 +173,8 @@ jobs:
         with:
           cache: true
           cache-workspaces: src-tauri -> target
+          # Pull requests restore the main cache but do not write a new one, so
+          # each PR cannot add ~1.5 GB to the repository cache budget.
+          cache-save-if: github.ref == 'refs/heads/main'
       - name: Run protocol integration suite
         run: tests/integration/run.sh

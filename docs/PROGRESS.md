@@ -1645,3 +1645,21 @@ which is only correct for local client connections. See
 
 - Rust: 132 passed, 19 ignored, clippy clean. Frontend: 245 tests. `astro check`
   and the production build green. CI and the site deploy run after the push.
+
+### 2026-11-14 — Session 53: Actions cache budget
+
+**Changed**
+
+- The repository cache reached 9.83 GB of the 10 GB limit because every runner
+  saved a full `target` directory: three release runners (~600 MB each) plus
+  four CI jobs across three operating systems.
+- Release builds no longer cache Rust (`cache: false`). They run once per tag, so
+  the cold build is cheaper than keeping ~2 GB per release.
+- CI jobs now pass `cache-save-if: github.ref == 'refs/heads/main'`, so pull
+  requests restore the cache without writing a new one.
+- Deleted all existing caches and documented the budget and the cleanup command
+  in `docs/RELEASE.md`.
+
+**Next**
+
+- Measure the cache size after the next CI run; expected around 2 GB.
