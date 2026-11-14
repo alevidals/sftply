@@ -1,14 +1,33 @@
-# sftply
+<p align="center">
+  <img src="public/mark.svg" width="96" height="96" alt="sftply" />
+</p>
 
-A modern, keyboard-first desktop client for FTP, FTPS and SFTP. Built with Tauri 2, React, TypeScript and Rust.
+<h1 align="center">sftply</h1>
 
-Website: <https://alevidals.github.io/sftply/>
+<p align="center">
+  A modern, keyboard-first desktop client for FTP, FTPS and SFTP.<br />
+  Native Rust networking, keychain credentials, and a transfer queue that only
+  promises what the protocol can deliver.
+</p>
 
-> **Status: pre-1.0.** `v0.2.0` is published as portable builds and installers for macOS, Windows and Linux. The source is usable and tested, but the product is still under active development; expect breaking behaviour changes before 1.0.
+<p align="center">
+  <a href="https://github.com/alevidals/sftply/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/alevidals/sftply?style=flat-square&color=8b5cf6" /></a>
+  <a href="https://github.com/alevidals/sftply/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/alevidals/sftply/ci.yml?branch=main&style=flat-square&label=ci" /></a>
+  <a href="https://alevidals.github.io/sftply/"><img alt="Website" src="https://img.shields.io/badge/website-sftply-4f8cff?style=flat-square" /></a>
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" />
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-64748b?style=flat-square" />
+</p>
+
+<p align="center">
+  <a href="https://alevidals.github.io/sftply/">Website</a> ·
+  <a href="https://github.com/alevidals/sftply/releases/latest">Download</a> ·
+  <a href="docs/USER_GUIDE.md">User guide</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a>
+</p>
+
+---
 
 ## Download
-
-Grab the latest build from [Releases](https://github.com/alevidals/sftply/releases/latest):
 
 | Platform                      | Portable (no install)                                                          | Installer           |
 | ----------------------------- | ------------------------------------------------------------------------------ | ------------------- |
@@ -16,41 +35,43 @@ Grab the latest build from [Releases](https://github.com/alevidals/sftply/releas
 | Windows 10/11 x64             | `*_windows-x64_portable.zip` — unzip and run `sftply.exe`                      | `-setup.exe` (NSIS) |
 | Linux x64                     | `.AppImage` — `chmod +x` and run                                               | `.deb`              |
 
-`SHA256SUMS` accompanies every release.
+Every release ships `SHA256SUMS`.
 
-**First launch on macOS** is blocked by Gatekeeper because the build is ad-hoc
-signed and not notarized. Right-click the app → **Open** → **Open**, or run:
+> **Unsigned builds.** macOS asks for confirmation on first launch (ad-hoc
+> signed, not notarized) and Windows shows a SmartScreen warning. The
+> [user guide](docs/USER_GUIDE.md#install) has the exact steps, and
+> [SECURITY.md](SECURITY.md) explains the trade-off.
 
-```sh
-xattr -dr com.apple.quarantine /Applications/sftply.app
-```
+## Highlights
 
-See [Release and packaging](docs/RELEASE.md) for the full caveats, including the
-WebView2 requirement on Windows and FUSE on Linux.
+|                                  |                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Three protocols, one client**  | FTP, explicit and implicit FTPS, and SFTP over native Rust networking. No shelling out to `lftp` or `ssh`.                      |
+| **Dual pane, keyboard first**    | Two folders side by side, multi-select, drag between panes, command palette, path autocomplete and shortcut hints per platform. |
+| **A queue that tells the truth** | Pause and resume appear only when the server supports them. A cancelled transfer is never reported as complete.                 |
+| **Secrets stay in the keychain** | Passwords and passphrases live in the OS keychain. Config files, exports and logs never contain them.                           |
+| **Remote text editing**          | Open a UTF-8 file up to 2 MiB, edit it in place and save atomically, with stale-write detection.                                |
+| **Themes and migrations**        | Dark by default, light first-class, named palettes contrast-tested. Connections import and export as credential-free JSON.      |
 
-## Design documents
+## Status
+
+Pre-1.0. The app is usable and tested, but behaviour can still change before
+1.0. The roadmap is explicit about what comes next:
+
+- **1.0** — hardening: real-server matrix, soak tests, parser fuzzing, audits.
+- **1.1** — directory diff and one-way sync with a mandatory dry-run.
+- **1.2** — bidirectional sync and remote previews.
+
+## Documentation
 
 - [User guide](docs/USER_GUIDE.md) — connections, host keys, transfers, troubleshooting
+- [Release and packaging](docs/RELEASE.md) — CI, artifacts, unsigned builds
 - [Changelog](CHANGELOG.md) — what changed in each release
-- [Architecture](docs/ARCHITECTURE.md) — layers, module boundaries, IPC contract, security model, design system
-- [Dependency evaluation](docs/DEPENDENCIES.md) — protocol libraries, Rust/frontend dependencies, rejected alternatives
-- [Release and packaging](docs/RELEASE.md) — CI, artifacts, portable caveats, signing
-- [Roadmap](docs/ROADMAP.md) — phased milestones with exit criteria
-- [Progress log](docs/PROGRESS.md) — what is built, verified, and what comes next
+- [Architecture](docs/ARCHITECTURE.md) — layers, IPC contract, security model
+- [Roadmap](docs/ROADMAP.md) — milestones and exit criteria
+- [Dependency evaluation](docs/DEPENDENCIES.md) — protocol libraries and rejected alternatives
+- [Progress log](docs/PROGRESS.md) — what is built, verified and next
 - [ADRs](docs/adr/README.md) — architectural decision records
-
-## Product direction
-
-- Dual-pane local/remote file browser with a dense, calm interface inspired by Linear, VS Code, Raycast and Finder.
-- Native Rust networking for FTP, explicit/implicit FTPS and SFTP. No system binaries.
-- OS keychain for credentials, strict SSH host-key verification, and certificate validation for FTPS.
-- A reliable, capability-aware transfer queue: no fake pause/resume, no optimistic "completed" states.
-- Dark theme by default, first-class light theme.
-- Typed Rust↔TypeScript boundary, strict TypeScript, tests for core logic and protocols.
-
-## Stack
-
-Tauri 2 · React 19 · TypeScript · Vite · Tailwind CSS v4 · shadcn/ui · Zustand · TanStack Query · React Hook Form + Zod · Rust · suppaftp · russh/russh-sftp · keyring
 
 ## Development
 
@@ -62,13 +83,6 @@ bun run tauri dev      # desktop app with hot reload
 bun run check          # typecheck, Biome, Vitest and production build
 ```
 
-The landing page lives in `web/` and is its own Bun project:
-
-```bash
-bun run web:dev        # Astro dev server
-bun run web:build      # static output in web/dist
-```
-
 Rust gates run from `src-tauri`:
 
 ```bash
@@ -77,10 +91,18 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
+The landing page lives in `web/` and is its own Bun project:
+
+```bash
+bun run web:dev        # Astro dev server
+bun run web:build      # static output in web/dist
+```
+
+## Stack
+
+Tauri 2 · React 19 · TypeScript · Vite · Tailwind CSS v4 · shadcn/ui · Zustand ·
+TanStack Query · React Hook Form + Zod · Rust · suppaftp · russh/russh-sftp · keyring
+
 ## License
 
 MIT. See [LICENSE](LICENSE). Security reports: [SECURITY.md](SECURITY.md).
-
-Releases are not OS-signed: macOS asks for confirmation on first launch and
-Windows shows a SmartScreen warning. Verify `SHA256SUMS` and see
-[SECURITY.md](SECURITY.md) for the reasoning.
