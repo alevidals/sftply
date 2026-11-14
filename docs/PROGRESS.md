@@ -202,10 +202,10 @@ These were recommended in the architecture package. Implementation proceeds with
 
 - [x] Shortcuts reference in Settings
 - [x] Full command palette + `?` shortcut sheet
-- [ ] Complete keyboard map and scopes
-- [ ] Context menus everywhere + disabled reasons
+- [x] Complete keyboard map and scopes (global, pane, tab and dialog scopes)
+- [x] Context menus everywhere + disabled reasons (files, connections, transfers, tabs)
 - [x] Tabs polish (overflow, reorder, close behavior)
-- [ ] All empty/loading/error/first-run states
+- [x] All empty/loading/error/first-run states (boot, connections, panes, transfers, history)
 - [x] Density/column/date/size preferences
 - [x] Accessibility audit (keyboard, labels, contrast, reduced motion)
 - [x] Startup/scroll/memory performance pass (overlays split; vendor chunking still open)
@@ -1168,3 +1168,23 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: first-run polish and cross-platform visual QA notes.
+
+### 2026-11-14 — Session 38: first-run audit and visual QA notes
+
+**Changed**
+
+- Audited every empty, loading, error and first-run surface: settings boot screen and boot error, connection list loading/error/empty, home-folder lookup, folder loading/error/empty/filtered, remote pane without a session, lost connection, transfer list, transfer history and activity.
+- Replaced two stale strings left over from before transfers shipped. Double-clicking a remote file now says it cannot be opened yet and must be downloaded; an empty remote folder now points at dragging files from the local pane.
+- Added a regression test for the remote pane's first-run state (heading, explanation and "Not connected" badge).
+- Marked the keyboard map, context menus and empty/loading/error checklist items done, with the audited scope named in each item.
+- Added a manual visual QA section to `docs/RELEASE.md`: window chrome, sidebar clamp and display scaling, themes and focus rings, long/non-ASCII names, platform shortcut labels, cross-pane drag, reduced motion, native dialogs, screen readers and packaging/icon checks. It must be run on each target OS; it cannot be executed from the build environment.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 189 tests in 28 files, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test` (101 passed, 18 ignored). No Rust code changed in this session.
+
+**Next**
+
+- Cross-platform visual QA is the only Phase 5 item left; it needs real macOS, Windows and Linux windows.
+- Phase 6 starts with the permissions editor and remote bookmarks.

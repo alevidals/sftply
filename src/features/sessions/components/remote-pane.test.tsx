@@ -92,6 +92,16 @@ beforeEach(() => {
 })
 
 describe("RemotePane", () => {
+  it("explains the first-run state when no session is active", () => {
+    render(<RemotePane />)
+
+    expect(screen.getByRole("heading", { name: "No active connection" })).toBeInTheDocument()
+    expect(
+      screen.getByText("Connect a saved server from the sidebar to browse its files."),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Not connected")).toBeInTheDocument()
+  })
+
   it("shows the lost state and reconnects the active session", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     const first = session("a", "Staging")

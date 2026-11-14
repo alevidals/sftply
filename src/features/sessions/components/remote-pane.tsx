@@ -278,7 +278,7 @@ export function RemotePane() {
             allowOpenFile={false}
             allowReveal={false}
             statusLabel={`${PROTOCOL_LABELS[active.protocol]} · ${active.host}:${active.port}`}
-            emptyDescription="This folder is empty. Remote uploads arrive with transfers."
+            emptyDescription="This folder is empty. Drag files here from the local pane to upload them."
             onPathChange={(path) => setPath(active.id, path)}
             onCancel={() => void cancel(active.id)}
             headerExtra={

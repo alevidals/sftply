@@ -76,6 +76,50 @@ Build on the target distribution. The Debian package is filed under the `devel`
 section; Tauri derives runtime dependencies automatically. AppImage and RPM
 targets need their usual host tooling (`linuxdeploy`, `rpmbuild`) available.
 
+## Manual visual QA (per OS)
+
+Automated tests cannot see the native window. Run this pass on macOS, Windows
+and Linux before publishing a build, using the same checklist for each.
+
+**Window and chrome**
+
+- [ ] Title bar drags, double-click maximizes/zooms, and the traffic lights
+  (macOS) or caption buttons (Windows/Linux) do not overlap the app title.
+- [ ] Sidebar stays between 240 and 420 px; no connection card clips at either
+  extreme or at 125 %, 150 % and 200 % display scaling.
+- [ ] Minimum window size keeps the path bar, both panes and the status bar
+  usable; panels resize without overlap.
+- [ ] Scrollbars look native in file lists, the transfer list and dialogs.
+
+**Themes and typography**
+
+- [ ] Light, dark and system modes apply without a flash of the wrong theme.
+- [ ] Every named theme renders readable text in the sidebar, file table,
+  transfers, dialogs and status bar.
+- [ ] Focus rings are visible on every theme, including keyboard-only use.
+- [ ] Fonts fall back cleanly when Inter or JetBrains Mono is unavailable.
+- [ ] Long file names, deep paths and non-ASCII names truncate or wrap without
+  pushing controls off screen.
+
+**Behaviour**
+
+- [ ] Shortcut hints show `⌘` on macOS and `Ctrl` on Windows/Linux.
+- [ ] Copy/paste works in path, filter and credential fields, and text is not
+  accidentally selectable elsewhere.
+- [ ] Drag a file between panes: the drop overlay appears, the transfer starts
+  and both listings refresh when it finishes.
+- [ ] Reduced motion disables spinners and transition-heavy effects.
+- [ ] Native file dialogs, keychain prompts and the "reveal in file manager"
+  action open the expected OS UI.
+- [ ] VoiceOver, NVDA or Orca announces the pane, tab, table and dialog names.
+
+**Packaging**
+
+- [ ] The installed app shows the icon in the dock/taskbar, launcher, window and
+  About panel.
+- [ ] Windows installs WebView2 when missing; Linux pulls the declared runtime
+  dependencies; macOS launches from a copied `.app`, not only the build tree.
+
 ## Checklist
 
 - [ ] Version bumped in the three files and bindings regenerated.

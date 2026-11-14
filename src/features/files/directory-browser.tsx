@@ -226,7 +226,7 @@ export function DirectoryBrowser({
         return
       }
       if (!allowOpenFile) {
-        toast.info("Opening remote files will arrive with transfers.")
+        toast.info("Remote files cannot be opened here yet. Download the file first.")
         return
       }
       localFiles.open(entry.path).catch((error) => {
