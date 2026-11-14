@@ -220,7 +220,7 @@ These were recommended in the architecture package. Implementation proceeds with
 
 - [x] Permissions editor: octal + symbolic, multi-select
 - [ ] Recursive permission changes with explicit confirmation
-- [ ] Remote bookmarks + recent paths
+- [x] Remote bookmarks + recent paths
 - [ ] Remote text editor (size/binary/encoding limits, conflict detection)
 - [ ] Remote previews (safe rendering)
 - [ ] Import/export without credentials
@@ -1209,3 +1209,23 @@ which is only correct for local client connections. See
 **Next**
 
 - Phase 6 continues with remote bookmarks and recent paths.
+
+### 2026-11-14 — Session 40: remote bookmarks and recent folders
+
+**Changed**
+
+- Persisted per-connection navigation data in settings: `remoteBookmarks` and `recentPaths`, both keyed by connection id. Rust normalization drops malformed keys/paths, de-duplicates entries, and caps the data at 200 connections, 100 bookmarks and 20 recents per connection.
+- Added a star button to the remote path bar. It opens a dialog with the current folder, one-click bookmark/remove, saved bookmarks with individual remove actions, and recent folders with a clear action. Selecting any entry navigates and closes the dialog.
+- Recent folders are recorded on navigation through the existing debounced settings writer, newest first; revisiting a path moves it to the front instead of duplicating it.
+- Deleting a connection now prunes its bookmarks and recents as best effort. A cleanup failure is logged and does not turn a successful connection deletion into an error.
+- Added `src/features/files/model/navigation.ts` with bookmark/recent list helpers and tests, plus a dialog test suite covering navigation, toggling, removal, clearing and empty states.
+- Regenerated the specta bindings for the new settings fields.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 208 tests in 31 files, production build).
+- `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test` (103 passed, 18 ignored). Settings tests cover defaults, de-duplication, malformed entries and list bounds.
+
+**Next**
+
+- Phase 6 continues with the remote text editor, or previews if the editor is split first.

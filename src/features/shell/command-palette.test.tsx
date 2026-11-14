@@ -74,6 +74,8 @@ const settings: AppSettings_Serialize = {
   bottomPanelOpen: false,
   paneSplit: 50,
   lastLocalPath: null,
+  remoteBookmarks: {},
+  recentPaths: {},
 }
 
 function transfer(id: string, status: TransferItem_Serialize["status"]): TransferItem_Serialize {

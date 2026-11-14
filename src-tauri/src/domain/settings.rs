@@ -1,7 +1,15 @@
+use std::collections::{BTreeMap, HashSet};
+
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
+
+/// Bounds for persisted remote navigation data. These keep a corrupted or
+/// tampered settings file from growing without limit.
+pub const MAX_NAV_CONNECTIONS: usize = 200;
+pub const MAX_BOOKMARKS_PER_CONNECTION: usize = 100;
+pub const MAX_RECENT_PATHS_PER_CONNECTION: usize = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +76,10 @@ pub struct AppSettings {
     pub bottom_panel_open: bool,
     pub pane_split: u16,
     pub last_local_path: Option<String>,
+    /// Bookmarked remote folders, keyed by connection id.
+    pub remote_bookmarks: BTreeMap<String, Vec<String>>,
+    /// Most recent remote folders, newest first, keyed by connection id.
+    pub recent_paths: BTreeMap<String, Vec<String>>,
 }
 
 impl Default for AppSettings {
@@ -89,6 +101,8 @@ impl Default for AppSettings {
             bottom_panel_open: true,
             pane_split: 50,
             last_local_path: None,
+            remote_bookmarks: BTreeMap::new(),
+            recent_paths: BTreeMap::new(),
         }
     }
 }
@@ -134,8 +148,41 @@ impl AppSettings {
             return Err("Last local path is invalid.".into());
         }
 
+        self.remote_bookmarks =
+            normalize_path_map(self.remote_bookmarks, MAX_BOOKMARKS_PER_CONNECTION);
+        self.recent_paths = normalize_path_map(self.recent_paths, MAX_RECENT_PATHS_PER_CONNECTION);
+
         Ok(self)
     }
+}
+
+/// Keep only well-formed connection keys and paths, remove duplicates, and
+/// bound each list. Navigation data is conveniences, so a malformed entry is
+/// dropped instead of resetting every other setting.
+fn normalize_path_map(
+    map: BTreeMap<String, Vec<String>>,
+    max_paths: usize,
+) -> BTreeMap<String, Vec<String>> {
+    map.into_iter()
+        .filter(|(connection_id, _)| {
+            !connection_id.is_empty() && connection_id.len() <= 128 && !connection_id.contains('\0')
+        })
+        .take(MAX_NAV_CONNECTIONS)
+        .map(|(connection_id, paths)| {
+            let mut seen = HashSet::new();
+            let mut paths: Vec<String> = paths
+                .into_iter()
+                .filter(|path| {
+                    !path.is_empty()
+                        && path.len() <= 4096
+                        && !path.contains('\0')
+                        && seen.insert(path.clone())
+                })
+                .collect();
+            paths.truncate(max_paths);
+            (connection_id, paths)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -210,6 +257,60 @@ mod tests {
         let settings: AppSettings = serde_json::from_str(json).unwrap();
         assert_eq!(settings.size_format, SizeFormat::Binary);
         assert_eq!(settings.date_format, DateFormat::Friendly);
+        assert!(settings.remote_bookmarks.is_empty());
+        assert!(settings.recent_paths.is_empty());
+    }
+
+    #[test]
+    fn normalizes_navigation_maps() {
+        let mut bookmarks = BTreeMap::new();
+        bookmarks.insert(
+            "connection".to_string(),
+            vec![
+                "/a".to_string(),
+                "/a".to_string(),
+                String::new(),
+                "/b".to_string(),
+                "/bad\0path".to_string(),
+            ],
+        );
+        bookmarks.insert(String::new(), vec!["/ignored".to_string()]);
+        bookmarks.insert("x".repeat(129), vec!["/ignored".to_string()]);
+
+        let settings = AppSettings {
+            remote_bookmarks: bookmarks,
+            ..AppSettings::default()
+        }
+        .normalized()
+        .unwrap();
+
+        assert_eq!(
+            settings.remote_bookmarks.get("connection"),
+            Some(&vec!["/a".to_string(), "/b".to_string()])
+        );
+        assert_eq!(settings.remote_bookmarks.len(), 1);
+    }
+
+    #[test]
+    fn bounds_navigation_lists() {
+        let many_bookmarks = (0..150).map(|index| format!("/b{index}")).collect();
+        let many_recent = (0..30).map(|index| format!("/r{index}")).collect();
+        let settings = AppSettings {
+            remote_bookmarks: BTreeMap::from([("connection".to_string(), many_bookmarks)]),
+            recent_paths: BTreeMap::from([("connection".to_string(), many_recent)]),
+            ..AppSettings::default()
+        }
+        .normalized()
+        .unwrap();
+
+        assert_eq!(
+            settings.remote_bookmarks["connection"].len(),
+            MAX_BOOKMARKS_PER_CONNECTION
+        );
+        assert_eq!(
+            settings.recent_paths["connection"].len(),
+            MAX_RECENT_PATHS_PER_CONNECTION
+        );
     }
 
     #[test]

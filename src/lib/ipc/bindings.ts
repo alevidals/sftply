@@ -159,6 +159,10 @@ export type AppSettings_Deserialize = {
 	bottomPanelOpen?: boolean,
 	paneSplit?: number,
 	lastLocalPath?: string | null,
+	/**  Bookmarked remote folders, keyed by connection id. */
+	remoteBookmarks?: { [key in string]: string[] },
+	/**  Most recent remote folders, newest first, keyed by connection id. */
+	recentPaths?: { [key in string]: string[] },
 };
 
 /**  Persisted user settings. Secrets must never be added to this struct. */
@@ -181,6 +185,10 @@ export type AppSettings_Serialize = {
 	bottomPanelOpen: boolean,
 	paneSplit: number,
 	lastLocalPath: string | null,
+	/**  Bookmarked remote folders, keyed by connection id. */
+	remoteBookmarks: { [key in string]: string[] },
+	/**  Most recent remote folders, newest first, keyed by connection id. */
+	recentPaths: { [key in string]: string[] },
 };
 
 /**

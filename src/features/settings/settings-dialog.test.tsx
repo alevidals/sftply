@@ -48,6 +48,8 @@ const settings: AppSettings_Serialize = {
   bottomPanelOpen: false,
   paneSplit: 50,
   lastLocalPath: null,
+  remoteBookmarks: {},
+  recentPaths: {},
 }
 
 beforeEach(() => {

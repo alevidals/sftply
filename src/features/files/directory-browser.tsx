@@ -17,6 +17,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SearchIcon,
+  StarIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -39,6 +40,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { filesApi, localFiles, scopeKey } from "@/features/files/api"
+import { BookmarksDialog } from "@/features/files/components/bookmarks-dialog"
 import { ColumnHeader } from "@/features/files/components/column-header"
 import {
   DeleteDialog,
@@ -51,6 +53,7 @@ import { PathBar } from "@/features/files/components/path-bar"
 import { useFsListing } from "@/features/files/hooks/use-fs-listing"
 import { usePathNavigation } from "@/features/files/hooks/use-path-navigation"
 import { type ColumnOptions, fileGridTemplate } from "@/features/files/model/columns"
+import { addBookmark, addRecentPath, removeBookmark } from "@/features/files/model/navigation"
 import { parentPath } from "@/features/files/model/path"
 import {
   clearSelection,
@@ -75,6 +78,7 @@ import {
   type TransferDragPayload,
 } from "@/features/transfers/model"
 import { useTransferActions } from "@/features/transfers/use-transfer-actions"
+import { useDebouncedSettingsPatch } from "@/hooks/use-debounced-settings"
 import { normalizeError } from "@/lib/errors"
 import { formatCount, formatMode } from "@/lib/format"
 import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
@@ -102,6 +106,8 @@ interface DirectoryBrowserProps {
   homePath?: string
   /** Cancel the in-flight remote operation, when supported by the scope. */
   onCancel?: () => void
+  /** Connection id used to persist bookmarks and recent folders. */
+  bookmarkKey?: string
 }
 
 export function DirectoryBrowser({
@@ -118,9 +124,11 @@ export function DirectoryBrowser({
   statusLabel,
   homePath,
   onCancel,
+  bookmarkKey,
 }: DirectoryBrowserProps) {
   const { settings, updateSettings } = useSettings()
   const queryClient = useQueryClient()
+  const persistNavigation = useDebouncedSettingsPatch()
   const activePane = useUiStore((state) => state.activePane)
   const setActivePane = useUiStore((state) => state.setActivePane)
   const setLocalSummary = useUiStore((state) => state.setLocalSummary)
@@ -146,6 +154,7 @@ export function DirectoryBrowser({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [permissionsOpen, setPermissionsOpen] = useState(false)
   const [permissionsTargets, setPermissionsTargets] = useState<FsEntry[]>([])
+  const [bookmarksOpen, setBookmarksOpen] = useState(false)
   const [dropActive, setDropActive] = useState(false)
 
   const rowHeight = settings.density === "comfortable" ? 38 : 30
@@ -169,6 +178,9 @@ export function DirectoryBrowser({
     [entries, selection.selected],
   )
   const parent = listing?.parent ?? (path ? parentPath(path) : null)
+  const bookmarks = bookmarkKey ? (settings.remoteBookmarks[bookmarkKey] ?? []) : []
+  const recentPaths = bookmarkKey ? (settings.recentPaths[bookmarkKey] ?? []) : []
+  const isBookmarked = Boolean(path && bookmarks.includes(path))
 
   const reportError = useCallback((title: string, error: unknown) => {
     const normalized = normalizeError(error)
@@ -208,6 +220,18 @@ export function DirectoryBrowser({
   useEffect(() => {
     if (path) onPathChange?.(path)
   }, [path, onPathChange])
+
+  // Remember visited folders per connection. Debounced so a burst of
+  // navigation writes settings once, and skipped when the path is already the
+  // newest entry.
+  useEffect(() => {
+    if (!bookmarkKey || !path) return
+    const current = settings.recentPaths[bookmarkKey] ?? []
+    if (current[0] === path) return
+    persistNavigation({
+      recentPaths: { ...settings.recentPaths, [bookmarkKey]: addRecentPath(current, path) },
+    })
+  }, [bookmarkKey, path, settings.recentPaths, persistNavigation])
 
   useEffect(() => {
     const summary = {
@@ -394,6 +418,32 @@ export function DirectoryBrowser({
     if (homePath) navigate(homePath)
   }
 
+  const updateBookmarks = (next: string[], message: string) => {
+    if (!bookmarkKey) return
+    updateSettings({ remoteBookmarks: { ...settings.remoteBookmarks, [bookmarkKey]: next } })
+      .then(() => toast.success(message))
+      .catch((error) => reportError("Could not save the bookmark", error))
+  }
+
+  const toggleBookmark = () => {
+    if (!bookmarkKey || !path) return
+    updateBookmarks(
+      isBookmarked ? removeBookmark(bookmarks, path) : addBookmark(bookmarks, path),
+      isBookmarked ? "Bookmark removed" : "Folder bookmarked",
+    )
+  }
+
+  const removeSavedBookmark = (target: string) => {
+    updateBookmarks(removeBookmark(bookmarks, target), "Bookmark removed")
+  }
+
+  const clearRecentPaths = () => {
+    if (!bookmarkKey) return
+    updateSettings({ recentPaths: { ...settings.recentPaths, [bookmarkKey]: [] } })
+      .then(() => toast.success("Recent folders cleared"))
+      .catch((error) => reportError("Could not clear recent folders", error))
+  }
+
   const shortcutActions = useRef({
     refresh,
     back,
@@ -566,6 +616,15 @@ export function DirectoryBrowser({
           onUp={() => parent && navigate(parent)}
           onNavigate={navigate}
         >
+          {bookmarkKey ? (
+            <ToolbarButton
+              label="Bookmarks and recent folders"
+              active={isBookmarked}
+              onClick={() => setBookmarksOpen(true)}
+            >
+              <StarIcon className={cn(isBookmarked && "fill-current")} />
+            </ToolbarButton>
+          ) : null}
           {filterOpen ? (
             <FilterBox
               value={filter}
@@ -752,6 +811,20 @@ export function DirectoryBrowser({
         onOpenChange={setPermissionsOpen}
         onConfirm={applyPermissions}
       />
+      {bookmarkKey ? (
+        <BookmarksDialog
+          open={bookmarksOpen}
+          onOpenChange={setBookmarksOpen}
+          currentPath={path}
+          bookmarks={bookmarks}
+          recent={recentPaths}
+          isBookmarked={isBookmarked}
+          onToggleBookmark={toggleBookmark}
+          onRemoveBookmark={removeSavedBookmark}
+          onNavigate={(target) => navigate(target)}
+          onClearRecent={clearRecentPaths}
+        />
+      ) : null}
       {conflictPrompt ? (
         <TransferConflictDialog
           open={conflictPrompt.open}

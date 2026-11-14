@@ -36,6 +36,19 @@ pub async fn connection_update(
 #[specta::specta]
 pub async fn connection_delete(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     state.connections.delete(&id).await?;
+
+    // Bookmarks and recents are keyed by connection id. Drop them after the
+    // metadata deletion succeeds, but do not fail the delete if this cleanup
+    // cannot be saved.
+    let mut settings = state.settings.get();
+    let pruned_bookmarks = settings.remote_bookmarks.remove(&id).is_some();
+    let pruned_recent = settings.recent_paths.remove(&id).is_some();
+    if (pruned_bookmarks || pruned_recent)
+        && let Err(error) = state.settings.update(settings).await
+    {
+        tracing::warn!(%error, "could not prune navigation data for a deleted connection");
+    }
+
     // Remove credentials only after the metadata deletion succeeded, so a
     // failed save cannot orphan a live connection row.
     credentials::delete_all(&id).await
