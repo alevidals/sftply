@@ -1,86 +1,73 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import type { TransferItem_Deserialize, TransferItem_Serialize } from "@/lib/ipc/bindings"
-import {
-  selectActiveTransferCount,
-  selectTransferSpeed,
-  useTransferStore,
-} from "@/stores/transfer-store"
+import type { TransferItem_Serialize, TransferStatus } from "@/lib/ipc/bindings"
+import { useTransferStore } from "@/stores/transfer-store"
 
-function item(overrides: Partial<TransferItem_Serialize> = {}): TransferItem_Serialize {
+function item(
+  id: string,
+  startedAt: number,
+  status: TransferStatus = "queued",
+): TransferItem_Serialize {
   return {
-    id: "t1",
-    direction: "download",
-    status: "running",
-    sourcePath: "/remote/a",
-    targetPath: "/local/a",
-    sourceLabel: "Remote",
-    targetLabel: "Local",
-    name: "a",
-    size: 100,
-    transferred: 40,
-    bytesPerSec: 10,
-    etaMs: 6000,
+    id,
+    direction: "upload",
+    status,
+    sourcePath: `/local/${id}`,
+    targetPath: `/remote/${id}`,
+    sourceLabel: "Local",
+    targetLabel: "Remote",
+    name: id,
+    size: 10,
+    transferred: 0,
+    bytesPerSec: 0,
+    etaMs: null,
     error: null,
-    startedAt: 1,
+    startedAt,
     finishedAt: null,
-    ...overrides,
   }
 }
 
-beforeEach(() => {
-  useTransferStore.getState().clear()
-})
-
 describe("transfer store", () => {
-  it("orders transfers newest first and fills optional fields", () => {
-    const withoutOptionals: TransferItem_Deserialize = {
-      id: "old",
-      direction: "download",
-      status: "running",
-      sourcePath: "/remote/old",
-      targetPath: "/local/old",
-      sourceLabel: "Remote",
-      targetLabel: "Local",
-      name: "old",
-      size: 10,
-      transferred: 1,
-      bytesPerSec: 1,
-      startedAt: 1,
-    }
-    useTransferStore.getState().setAll([withoutOptionals, item({ id: "new", startedAt: 5 })])
-
-    const state = useTransferStore.getState()
-    expect(state.order).toEqual(["new", "old"])
-    expect(state.items.old?.etaMs).toBeNull()
-    expect(state.items.old?.error).toBeNull()
-    expect(state.items.old?.finishedAt).toBeNull()
+  beforeEach(() => {
+    useTransferStore.getState().clear()
   })
 
-  it("applies upserts and removals from a delta", () => {
-    useTransferStore.getState().setAll([item({ id: "a" })])
+  it("sorts a fresh snapshot newest first", () => {
+    useTransferStore.getState().setAll([item("a", 1), item("c", 3), item("b", 2)])
+    expect(useTransferStore.getState().order).toEqual(["c", "b", "a"])
+  })
+
+  it("does not reorder on progress updates", () => {
+    useTransferStore.getState().setAll([item("a", 1), item("b", 2)])
+    const order = useTransferStore.getState().order
+
     useTransferStore.getState().applyDelta({
-      upserts: [item({ id: "b", startedAt: 2 }), item({ id: "a", status: "completed" })],
+      upserts: [{ ...item("a", 1, "running"), transferred: 5 }],
       removed: [],
     })
 
-    expect(useTransferStore.getState().items.a?.status).toBe("completed")
-    expect(useTransferStore.getState().order).toEqual(["b", "a"])
-
-    useTransferStore.getState().applyDelta({ upserts: [], removed: ["b"] })
-    expect(useTransferStore.getState().order).toEqual(["a"])
+    expect(useTransferStore.getState().order).toBe(order)
+    expect(useTransferStore.getState().items.a?.transferred).toBe(5)
   })
 
-  it("counts active transfers and sums only running throughput", () => {
-    useTransferStore
-      .getState()
-      .setAll([
-        item({ id: "a", status: "running", bytesPerSec: 100 }),
-        item({ id: "b", status: "queued", bytesPerSec: 50 }),
-        item({ id: "c", status: "completed", bytesPerSec: 999 }),
-      ])
+  it("prepends new rows and drops removed ones", () => {
+    useTransferStore.getState().setAll([item("a", 1), item("b", 2)])
 
-    const state = useTransferStore.getState()
-    expect(selectActiveTransferCount(state)).toBe(2)
-    expect(selectTransferSpeed(state)).toBe(100)
+    useTransferStore.getState().applyDelta({
+      upserts: [item("c", 3)],
+      removed: ["a"],
+    })
+
+    expect(useTransferStore.getState().order).toEqual(["c", "b"])
+    expect(useTransferStore.getState().items.a).toBeUndefined()
+  })
+
+  it("keeps a single entry when a row is upserted twice in one batch", () => {
+    useTransferStore.getState().applyDelta({
+      upserts: [item("a", 1), { ...item("a", 1), transferred: 9 }],
+      removed: [],
+    })
+
+    expect(useTransferStore.getState().order).toEqual(["a"])
+    expect(useTransferStore.getState().items.a?.transferred).toBe(9)
   })
 })

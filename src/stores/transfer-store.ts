@@ -40,14 +40,23 @@ export const useTransferStore = create<TransferState>((set) => ({
   applyDelta: (event) =>
     set((state) => {
       const items = { ...state.items }
+      const added: string[] = []
       for (const upsert of event.upserts) {
         const normalized = normalizeTransferItem(upsert)
+        if (!items[normalized.id]) added.push(normalized.id)
         items[normalized.id] = normalized
       }
-      for (const id of event.removed) {
-        delete items[id]
-      }
-      return { items, order: sortIds(Object.values(items)) }
+      const removed = new Set(event.removed)
+      for (const id of removed) delete items[id]
+
+      // Progress deltas never change `startedAt`, so the order only needs to
+      // change when rows appear or disappear. Re-sorting every delta made the
+      // queue quadratic with thousands of files.
+      if (added.length === 0 && removed.size === 0) return { items }
+
+      added.sort((left, right) => (items[right]?.startedAt ?? 0) - (items[left]?.startedAt ?? 0))
+      const kept = state.order.filter((id) => !removed.has(id) && !added.includes(id))
+      return { items, order: [...added, ...kept] }
     }),
 
   remove: (ids) =>

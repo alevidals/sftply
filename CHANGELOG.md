@@ -14,6 +14,14 @@ All notable changes to sftply. The format follows
 
 ### Fixed
 
+- The transfer queue re-sorted every row on each progress event. With hundreds
+  of files and eight concurrent transfers the window froze and cancelling became
+  impossible. Rows now reorder only when they appear or disappear, and the
+  bridge merges progress deltas into one update every 100 ms.
+- Release builds aborted the entire app when a transfer task panicked, because
+  the release profile set `panic = "abort"`. Panics are now logged to the app log
+  and turn into a failed row that can be retried.
+- Cancelling a transfer now responds while its connection is still opening.
 - Choosing **Rename** from the row context menu or the pane actions menu left
   focus on the row. The menus no longer restore focus to their trigger, so the
   inline input keeps it.

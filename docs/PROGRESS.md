@@ -1689,3 +1689,32 @@ which is only correct for local client connections. See
 **Next**
 
 - Manual check on macOS/Windows/Linux, then retag 0.3.x if the behaviour holds.
+
+### 2026-11-14 — Session 55: transfer freeze and crash
+
+**Fixed**
+
+- **Freeze with many transfers.** `applyDelta` sorted the whole item list on
+  every progress event, and `order` changed identity each time, so the queue,
+  the status bar and the panel badge re-rendered about 80 times per second with
+  thousands of rows. The store now keeps the order stable and only prepends new
+  rows or drops removed ones; the bridge coalesces deltas into one update every
+  100 ms.
+- **The app exited on retry.** The release profile used `panic = "abort"`, so a
+  panic inside a transfer task killed the process. Removed it, installed a panic
+  hook that writes to the app log, and wrapped the transfer task in
+  `catch_unwind`: a panic now marks that row as failed with
+  "The transfer stopped unexpectedly" and the app keeps running.
+- Cancel was ignored while a transfer was still opening its connection; the
+  connect future is now raced against the cancellation token.
+
+**Changed**
+
+- The delete confirmation shows the pane ("Local" or "Remote") as a badge next
+  to the title and names the target in the description.
+
+**Verified**
+
+- Store tests: snapshot sorting, stable order on updates, prepend on insert,
+  removal, and duplicate upserts in one batch.
+- Rust 133 tests, clippy clean, 246 frontend tests, production build.

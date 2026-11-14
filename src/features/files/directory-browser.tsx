@@ -941,6 +941,7 @@ export function DirectoryBrowser({
       <DeleteDialog
         open={deleteOpen}
         entries={selectedEntries}
+        scope={title}
         onOpenChange={setDeleteOpen}
         onConfirm={deleteEntries}
       />

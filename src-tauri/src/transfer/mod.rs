@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
+use futures_util::FutureExt;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event;
 use tokio::sync::watch;
@@ -435,26 +436,51 @@ pub fn spawn_transfer<R: Runtime>(
         item.status = TransferStatus::Running;
         manager.publish(&app, &item);
 
-        let outcome = run_job(&app, &manager, &mut item, &job, &token).await;
+        // A panic in a protocol crate must not take the app down. The task is
+        // contained here and the row is reported as failed so it can be retried.
+        let outcome =
+            std::panic::AssertUnwindSafe(run_job(&app, &manager, &mut item, &job, &token))
+                .catch_unwind()
+                .await;
         drop(slot);
 
         match outcome {
-            Ok(()) => {
+            Ok(Ok(())) => {
                 item.status = TransferStatus::Completed;
                 item.error = None;
                 item.eta_ms = None;
                 item.finished_at = Some(crate::domain::activity::unix_millis());
                 manager.publish(&app, &item);
             }
-            Err(error) if error.code == ErrorCode::Cancelled => {
+            Ok(Err(error)) if error.code == ErrorCode::Cancelled => {
                 finish_cancelled(&app, &manager, &mut item);
             }
-            Err(error) => fail(&app, &manager, &mut item, error),
+            Ok(Err(error)) => fail(&app, &manager, &mut item, error),
+            Err(payload) => {
+                let detail = panic_detail(payload.as_ref());
+                tracing::error!(transfer = %item.id, detail = %detail, "transfer task panicked");
+                fail(
+                    &app,
+                    &manager,
+                    &mut item,
+                    AppError::internal("The transfer stopped unexpectedly.", detail),
+                );
+            }
         }
         manager.finish_task(&item.id);
     });
 
     item
+}
+
+fn panic_detail(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
+    }
 }
 
 fn finish_cancelled<R: Runtime>(
@@ -502,7 +528,13 @@ async fn run_job<R: Runtime>(
                     "missing remote source",
                 )
             })?;
-            let mut client = connect_remote(access).await?;
+            // Cancel must respond while the connection is still opening, which
+            // can take up to the connect timeout.
+            let mut client = tokio::select! {
+                biased;
+                _ = token.cancelled() => return Err(cancelled()),
+                result = connect_remote(access) => result?,
+            };
             let result = download(app, manager, item, &mut client, job.policy, token).await;
             let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
             result
@@ -511,7 +543,11 @@ async fn run_job<R: Runtime>(
             let access = job.target_remote.as_ref().ok_or_else(|| {
                 AppError::internal("The upload target is not remote.", "missing remote target")
             })?;
-            let mut client = connect_remote(access).await?;
+            let mut client = tokio::select! {
+                biased;
+                _ = token.cancelled() => return Err(cancelled()),
+                result = connect_remote(access) => result?,
+            };
             let preserve_permissions = app
                 .state::<crate::app_state::AppState>()
                 .settings

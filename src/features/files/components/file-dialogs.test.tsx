@@ -85,10 +85,19 @@ describe("DeleteDialog", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     const onOpenChange = vi.fn()
-    render(<DeleteDialog open entries={[file]} onConfirm={onConfirm} onOpenChange={onOpenChange} />)
+    render(
+      <DeleteDialog
+        open
+        entries={[file]}
+        scope="Remote"
+        onConfirm={onConfirm}
+        onOpenChange={onOpenChange}
+      />,
+    )
 
     expect(screen.getByText("Delete “alpha.txt”?")).toBeInTheDocument()
-    expect(screen.getByText("This cannot be undone.")).toBeInTheDocument()
+    expect(screen.getByText(/removed from the server/)).toBeInTheDocument()
+    expect(screen.getByText("Remote")).toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Delete" }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(false))
@@ -99,7 +108,13 @@ describe("DeleteDialog", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     render(
-      <DeleteDialog open entries={[file, folder]} onConfirm={onConfirm} onOpenChange={vi.fn()} />,
+      <DeleteDialog
+        open
+        entries={[file, folder]}
+        scope="Remote"
+        onConfirm={onConfirm}
+        onOpenChange={vi.fn()}
+      />,
     )
 
     expect(screen.getByText("Delete 2 items?")).toBeInTheDocument()
@@ -114,7 +129,13 @@ describe("DeleteDialog", () => {
     const onConfirm = vi.fn().mockRejectedValue(failure("Folder is not empty"))
     const onOpenChange = vi.fn()
     render(
-      <DeleteDialog open entries={[folder]} onConfirm={onConfirm} onOpenChange={onOpenChange} />,
+      <DeleteDialog
+        open
+        entries={[folder]}
+        scope="Local"
+        onConfirm={onConfirm}
+        onOpenChange={onOpenChange}
+      />,
     )
 
     await user.click(screen.getByRole("button", { name: "Delete" }))

@@ -137,11 +137,13 @@ export function NewFolderDialog({
 interface DeleteDialogProps {
   open: boolean
   entries: readonly FsEntry[]
+  /** Pane the entries belong to: "Local" or "Remote". */
+  scope: string
   onOpenChange: (open: boolean) => void
   onConfirm: (recursive: boolean) => Promise<void>
 }
 
-export function DeleteDialog({ open, entries, onOpenChange, onConfirm }: DeleteDialogProps) {
+export function DeleteDialog({ open, entries, scope, onOpenChange, onConfirm }: DeleteDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasDirectory = entries.some((entry) => entry.kind === "directory")
@@ -177,11 +179,14 @@ export function DeleteDialog({ open, entries, onOpenChange, onConfirm }: DeleteD
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangleIcon className="size-4 text-destructive" />
             {title}
+            <span className="rounded border border-border px-1.5 py-0.5 text-2xs font-normal text-muted-foreground">
+              {scope}
+            </span>
           </AlertDialogTitle>
           <AlertDialogDescription>
             {hasDirectory
-              ? "Folders and everything inside them will be removed. This cannot be undone."
-              : "This cannot be undone."}
+              ? `The folders and everything inside them will be removed from ${scope === "Local" ? "this computer" : "the server"}. This cannot be undone.`
+              : `The files will be removed from ${scope === "Local" ? "this computer" : "the server"}. This cannot be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
 

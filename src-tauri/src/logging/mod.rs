@@ -38,8 +38,19 @@ pub fn init(paths: &AppPaths) -> Result<WorkerGuard, AppError> {
         .with(file_layer)
         .try_init();
 
+    install_panic_hook();
     tracing::info!(log_dir = %paths.log_dir.display(), "logging initialized");
     Ok(guard)
+}
+
+/// Report panics through tracing before the default hook prints them. Without
+/// this a panic in a release build only reaches stderr, which a GUI app discards.
+pub fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!(panic = %info, "unhandled panic");
+        previous(info);
+    }));
 }
 
 /// Redact values that must never appear in logs. Logging call sites should
