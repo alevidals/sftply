@@ -1798,3 +1798,21 @@ which is only correct for local client connections. See
 **Verified**
 
 - 18 FileTable tests, full frontend suite, typecheck, lint and build.
+
+### 2026-11-14 — Session 60: reconnect after retry and clear selection
+
+**Fixed**
+
+- **Stale "Connection lost" banner.** A transfer opens its own connection, so a
+  successful retry proved the server was back while the browsing session stayed
+  marked lost. The reconnect logic moved into `reconnect_session`, and a
+  completed transfer now calls `reconnect_lost_for_connection` in a detached
+  task. The tab reconnects, emits `Connecting` → `Connected` and the banner
+  clears without the user clicking anything.
+- **Selection was sticky.** Clicking the empty area below the rows now calls
+  `onClearSelection`, matching a file manager. Clicking a row is unaffected.
+
+**Verified**
+
+- Rust 134 tests and clippy; FileTable 19 tests; full frontend suite 245;
+  typecheck, lint and build.

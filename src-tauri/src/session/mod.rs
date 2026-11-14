@@ -290,8 +290,8 @@ impl SessionManager {
     }
 }
 
-pub fn emit_state(
-    app: &AppHandle,
+pub fn emit_state<R: tauri::Runtime>(
+    app: &AppHandle<R>,
     session_id: &str,
     connection_id: &str,
     state: SessionState,

@@ -6,6 +6,14 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- After a failed transfer left the browsing session lost, retrying the upload
+  could succeed while the pane still showed **Connection lost**. A successful
+  transfer now reconnects lost sessions for the same connection automatically.
+- Clicking the empty area of a pane now clears the selection, so **Select all**
+  can be undone with a click.
+
 ### Changed
 
 - Right-clicking the empty area of a pane now shows a small folder menu (new

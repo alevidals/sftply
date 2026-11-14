@@ -132,10 +132,21 @@ pub async fn session_reconnect(
         .sessions
         .get(&session_id)
         .ok_or_else(|| AppError::not_found("That session is no longer open."))?;
+    reconnect_session(&app, &state, existing).await
+}
 
+/// Reconnect a session that lost its stream. Shared by the reconnect command
+/// and by transfers, which reconnect the browsing tab once their own
+/// connection proves the server is back.
+pub(crate) async fn reconnect_session<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+    existing: std::sync::Arc<Session>,
+) -> Result<SessionInfo, AppError> {
+    let session_id = existing.info.id.clone();
     let started = Instant::now();
     emit_state(
-        &app,
+        app,
         &session_id,
         &existing.info.connection_id,
         SessionState::Connecting,
@@ -151,7 +162,7 @@ pub async fn session_reconnect(
     let timeout = Duration::from_secs(state.settings.get().connect_timeout_seconds.into());
     let result = tokio::time::timeout(
         timeout,
-        establish(&state, &existing.profile, &existing.credentials),
+        establish(state, &existing.profile, &existing.credentials),
     )
     .await;
 
@@ -171,14 +182,14 @@ pub async fn session_reconnect(
                 latency_ms: started.elapsed().as_millis() as f64,
                 usable: true,
             };
-            state.sessions.insert(Arc::new(Session::new(
+            state.sessions.insert(std::sync::Arc::new(Session::new(
                 info.clone(),
                 existing.profile.clone(),
                 existing.credentials.clone(),
                 client,
             )));
             emit_state(
-                &app,
+                app,
                 &session_id,
                 &info.connection_id,
                 SessionState::Connected,
@@ -189,7 +200,7 @@ pub async fn session_reconnect(
         Ok(Err(error)) => {
             existing.mark_unusable();
             emit_state(
-                &app,
+                app,
                 &session_id,
                 &existing.info.connection_id,
                 SessionState::Failed,
@@ -201,13 +212,30 @@ pub async fn session_reconnect(
             existing.mark_unusable();
             let error = timeout_error();
             emit_state(
-                &app,
+                app,
                 &session_id,
                 &existing.info.connection_id,
                 SessionState::Failed,
                 Some(error.message.clone()),
             );
             Err(error)
+        }
+    }
+}
+
+/// A successful transfer proves the server is reachable again, so reconnect any
+/// browsing tab for that connection that is still marked lost.
+pub(crate) async fn reconnect_lost_for_connection<R: tauri::Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+    connection_id: &str,
+) {
+    for session in state.sessions.for_connection(connection_id) {
+        if session.is_usable() {
+            continue;
+        }
+        if let Err(error) = reconnect_session(app, state, session).await {
+            tracing::debug!(%error, "automatic reconnect after a transfer failed");
         }
     }
 }

@@ -279,6 +279,12 @@ export function FileTable({
           }
           tabIndex={0}
           onKeyDown={handleKeyDown}
+          onMouseDown={(event) => {
+            if (event.button !== 0) return
+            // Clicking the empty area below the rows clears the selection, as
+            // in a file manager. Rows handle their own clicks.
+            if (!(event.target as Element).closest('[role="row"]')) onClearSelection()
+          }}
           onContextMenu={(event) => {
             // Rows set their own index. Anything else is the empty background,
             // where row actions make no sense.

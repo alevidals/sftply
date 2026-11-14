@@ -109,6 +109,16 @@ describe("FileTable background menu", () => {
     expect(screen.queryByRole("menuitem", { name: /Rename/ })).not.toBeInTheDocument()
   })
 
+  it("clears the selection when the empty background is clicked", () => {
+    const { handlers, grid } = renderTable({ selection: selection(0, ["/tmp/alpha.txt"]) })
+
+    fireEvent.mouseDown(screen.getByText("alpha.txt"), { button: 0 })
+    expect(handlers.onClearSelection).not.toHaveBeenCalled()
+
+    fireEvent.mouseDown(grid, { button: 0 })
+    expect(handlers.onClearSelection).toHaveBeenCalledTimes(1)
+  })
+
   it("selects the row under the cursor when the menu opens", async () => {
     const { handlers } = renderTable({ selection: selection(null, []) })
 

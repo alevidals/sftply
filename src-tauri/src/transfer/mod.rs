@@ -442,6 +442,27 @@ pub fn spawn_transfer<R: Runtime>(
                 item.eta_ms = None;
                 item.finished_at = Some(crate::domain::activity::unix_millis());
                 manager.publish(&app, &item);
+
+                // The transfer opened its own connection, so a successful one
+                // proves the server is back. Reconnect a browsing tab that is
+                // still marked lost instead of making the user click Reconnect.
+                if let Some(connection_id) = job
+                    .target_remote
+                    .as_ref()
+                    .or(job.source_remote.as_ref())
+                    .map(|access| access.profile.id.clone())
+                {
+                    let reconnect_app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let state = reconnect_app.state::<crate::app_state::AppState>();
+                        crate::commands::sessions::reconnect_lost_for_connection(
+                            &reconnect_app,
+                            state.inner(),
+                            &connection_id,
+                        )
+                        .await;
+                    });
+                }
             }
             Ok(Err(error)) if error.code == ErrorCode::Cancelled => {
                 finish_cancelled(&app, &manager, &mut item);
