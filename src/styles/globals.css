@@ -541,6 +541,25 @@
     height: 100%;
   }
 
+  /* The window itself never scrolls; stop wheel/trackpad gestures from
+     rubber-banding the whole app or chaining into an overlay. */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+
   html {
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
@@ -551,6 +570,12 @@
        `.selectable` regions opt back in below. */
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="scroll-area-viewport"] {
+    overscroll-behavior: contain;
   }
 
   input,

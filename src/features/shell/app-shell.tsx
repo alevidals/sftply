@@ -82,6 +82,13 @@ export function AppShell() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
+      <a
+        href="#file-panes"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-popover focus:px-3 focus:py-1.5 focus:text-xs focus:text-foreground focus:shadow-md"
+      >
+        Skip to the file panes
+      </a>
+      <h1 className="sr-only">sftply</h1>
       <TitleBar />
 
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
@@ -102,7 +109,14 @@ export function AppShell() {
         <ResizableHandle />
 
         <ResizablePanel id="main" minSize={480}>
-          <ResizablePanelGroup orientation="vertical" className="min-h-0">
+          <ResizablePanelGroup
+            id="file-panes"
+            role="main"
+            aria-label="File panes"
+            tabIndex={-1}
+            orientation="vertical"
+            className="min-h-0 outline-none"
+          >
             <ResizablePanel id="workspace" minSize={200}>
               <Workspace />
             </ResizablePanel>
