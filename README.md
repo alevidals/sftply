@@ -30,6 +30,8 @@ WebView2 requirement on Windows and FUSE on Linux.
 
 ## Design documents
 
+- [User guide](docs/USER_GUIDE.md) — connections, host keys, transfers, troubleshooting
+- [Changelog](CHANGELOG.md) — what changed in each release
 - [Architecture](docs/ARCHITECTURE.md) — layers, module boundaries, IPC contract, security model, design system
 - [Dependency evaluation](docs/DEPENDENCIES.md) — protocol libraries, Rust/frontend dependencies, rejected alternatives
 - [Release and packaging](docs/RELEASE.md) — CI, artifacts, portable caveats, signing
@@ -77,7 +79,7 @@ cargo test
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Security reports: [SECURITY.md](SECURITY.md).
 
 Releases are not OS-signed: macOS asks for confirmation on first launch and
 Windows shows a SmartScreen warning. Verify `SHA256SUMS` and see

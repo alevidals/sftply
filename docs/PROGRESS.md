@@ -1465,3 +1465,46 @@ which is only correct for local client connections. See
 - 0.2.0: import/export of connections, the update check, `CHANGELOG.md` and a
   user guide.
 - Real-machine QA matrix before any 0.9 beta; no OS signing is planned.
+
+### 2026-11-14 — Session 49: 0.2.0 feature work
+
+**Changed**
+
+- **Connection import/export** (`config/connection_bundle.rs`). The bundle is
+  `{ format: "sftply.connections", schemaVersion, exportedAt, app, connections }`
+  where every entry is the non-secret `ConnectionInput`: no ids, timestamps,
+  passwords, passphrases or key material, which is enforced by the data model.
+  Parsing rejects foreign JSON, newer schemas (with `UNSUPPORTED`), files over
+  4 MiB and more than 1,000 entries; invalid entries are reported individually
+  and the rest still import.
+- `ConnectionStore::insert_many` merges in a single write and skips entries that
+  already exist with the same protocol, host, port and username, naming the
+  duplicate in the report.
+- Frontend menu in the connections header: **Import connections…** /
+  **Export connections…** through the native dialogs, with a summary toast and
+  an activity entry. Export is disabled when there is nothing to export.
+- **Manual update check** (`update.rs`). One `ureq` request to the public GitHub
+  releases API with an 8 s timeout and a sftply user agent; the answer is parsed
+  separately from the request so tests never touch the network. Version
+  comparison is numeric and treats pre-releases as older. Settings → About shows
+  the result and opens the release page with the opener plugin; nothing is
+  downloaded or installed.
+- `CHANGELOG.md` (Keep a Changelog) and `docs/USER_GUIDE.md` covering install,
+  connections, host keys, browsing, transfers, the editor, permissions,
+  import/export, updates, disk layout and troubleshooting.
+- Vite splits vendor code into `react`, `radix`, `tanstack`, `vendor` and
+  `icons` chunks. The main chunk dropped from 888 kB to 196 kB and the 500 kB
+  warning is gone.
+
+**Verified**
+
+- `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
+  (122 passed, 18 ignored) including bundle round-trip, secret-free assertions,
+  schema limits and version comparison.
+- `bun run typecheck`, `bun run lint`, 235 frontend tests in 36 files, production
+  build without size warnings.
+
+**Next**
+
+- Real-machine QA of the new menu and the update check before tagging 0.2.0.
+- Remote previews, diff and sync stay in 1.1.

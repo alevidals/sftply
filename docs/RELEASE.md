@@ -157,12 +157,14 @@ already accepts `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` and
 
 ## Version bump
 
-Update the version in all three places, then regenerate the bindings so the
-About panel and diagnostics agree:
+Update the version in all three places, move the `[Unreleased]` section of
+`CHANGELOG.md` under the new version, then regenerate the bindings so the About
+panel and diagnostics agree:
 
 1. `package.json`
 2. `src-tauri/Cargo.toml`
 3. `src-tauri/tauri.conf.json`
+4. `CHANGELOG.md`
 
 ```sh
 bun run version:check

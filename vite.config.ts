@@ -14,6 +14,26 @@ export default defineConfig(() => ({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        // Keep the vendor libraries in a few long-lived chunks instead of one
+        // 880 kB blob. The Tauri asset protocol serves these from disk, so the
+        // win is cache granularity and a small app chunk on every upgrade.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined
+          if (id.includes("react-dom") || id.includes("react/") || id.includes("scheduler")) {
+            return "react"
+          }
+          if (id.includes("radix") || id.includes("@floating-ui")) return "radix"
+          if (id.includes("@tanstack")) return "tanstack"
+          if (id.includes("lucide-react")) return "icons"
+          return "vendor"
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
