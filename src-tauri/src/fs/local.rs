@@ -9,7 +9,9 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use crate::domain::fs::{EntryKind, FsCapabilities, FsEntry, Listing};
 use crate::domain::text::{TextFile, text_version};
 use crate::error::{AppError, ErrorCode};
-use crate::fs::path::{join_child, normalize_absolute, validate_mode};
+#[cfg(unix)]
+use crate::fs::path::validate_mode;
+use crate::fs::path::{join_child, normalize_absolute};
 use crate::fs::{FileReader, FileWriter};
 
 const METADATA_CONCURRENCY: usize = 64;

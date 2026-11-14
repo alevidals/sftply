@@ -14,7 +14,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bindings": "cd src-tauri && cargo run --bin export-bindings",
+    "bindings": "cd src-tauri && cargo run --example export-bindings",
     "rust:check": "cd src-tauri && cargo check --all-targets",
     "rust:test": "cd src-tauri && cargo test",
     "rust:lint": "cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings",

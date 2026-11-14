@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "A modern FTP, FTPS and SFTP desktop client"
 authors = ["sftply"]
 edition = "2024"
-# `tauri dev` runs `cargo run`; without this Cargo cannot choose between the
-# app binary and the bindings exporter.
+# Keep the bindings exporter in `examples/`, never in `src/bin/`: Tauri's
+# universal macOS bundler copies every binary target and only `lipo`s the app.
 default-run = "sftply"
 
 [lib]

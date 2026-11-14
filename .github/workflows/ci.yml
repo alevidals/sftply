@@ -80,6 +80,14 @@ jobs:
       - name: Format
         run: cargo fmt --check
         working-directory: src-tauri
+      # Tauri's universal macOS bundler copies every binary target next to the
+      # app and only lipos the main one, so a stray src/bin target breaks
+      # `tauri build --target universal-apple-darwin`.
+      - name: Ensure the app has no extra binary targets
+        run: |
+          test ! -d src/bin
+          ! grep -q '^\[\[bin\]\]' Cargo.toml
+        working-directory: src-tauri
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
         working-directory: src-tauri

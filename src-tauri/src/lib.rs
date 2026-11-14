@@ -82,7 +82,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         ])
 }
 
-/// Generate the TypeScript bindings. Invoked by `cargo run --bin
+/// Generate the TypeScript bindings. Invoked by `cargo run --example
 /// export-bindings` and, in debug builds, on startup.
 pub fn export_bindings() -> Result<(), Box<dyn std::error::Error>> {
     specta_builder().export(

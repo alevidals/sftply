@@ -11,6 +11,8 @@ on demand:
 - **Frontend**: version consistency, typecheck, Biome, Vitest and production build.
 - **Rust (Linux)**: rustfmt, clippy with `-D warnings`, `cargo test`, and a
   check that `src/lib/ipc/bindings.ts` matches what `bun run bindings` generates.
+  It also fails if `src-tauri/src/bin/` or a `[[bin]]` target reappears: Tauri's
+  universal macOS bundler copies every binary target and only `lipo`s the app.
 - **Rust check matrix**: `cargo check --all-targets` on Ubuntu, macOS and
   Windows. This does not bundle anything; it catches platform-specific code and
   dependency problems early.
@@ -62,6 +64,10 @@ About panel and diagnostics agree:
 bun run version:check
 bun run bindings
 ```
+
+`bun run bindings` runs `cargo run --example export-bindings`. The exporter lives
+in `src-tauri/examples/`, not `src-tauri/src/bin/`, so release builds stay
+bundleable.
 
 ## Local unsigned build
 

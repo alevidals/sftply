@@ -1316,3 +1316,35 @@ which is only correct for local client connections. See
 
 - Push a `v*` tag after the next version bump to validate the release workflow and the portable archives on real machines.
 - Add `cargo audit`/`bun audit` on a weekly schedule, and import a Developer ID certificate when signing is available.
+
+### 2026-11-14 — Session 45: first CI and release run
+
+**Changed**
+
+- Moved the bindings exporter from `src-tauri/src/bin/export-bindings.rs` to
+  `src-tauri/examples/export-bindings.rs`. Tauri's universal macOS bundler scans
+  `src/bin/` and tries to copy every binary next to the app, but only runs `lipo`
+  on the main executable, so the extra bin made `tauri build --target
+  universal-apple-darwin` fail with `Failed to copy binary ... export-bindings`.
+  `bun run bindings` now runs `cargo run --example export-bindings`.
+- Gated the `validate_mode` import in `src-tauri/src/fs/local.rs` behind
+  `#[cfg(unix)]`. It is only used by the Unix branch of `chmod`, and the Windows
+  build denies warnings.
+- CI's Rust job now fails if `src-tauri/src/bin/` or a `[[bin]]` target reappears,
+  so the bundling regression cannot come back silently.
+
+**Verified**
+
+- `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`.
+- `bun run bindings` regenerates `src/lib/ipc/bindings.ts` byte for byte,
+  `bun run version:check` and `bun run check` (227 tests in 34 files).
+- First expanded CI run: frontend, Linux Rust, Ubuntu and macOS checks, and the
+  Docker protocol suite passed. Windows failed on the unused import above.
+- First release dispatch: Linux built the AppImage and `.deb` in 11m33s. macOS and
+  Windows failed on the two issues above.
+
+**Next**
+
+- Rerun CI and a manual release dispatch; both must be green before tagging.
+- Then tag `v0.1.0` to validate the draft release, the portable archives and
+  `SHA256SUMS`.
