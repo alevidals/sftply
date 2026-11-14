@@ -63,6 +63,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
 - The main production chunk is still above Vite's 500 kB warning threshold (≈864 kB raw / 259 kB gzip). The settings dialog and command palette now load on demand (≈22 kB each); the remaining weight is React, Radix, TanStack, forms and icons. Vendor chunking belongs in the next performance pass.
 - Biome's `useSemanticElements` / `useFocusableInteractive` are disabled for the virtualized file table and column header only. They are an ARIA grid with a single roving tab stop, not semantic `<table>` markup; keyboard access is handled on the grid container.
+- Recursive permission changes are not implemented. The permissions dialog applies to the selected entries and states that folder contents keep their modes; a safe recursive walk needs cancellation, depth limits and symlink rules before it can be exposed.
 
 ---
 
@@ -217,7 +218,8 @@ These were recommended in the architecture package. Implementation proceeds with
 
 ## Phase 6 — Advanced features
 
-- [ ] Permissions editor (octal + symbolic, recursive confirmation)
+- [x] Permissions editor: octal + symbolic, multi-select
+- [ ] Recursive permission changes with explicit confirmation
 - [ ] Remote bookmarks + recent paths
 - [ ] Remote text editor (size/binary/encoding limits, conflict detection)
 - [ ] Remote previews (safe rendering)
@@ -1188,3 +1190,22 @@ which is only correct for local client connections. See
 
 - Cross-platform visual QA is the only Phase 5 item left; it needs real macOS, Windows and Linux windows.
 - Phase 6 starts with the permissions editor and remote bookmarks.
+
+### 2026-11-14 — Session 39: symbolic permission editor
+
+**Changed**
+
+- Reworked the permissions dialog around symbolic editing: read/write/execute checkboxes for owner, group and other, kept in sync with the octal field in both directions. Special bits (setuid, setgid, sticky) are preserved when a checkbox changes and remain editable through the octal value.
+- The editor now accepts a multi-item selection. When every item shares a mode it seeds from that mode; a mixed selection warns, starts from the first item and says the value applies to all of them.
+- Applying permissions walks the selection sequentially, stops at the first failure, refreshes the listing and names the item that failed. The activity log and toast report one item or a count.
+- Folders are explicit: the dialog states that only the selected folder entries change and their contents keep their current modes. Recursive permission changes remain a separate unchecked item because the backend `chmod` operates on one path and a safe walk needs its own cancellation and symlink rules.
+- Added `src/features/files/model/permissions.ts` for bit math, `commonMode` and the permission matrix, with unit tests. Dialog tests cover octal input, symbolic toggles, invalid values, mixed modes and the folder-scope note.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 195 tests in 29 files, production build).
+- No Rust changes; the previous `cargo fmt`, clippy and test gates remain valid.
+
+**Next**
+
+- Phase 6 continues with remote bookmarks and recent paths.

@@ -129,7 +129,12 @@ describe("PermissionsDialog", () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     const onOpenChange = vi.fn()
     render(
-      <PermissionsDialog open entry={folder} onConfirm={onConfirm} onOpenChange={onOpenChange} />,
+      <PermissionsDialog
+        open
+        entries={[folder]}
+        onConfirm={onConfirm}
+        onOpenChange={onOpenChange}
+      />,
     )
 
     const input = screen.getByLabelText("Mode")
@@ -142,9 +147,26 @@ describe("PermissionsDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
+  it("edits the mode with the symbolic checkboxes", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    render(
+      <PermissionsDialog open entries={[folder]} onConfirm={onConfirm} onOpenChange={vi.fn()} />,
+    )
+
+    await user.click(screen.getByRole("checkbox", { name: "Owner execute" }))
+    expect(screen.getByLabelText("Mode")).toHaveValue("0655")
+
+    await user.click(screen.getByRole("checkbox", { name: "Group write" }))
+    expect(screen.getByLabelText("Mode")).toHaveValue("0675")
+
+    await user.click(screen.getByRole("button", { name: "Apply" }))
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(0o675))
+  })
+
   it("rejects an invalid mode", () => {
     const onConfirm = vi.fn()
-    render(<PermissionsDialog open entry={file} onConfirm={onConfirm} onOpenChange={vi.fn()} />)
+    render(<PermissionsDialog open entries={[file]} onConfirm={onConfirm} onOpenChange={vi.fn()} />)
 
     const input = screen.getByLabelText("Mode")
     fireEvent.change(input, { target: { value: "0899" } })
@@ -152,5 +174,22 @@ describe("PermissionsDialog", () => {
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled()
     expect(screen.getByText("Invalid mode")).toBeInTheDocument()
     expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it("warns when the selection has mixed modes and explains folder scope", () => {
+    const other: FsEntry = { ...file, name: "beta.txt", path: "/tmp/beta.txt", permissions: 0o600 }
+    render(
+      <PermissionsDialog
+        open
+        entries={[file, folder, other]}
+        onConfirm={vi.fn()}
+        onOpenChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText("3 items")).toBeInTheDocument()
+    expect(screen.getByText(/different or unknown modes/)).toBeInTheDocument()
+    expect(screen.getByText(/contents keep their current modes/)).toBeInTheDocument()
+    expect(screen.getByLabelText("Mode")).toHaveValue("0644")
   })
 })

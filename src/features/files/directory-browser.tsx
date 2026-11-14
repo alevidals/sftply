@@ -145,7 +145,7 @@ export function DirectoryBrowser({
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [permissionsOpen, setPermissionsOpen] = useState(false)
-  const [permissionsTarget, setPermissionsTarget] = useState<FsEntry | null>(null)
+  const [permissionsTargets, setPermissionsTargets] = useState<FsEntry[]>([])
   const [dropActive, setDropActive] = useState(false)
 
   const rowHeight = settings.density === "comfortable" ? 38 : 30
@@ -187,7 +187,7 @@ export function DirectoryBrowser({
     setFilter("")
     setFilterOpen(false)
     setRenamingPath(null)
-    setPermissionsTarget(null)
+    setPermissionsTargets([])
   }, [path])
 
   useEffect(() => {
@@ -262,8 +262,8 @@ export function DirectoryBrowser({
           if (activeEntry && allowReveal) revealEntry(activeEntry)
           break
         case "permissions":
-          if (activeEntry && canChmod && selection.selected.size === 1) {
-            setPermissionsTarget(activeEntry)
+          if (selectedEntries.length > 0 && canChmod) {
+            setPermissionsTargets(selectedEntries)
             setPermissionsOpen(true)
           }
           break
@@ -300,7 +300,6 @@ export function DirectoryBrowser({
       reportError,
       revealEntry,
       selectedEntries,
-      selection.selected.size,
       transfer,
     ],
   )
@@ -352,13 +351,30 @@ export function DirectoryBrowser({
   }
 
   const applyPermissions = async (mode: number) => {
-    if (!permissionsTarget) throw new Error("No item is selected.")
-    await filesApi(scope).chmod(permissionsTarget.path, mode)
+    if (permissionsTargets.length === 0) throw new Error("No items are selected.")
+    let failed: { entry: FsEntry; error: unknown } | null = null
+
+    for (const entry of permissionsTargets) {
+      try {
+        await filesApi(scope).chmod(entry.path, mode)
+      } catch (error) {
+        failed = { entry, error }
+        break
+      }
+    }
+
     await invalidate()
-    recordActivity(
-      "success",
-      `Changed permissions on “${permissionsTarget.name}” to ${formatMode(mode)}`,
-    )
+
+    if (failed) {
+      const normalized = normalizeError(failed.error)
+      throw new Error(`Could not change “${failed.entry.name}”: ${normalized.message}`)
+    }
+
+    const message =
+      permissionsTargets.length === 1
+        ? `Changed permissions on “${permissionsTargets[0]?.name ?? "item"}” to ${formatMode(mode)}`
+        : `Changed permissions on ${permissionsTargets.length} items to ${formatMode(mode)}`
+    recordActivity("success", message)
     toast.success("Permissions updated")
   }
 
@@ -529,7 +545,7 @@ export function DirectoryBrowser({
             canOpen={Boolean(activeEntry) && (activeEntry?.kind === "directory" || allowOpenFile)}
             canRename={Boolean(activeEntry) && canRename}
             canDelete={selectedEntries.length > 0 && canRemove}
-            canPermissions={Boolean(activeEntry) && canChmod && selection.selected.size === 1}
+            canPermissions={selectedEntries.length > 0 && canChmod}
             canReveal={allowReveal}
             canTransfer={canTransfer && selectedEntries.length > 0}
             transferLabel={transferLabel}
@@ -732,7 +748,7 @@ export function DirectoryBrowser({
       />
       <PermissionsDialog
         open={permissionsOpen}
-        entry={permissionsTarget}
+        entries={permissionsTargets}
         onOpenChange={setPermissionsOpen}
         onConfirm={applyPermissions}
       />
