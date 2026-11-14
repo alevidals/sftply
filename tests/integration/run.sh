@@ -54,9 +54,13 @@ wait_for_service ftps-implicit "Starting pure-ftpd implicit FTPS" 2990 "implicit
 wait_for_service sftp "Server listening on" 2222 "SFTP"
 
 echo "Running protocol integration tests…"
+# The update check is the only ignored test that talks to the public internet.
+# It is rate-limited from shared runners and has nothing to do with the protocol
+# stack, so the suite skips it.
 cargo test \
   --manifest-path ../../src-tauri/Cargo.toml \
   --lib \
   -- \
   --ignored \
+  --skip update::tests::live_check_reaches_github \
   --nocapture
