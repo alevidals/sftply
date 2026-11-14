@@ -33,6 +33,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "sftply",
+    "copyright": "Copyright © 2026 sftply contributors",
     "category": "DeveloperTool",
     "shortDescription": "A modern FTP, FTPS and SFTP client",
     "longDescription": "sftply is a fast, keyboard-first desktop client for FTP, FTPS and SFTP with a dual-pane file browser.",
@@ -42,6 +44,20 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": true
+    },
+    "linux": {
+      "deb": {
+        "section": "devel"
+      }
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
   }
 }

@@ -212,7 +212,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [x] Accessibility audit (keyboard, labels, contrast, reduced motion)
 - [ ] Startup/scroll/memory performance pass
 - [x] App icon and in-app branding
-- [ ] Product metadata, packaging (macOS signing/notarization; Windows/Linux)
+- [x] Product metadata and unsigned bundles (signing/notarization documented in `docs/RELEASE.md`)
 - [ ] Cross-platform visual QA
 
 ---
@@ -1135,3 +1135,21 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: packaging and product metadata.
+
+### 2026-11-14 — Session 36: packaging metadata
+
+**Changed**
+
+- Filled in bundle metadata: publisher, copyright, macOS 10.15 minimum, hardened runtime, Debian `devel` section and an explicit WebView2 `downloadBootstrapper` mode.
+- Added `docs/RELEASE.md`: version bump checklist, per-OS bundle commands, macOS signing/notarization environment variables, verification commands (`codesign`, `spctl`, `stapler`), Windows certificate options and Linux package notes.
+- Documented the keychain entitlement caveat: the app is not sandboxed today, so saved credentials need no extra entitlement; sandboxing later would require `keychain-access-groups`.
+
+**Verified**
+
+- `bun run tauri info` accepts the configuration.
+- `bun run tauri build --debug --bundles app` produced `sftply.app` (128.29 MiB). `Info.plist` reports `com.alevidals.sftply`, version `0.1.0`, minimum macOS `10.15`, the developer-tools category, the copyright line and `icon.icns`.
+- Signing and notarization were not run: this machine has no Developer ID certificate. The release doc covers the exact steps and the remaining checklist item tracks signed installers.
+
+**Next**
+
+- Continue Phase 5: first-run and remaining loading/error states, then the startup/scroll/memory pass.
