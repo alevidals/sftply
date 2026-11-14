@@ -105,6 +105,7 @@ export function FileTable({
   onRenameCancel,
 }: FileTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const suppressClick = useRef(false)
   const typeAhead = useRef<{ value: string; timer: ReturnType<typeof setTimeout> | null }>({
     value: "",
     timer: null,
@@ -266,6 +267,9 @@ export function FileTable({
               const renaming = renamingPath === entry.path
 
               return (
+                // Keyboard selection is handled once on the grid container,
+                // which owns the roving tab stop; rows are not tab stops.
+                // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection lives on the grid container
                 <div
                   key={entry.path}
                   id={`file-row-${index}`}
@@ -275,15 +279,24 @@ export function FileTable({
                   title={entry.path}
                   onMouseDown={(event) => {
                     if (event.button !== 0) return
+                    suppressClick.current = false
                     scrollRef.current?.focus()
-                    onSelect(
-                      index,
-                      event.shiftKey
-                        ? "range"
-                        : event.metaKey || event.ctrlKey
-                          ? "toggle"
-                          : "replace",
-                    )
+                    if (event.shiftKey) {
+                      onSelect(index, "range")
+                    } else if (event.metaKey || event.ctrlKey) {
+                      onSelect(index, "toggle")
+                    } else if (!selected) {
+                      onSelect(index, "replace")
+                    } else {
+                      // Keep a multi-selection intact until mouseup so the drag
+                      // can carry every selected row.
+                      onSelect(index, "focus")
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (event.shiftKey || event.metaKey || event.ctrlKey) return
+                    if (suppressClick.current) return
+                    if (selected) onSelect(index, "replace")
                   }}
                   onDoubleClick={() => {
                     if (!renaming) onAction("open")
@@ -294,6 +307,7 @@ export function FileTable({
                   }}
                   draggable={!renaming}
                   onDragStart={(event) => {
+                    suppressClick.current = true
                     const dragged = selected
                       ? entries.filter((item) => selection.selected.has(item.path))
                       : [entry]

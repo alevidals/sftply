@@ -224,6 +224,35 @@ describe("FileTable drag and drop", () => {
     expect(payload.entries.map((entry) => entry.name)).toEqual(["alpha.txt"])
     expect(directory.name).toBe("beta")
   })
+
+  it("keeps a multi-selection when pressing a selected row and drags all of it", () => {
+    const transfer = dataTransfer()
+    const { handlers } = renderTable({
+      selection: selection(0, ["/tmp/alpha.txt", "/tmp/beta"]),
+    })
+    const alpha = screen.getByTitle("/tmp/alpha.txt")
+
+    fireEvent.mouseDown(alpha)
+    expect(handlers.onSelect).toHaveBeenCalledWith(0, "focus")
+
+    fireEvent.dragStart(alpha, { dataTransfer: transfer })
+    const payload = JSON.parse(
+      transfer.getData("application/x-sftply-entries"),
+    ) as TransferDragPayload
+    expect(payload.entries.map((entry) => entry.name)).toEqual(["alpha.txt", "beta"])
+  })
+
+  it("collapses a multi-selection on a plain click without dragging", () => {
+    const { handlers } = renderTable({
+      selection: selection(0, ["/tmp/alpha.txt", "/tmp/beta"]),
+    })
+    const alpha = screen.getByTitle("/tmp/alpha.txt")
+
+    fireEvent.mouseDown(alpha)
+    fireEvent.click(alpha)
+
+    expect(handlers.onSelect).toHaveBeenLastCalledWith(0, "replace")
+  })
 })
 
 describe("FileTable inline rename", () => {

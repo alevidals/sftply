@@ -35,6 +35,15 @@ describe("selectRow", () => {
     expect(range.anchor).toBe(1)
     expect(range.active).toBe(3)
   })
+
+  it("moves the active row without clearing a multi-selection", () => {
+    const first = selectRow(entries, EMPTY_SELECTION, 0, "replace")
+    const second = selectRow(entries, first, 2, "toggle")
+    const focused = selectRow(entries, second, 2, "focus")
+    expect([...focused.selected].sort()).toEqual(["/tmp/a", "/tmp/c"])
+    expect(focused.anchor).toBe(2)
+    expect(focused.active).toBe(2)
+  })
 })
 
 describe("keyboard movement", () => {

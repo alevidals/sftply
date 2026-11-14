@@ -6,7 +6,7 @@ export interface SelectionState {
   active: number | null
 }
 
-export type SelectionMode = "replace" | "toggle" | "range"
+export type SelectionMode = "replace" | "toggle" | "range" | "focus"
 
 interface PathEntry {
   path: string
@@ -38,6 +38,10 @@ export function selectRow(
 ): SelectionState {
   const entry = entries[index]
   if (!entry) return state
+
+  if (mode === "focus") {
+    return { selected: state.selected, anchor: index, active: index }
+  }
 
   if (mode === "range" && state.anchor !== null) {
     return {

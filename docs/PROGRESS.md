@@ -1230,3 +1230,19 @@ which is only correct for local client connections. See
 **Next**
 
 - Phase 6 continues with the remote text editor, or previews if the editor is split first.
+
+### 2026-11-14 — Session 41: multi-row drag transfers the whole selection
+
+**Changed**
+
+- Pressing a row that is already part of a multi-selection no longer collapses the selection on `mousedown`. The row becomes the active/anchor row through a new `"focus"` selection mode, so a drag started from it carries every selected entry.
+- A plain click without dragging still collapses the selection to that row on `click`; `dragstart` sets a suppression flag so dropping does not also collapse it.
+- Added tests for the focus mode and for dragging a two-row selection, plus a regression test that a plain click still collapses.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome with no warnings, 212 tests in 31 files, production build).
+
+**Next**
+
+- Manual check on the running app: select several files, drag one of them to the other pane, confirm every selected file transfers.
