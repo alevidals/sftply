@@ -4,7 +4,7 @@ A modern, keyboard-first desktop client for FTP, FTPS and SFTP. Built with Tauri
 
 Website: <https://alevidals.github.io/sftply/>
 
-> **Status: pre-1.0.** `v0.1.0` is published as portable builds and installers for macOS, Windows and Linux. The source is usable and tested, but the product is still under active development; expect breaking behaviour changes before 1.0.
+> **Status: pre-1.0.** `v0.2.0` is published as portable builds and installers for macOS, Windows and Linux. The source is usable and tested, but the product is still under active development; expect breaking behaviour changes before 1.0.
 
 ## Download
 

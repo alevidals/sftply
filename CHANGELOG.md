@@ -6,6 +6,10 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-11-14
+
 ### Added
 
 - Import and export saved connections as credential-free JSON. Imports merge
@@ -78,5 +82,6 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/alevidals/sftply/releases/tag/v0.2.0
 [0.1.0]: https://github.com/alevidals/sftply/releases/tag/v0.1.0
