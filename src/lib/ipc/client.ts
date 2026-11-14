@@ -3,6 +3,8 @@ import {
   type AppInfo,
   type AppSettings_Serialize,
   type ConflictPolicy,
+  type ConnectionExportSummary,
+  type ConnectionImportSummary,
   type ConnectionInput_Deserialize,
   type ConnectionProfile_Serialize,
   commands,
@@ -20,6 +22,7 @@ import {
   type TransferItem,
   type TransferItem_Serialize,
   type TransferPlan_Serialize,
+  type UpdateStatus,
 } from "@/lib/ipc/bindings"
 
 type CommandResult<T, E> = { status: "ok"; data: T } | { status: "error"; error: E }
@@ -41,6 +44,10 @@ function unwrap<T, E>(result: CommandResult<T, E>): T {
 export const ipc = {
   appInfo(): Promise<AppInfo> {
     return invoke(commands.appInfo())
+  },
+
+  checkUpdate(): Promise<UpdateStatus> {
+    return invoke(commands.appCheckUpdate()).then((result) => unwrap(result))
   },
 
   startupReport(): Promise<StartupReport> {
@@ -158,6 +165,14 @@ export const ipc = {
 
   connectionSecretStatus(id: string): Promise<SecretStatus> {
     return invoke(commands.connectionSecretStatus(id)).then((result) => unwrap(result))
+  },
+
+  connectionsExport(path: string): Promise<ConnectionExportSummary> {
+    return invoke(commands.connectionsExport(path)).then((result) => unwrap(result))
+  },
+
+  connectionsImport(path: string): Promise<ConnectionImportSummary> {
+    return invoke(commands.connectionsImport(path)).then((result) => unwrap(result))
   },
 
   knownHostsList(): Promise<KnownHost[]> {

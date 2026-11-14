@@ -10,6 +10,7 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
 	startupReport: () => __TAURI_INVOKE<StartupReport>("startup_report"),
+	appCheckUpdate: () => typedError<UpdateStatus, AppError_Serialize>(__TAURI_INVOKE("app_check_update")),
 	settingsGet: () => __TAURI_INVOKE<AppSettings_Serialize>("settings_get"),
 	settingsUpdate: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
 	fsList: (scope: FsScope, path: string, showHidden: boolean) => typedError<Listing_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_list", { scope, path, showHidden })),
@@ -32,6 +33,8 @@ export const commands = {
 	connectionSecretSet: (id: string, kind: SecretKind, secret: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("connection_secret_set", { id, kind, secret })),
 	connectionSecretDelete: (id: string, kind: SecretKind) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("connection_secret_delete", { id, kind })),
 	connectionSecretStatus: (id: string) => typedError<SecretStatus, AppError_Serialize>(__TAURI_INVOKE("connection_secret_status", { id })),
+	connectionsExport: (path: string) => typedError<ConnectionExportSummary, AppError_Serialize>(__TAURI_INVOKE("connections_export", { path })),
+	connectionsImport: (path: string) => typedError<ConnectionImportSummary, AppError_Serialize>(__TAURI_INVOKE("connections_import", { path })),
 	knownHostsList: () => __TAURI_INVOKE<KnownHost[]>("known_hosts_list"),
 	knownHostTrust: (host: string, port: number, keyType: string, fingerprint: string) => typedError<KnownHost, AppError_Serialize>(__TAURI_INVOKE("known_host_trust", { host, port, keyType, fingerprint })),
 	knownHostRemove: (host: string, port: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("known_host_remove", { host, port })),
@@ -208,6 +211,20 @@ export type ConnectionAuth = { kind: "password" } | { kind: "key";
 keyPath: string; 
 /**  Whether the key is expected to need a passphrase in the keychain. */
 passphraseProtected: boolean };
+
+/**  Summary returned after writing a connections bundle. */
+export type ConnectionExportSummary = {
+	path: string,
+	count: number,
+};
+
+/**  Summary returned after reading a connections bundle. */
+export type ConnectionImportSummary = {
+	imported: number,
+	skipped: number,
+	/**  One line per skipped entry, already safe to show to the user. */
+	problems: string[],
+};
 
 /**  Fields the frontend may submit when creating or updating a connection. */
 export type ConnectionInput = ConnectionInput_Serialize | ConnectionInput_Deserialize;
@@ -772,6 +789,14 @@ export type TransferPlan_Serialize = {
 };
 
 export type TransferStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type UpdateStatus = {
+	currentVersion: string,
+	latestVersion: string,
+	updateAvailable: boolean,
+	/**  Release page for the newest published version. */
+	releaseUrl: string,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

@@ -9,6 +9,7 @@ mod logging;
 mod protocol;
 mod session;
 mod transfer;
+mod update;
 
 use app_state::AppState;
 use config::connection_store::ConnectionStore;
@@ -30,6 +31,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             commands::app::app_info,
             commands::app::startup_report,
+            commands::app::app_check_update,
             commands::settings::settings_get,
             commands::settings::settings_update,
             commands::fs::fs_list,
@@ -52,6 +54,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::connections::connection_secret_set,
             commands::connections::connection_secret_delete,
             commands::connections::connection_secret_status,
+            commands::connections::connections_export,
+            commands::connections::connections_import,
             commands::connections::known_hosts_list,
             commands::connections::known_host_trust,
             commands::connections::known_host_remove,

@@ -140,6 +140,56 @@ impl ConnectionStore {
         self.persist(next).await
     }
 
+    /// Add connections imported from a bundle in one write.
+    ///
+    /// Entries that point at a host already saved with the same protocol, host,
+    /// port and username are skipped instead of duplicated. The returned notes
+    /// explain every skip so the UI can report it.
+    pub async fn insert_many(
+        &self,
+        inputs: Vec<ConnectionInput>,
+    ) -> Result<(Vec<ConnectionProfile>, Vec<String>), AppError> {
+        let _guard = self.write_lock.lock().await;
+        let mut next = self.snapshot();
+        let now = unix_millis();
+        let mut imported = Vec::new();
+        let mut skipped = Vec::new();
+
+        for input in inputs {
+            let name = input.name.clone();
+            let input = match input.normalized() {
+                Ok(input) => input,
+                Err(reason) => {
+                    skipped.push(format!("“{name}” was skipped: {reason}"));
+                    continue;
+                }
+            };
+
+            if let Some(existing) = next.iter().find(|profile| {
+                profile.protocol == input.protocol
+                    && profile.port == input.port
+                    && profile.host.eq_ignore_ascii_case(&input.host)
+                    && profile.username.eq_ignore_ascii_case(&input.username)
+            }) {
+                skipped.push(format!(
+                    "“{}” was skipped: it already exists as “{}”.",
+                    input.name, existing.name
+                ));
+                continue;
+            }
+
+            let profile =
+                ConnectionProfile::from_input(uuid::Uuid::new_v4().to_string(), input, now);
+            next.push(profile.clone());
+            imported.push(profile);
+        }
+
+        if !imported.is_empty() {
+            self.persist(next).await?;
+        }
+        Ok((imported, skipped))
+    }
+
     pub async fn duplicate(&self, id: &str) -> Result<ConnectionProfile, AppError> {
         let _guard = self.write_lock.lock().await;
         let mut next = self.snapshot();

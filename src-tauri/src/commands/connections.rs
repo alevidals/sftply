@@ -1,11 +1,15 @@
 use tauri::State;
 
 use crate::app_state::AppState;
+use crate::config::connection_bundle;
 use crate::credentials;
 use crate::domain::connection::{ConnectionInput, ConnectionProfile};
 use crate::domain::credentials::{SecretKind, SecretStatus};
 use crate::domain::host_key::KnownHost;
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
+
+use serde::Serialize;
+use specta::Type;
 
 #[tauri::command]
 #[specta::specta]
@@ -152,4 +156,69 @@ pub async fn known_host_remove(
     port: u16,
 ) -> Result<(), AppError> {
     state.known_hosts.remove(&host, port).await
+}
+
+/// Summary returned after writing a connections bundle.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionExportSummary {
+    pub path: String,
+    pub count: u32,
+}
+
+/// Summary returned after reading a connections bundle.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionImportSummary {
+    pub imported: u32,
+    pub skipped: u32,
+    /// One line per skipped entry, already safe to show to the user.
+    pub problems: Vec<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn connections_export(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<ConnectionExportSummary, AppError> {
+    let connections = state.connections.list();
+    let target = path.clone();
+    let count = tokio::task::spawn_blocking(move || {
+        connection_bundle::export_to(std::path::Path::new(&target), &connections)
+    })
+    .await
+    .map_err(|error| {
+        AppError::new(ErrorCode::Internal, "Could not export your connections.")
+            .with_detail(error.to_string())
+    })??;
+
+    Ok(ConnectionExportSummary { path, count })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn connections_import(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<ConnectionImportSummary, AppError> {
+    let target = path.clone();
+    let parsed = tokio::task::spawn_blocking(move || {
+        connection_bundle::parse(std::path::Path::new(&target))
+    })
+    .await
+    .map_err(|error| {
+        AppError::new(ErrorCode::Internal, "Could not import those connections.")
+            .with_detail(error.to_string())
+    })??;
+
+    let (imported, skipped) = state.connections.insert_many(parsed.connections).await?;
+    let mut problems = parsed.problems;
+    problems.extend(skipped);
+
+    Ok(ConnectionImportSummary {
+        imported: imported.len() as u32,
+        skipped: problems.len() as u32,
+        problems,
+    })
 }

@@ -34,6 +34,8 @@ tracing-appender = "0.2"
 futures-util = "0.3"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
+# Manual update check only; see src/update.rs.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 
 # Protocol adapters (pinned; see docs/DEPENDENCIES.md)
 suppaftp = { version = "=12.2.1", features = ["tokio-rustls-ring", "deprecated"] }

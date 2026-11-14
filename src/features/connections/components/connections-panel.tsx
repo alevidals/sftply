@@ -46,6 +46,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { connectionsApi } from "@/features/connections/api"
 import { ConnectionDialog } from "@/features/connections/components/connection-form-dialog"
+import { ConnectionsTransferMenu } from "@/features/connections/components/connections-transfer-menu"
 import { connectionsQueryKey, useConnections } from "@/features/connections/hooks/use-connections"
 import { PROTOCOL_LABELS, protocolIsSecure } from "@/features/connections/schema"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
@@ -164,6 +165,7 @@ export function ConnectionsPanel() {
               New connection
             </TooltipContent>
           </Tooltip>
+          <ConnectionsTransferMenu connectionCount={sorted.length} onChanged={refresh} />
         </div>
       </div>
 

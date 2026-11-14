@@ -1,4 +1,6 @@
 import type {
+  ConnectionExportSummary,
+  ConnectionImportSummary,
   ConnectionInput_Deserialize,
   ConnectionProfile_Serialize,
   SecretKind,
@@ -46,5 +48,15 @@ export const connectionsApi = {
 
   secretStatus(id: string): Promise<SecretStatus> {
     return ipc.connectionSecretStatus(id)
+  },
+
+  /** Write every non-secret connection field to a JSON bundle. */
+  exportTo(path: string): Promise<ConnectionExportSummary> {
+    return ipc.connectionsExport(path)
+  },
+
+  /** Merge a bundle into the saved connections, skipping duplicates. */
+  importFrom(path: string): Promise<ConnectionImportSummary> {
+    return ipc.connectionsImport(path)
   },
 }

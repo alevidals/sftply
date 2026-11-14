@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSettings } from "@/features/settings/settings-context"
 import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
+import { UpdateCheck } from "@/features/settings/update-check"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
@@ -464,6 +465,7 @@ export function SettingsDialog() {
                   Credentials are stored in the operating system keychain and never written to
                   configuration files or logs.
                 </p>
+                <UpdateCheck />
               </TabsContent>
             </div>
           </Tabs>

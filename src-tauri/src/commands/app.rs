@@ -22,3 +22,14 @@ pub fn startup_report(state: State<'_, AppState>) -> StartupReport {
         warnings: state.take_startup_warnings(),
     }
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn app_check_update() -> Result<crate::update::UpdateStatus, crate::error::AppError> {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    tokio::task::spawn_blocking(move || crate::update::check(&current))
+        .await
+        .map_err(|error| {
+            crate::error::AppError::internal("The update check could not run.", error.to_string())
+        })?
+}
