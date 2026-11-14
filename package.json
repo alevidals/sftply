@@ -21,7 +21,8 @@
     "dev:ftp": "docker compose -f docker/dev-ftp/docker-compose.yml up -d --build",
     "dev:ftp:down": "docker compose -f docker/dev-ftp/docker-compose.yml down",
     "dev:ftp:logs": "docker compose -f docker/dev-ftp/docker-compose.yml logs -f ftp",
-    "check": "bun run typecheck && bun run lint && bun run test && bun run build"
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build",
+    "version:check": "bun scripts/check-versions.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -3,6 +3,52 @@
 `sftply` ships as a Tauri 2 desktop app. Bundles are produced per operating
 system; Tauri does not cross-compile installers.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main`, every pull request and
+on demand:
+
+- **Frontend**: version consistency, typecheck, Biome, Vitest and production build.
+- **Rust (Linux)**: rustfmt, clippy with `-D warnings`, `cargo test`, and a
+  check that `src/lib/ipc/bindings.ts` matches what `bun run bindings` generates.
+- **Rust check matrix**: `cargo check --all-targets` on Ubuntu, macOS and
+  Windows. This does not bundle anything; it catches platform-specific code and
+  dependency problems early.
+- **Protocol integration**: `tests/integration/run.sh` against the loopback FTP,
+  explicit FTPS, implicit FTPS and SFTP stack. It runs on `main` and on demand,
+  not on pull requests, because it builds four Docker images.
+
+## Downloadable builds
+
+`.github/workflows/release.yml` builds on every `v*` tag. A manual
+`workflow_dispatch` run builds the same artifacts but does not publish a
+release, which is useful for validating the pipeline.
+
+Every job first runs `bun run version:check`, so the tag must match the version
+in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
+
+| System          | Portable (no install)                            | Installer         |
+| --------------- | ------------------------------------------------ | ----------------- |
+| macOS universal | `*_macos-universal_portable.zip` (zipped `.app`) | `.dmg`            |
+| Windows x64     | `*_windows-x64_portable.zip` (raw `.exe`)        | NSIS `-setup.exe` |
+| Linux x64       | `.AppImage`                                      | `.deb`            |
+
+A final job writes `SHA256SUMS` and creates a **draft** GitHub release with all
+artifacts. Review it and publish manually.
+
+Portable caveats:
+
+- **Windows**: the raw `.exe` needs the WebView2 runtime, which ships with
+  Windows 10 (1803+) and Windows 11. It does not register file associations or
+  an uninstaller.
+- **macOS**: the `.app` is ad-hoc signed in CI, so Apple Silicon will run it, but
+  Gatekeeper still requires the user to allow an app from an unknown developer.
+  Real signing and notarization need a Developer ID certificate and the steps
+  below.
+- **Linux**: the AppImage is a single executable, but it may need FUSE 2 (or
+  `--appimage-extract-and-run`) and the WebKitGTK libraries provided by the
+  distribution. It is built on Ubuntu 22.04 to keep the glibc baseline low.
+
 ## Version bump
 
 Update the version in all three places, then regenerate the bindings so the
@@ -13,6 +59,7 @@ About panel and diagnostics agree:
 3. `src-tauri/tauri.conf.json`
 
 ```sh
+bun run version:check
 bun run bindings
 ```
 

@@ -55,11 +55,11 @@ These were recommended in the architecture package. Implementation proceeds with
 
 - [ ] Phase 1 + 2 visual runtime QA in the real Tauri window (layout, traffic lights, CSP, theme toggle, palette, settings persistence, startup activity, local browser interactions)
 - [x] Rendered component tests for keyboard table navigation and rename/delete dialog flows
-- [ ] First CI run on a remote (workflow definition exists)
+- [x] First CI run on a remote (frontend + Linux Rust gates green)
 
 ### Known issues / blockers
 
-- A CI workflow now covers the frontend and non-Docker Rust gates, but it has not run yet because the repository has no remote configured.
+- CI runs the frontend gates, Linux Rust gates, a `cargo check` matrix on Linux/macOS/Windows, a generated-bindings drift check and the Docker protocol integration suite. Release builds for all three systems are produced by `.github/workflows/release.yml` on `v*` tags.
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
 - The main production chunk is still above Vite's 500 kB warning threshold (≈864 kB raw / 259 kB gzip). The settings dialog and command palette now load on demand (≈22 kB each); the remaining weight is React, Radix, TanStack, forms and icons. Vendor chunking belongs in the next performance pass.
 - Biome's `useSemanticElements` / `useFocusableInteractive` are disabled for the virtualized file table and column header only. They are an ARIA grid with a single roving tab stop, not semantic `<table>` markup; keyboard access is handled on the grid container.
@@ -88,7 +88,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - Typed IPC generation works.
 - Known limitations documented; no security fallback chosen silently.
 
-**Status:** Typed IPC works and a CI workflow definition exists. The first remote CI run, the dependency audit, and the protocol/keyring runtime spikes remain outstanding.
+**Status:** Typed IPC works and CI is green on the remote. The dependency audit, protocol/keyring runtime spikes and the first tagged release remain outstanding.
 
 ---
 
@@ -1289,3 +1289,30 @@ which is only correct for local client connections. See
 
 - Manual loopback FTP/SFTP check: open, edit, save and force a conflict. Rust changed, so restart `bun run tauri -- dev`.
 - Phase 6 continues with safe remote previews, import/export without credentials, file comparison and synchronization.
+
+### 2026-11-14 — Session 44: CI gates and downloadable builds
+
+**Changed**
+
+- Pinned Bun 1.4.4 with `.bun-version` and added `bun run version:check`, which compares `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, and fails when a `v*` tag does not match.
+- CI now has four jobs:
+  - **Frontend**: version check, typecheck, Biome, Vitest and production build.
+  - **Rust (Linux)**: rustfmt, clippy with `-D warnings`, tests, and a generated-bindings drift check (`bun run bindings` followed by `git diff --exit-code`).
+  - **Rust check matrix**: `cargo check --all-targets` on Ubuntu, macOS and Windows, so platform-specific `cfg` code and native dependencies are compiled everywhere.
+  - **Protocol integration**: runs `tests/integration/run.sh` against the loopback FTP, explicit FTPS, implicit FTPS and SFTP stack on `main` and on demand.
+- Added `.github/workflows/release.yml`, triggered by `v*` tags (and manually, which only builds):
+  - macOS universal (`aarch64` + `x86_64`), ad-hoc signed, producing `.app` (zipped as portable) and `.dmg`.
+  - Linux x64 on Ubuntu 22.04, producing AppImage (portable) and `.deb`.
+  - Windows x64, producing the raw `.exe` (zipped as portable) and the NSIS setup.
+  - A final job downloads every artifact, writes `SHA256SUMS` and creates a draft GitHub release.
+- Portable caveats are documented: Windows needs the WebView2 runtime that ships with Windows 10 1803+/11, macOS Gatekeeper still asks the user to allow an unsigned/ad-hoc app, and Linux AppImages may need FUSE 2 or `--appimage-extract-and-run`.
+
+**Verified**
+
+- `bun run version:check` and `bun run check`.
+- Workflow YAML parses; the expanded CI ran on the first push.
+
+**Next**
+
+- Push a `v*` tag after the next version bump to validate the release workflow and the portable archives on real machines.
+- Add `cargo audit`/`bun audit` on a weekly schedule, and import a Developer ID certificate when signing is available.
