@@ -1,12 +1,10 @@
-import { useEffect, useRef } from "react"
+import { lazy, Suspense, useEffect, useRef } from "react"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { QuickConnectDialog } from "@/features/connections/components/quick-connect-dialog"
 import { HostKeyDialog } from "@/features/sessions/components/host-key-dialog"
 import { useSessionBridge } from "@/features/sessions/hooks/use-session-bridge"
 import { useSettings } from "@/features/settings/settings-context"
-import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { BottomPanel } from "@/features/shell/bottom-panel"
-import { CommandPalette } from "@/features/shell/command-palette"
 import { Sidebar } from "@/features/shell/sidebar"
 import { StatusBar } from "@/features/shell/status-bar"
 import { TitleBar } from "@/features/shell/title-bar"
@@ -18,6 +16,19 @@ import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts"
 import { useStartupReport } from "@/hooks/use-startup-report"
 import { useTransferBridge } from "@/hooks/use-transfer-bridge"
 import { recordActivity } from "@/stores/activity-store"
+import { useUiStore } from "@/stores/ui-store"
+
+// Overlays are only needed on demand, so keep their code out of the first load.
+const CommandPalette = lazy(() =>
+  import("@/features/shell/command-palette").then((module) => ({
+    default: module.CommandPalette,
+  })),
+)
+const SettingsDialog = lazy(() =>
+  import("@/features/settings/settings-dialog").then((module) => ({
+    default: module.SettingsDialog,
+  })),
+)
 
 /** Keep the sidebar wide enough for a connection card's actions. */
 const SIDEBAR_MIN_WIDTH = 240
@@ -25,6 +36,8 @@ const SIDEBAR_MAX_WIDTH = 420
 
 export function AppShell() {
   const { settings } = useSettings()
+  const paletteOpen = useUiStore((state) => state.paletteOpen)
+  const settingsOpen = useUiStore((state) => state.settingsOpen)
   const persistLayout = useDebouncedSettingsPatch()
   const appInfo = useAppInfo()
   const startupReport = useStartupReport()
@@ -114,8 +127,16 @@ export function AppShell() {
 
       <StatusBar />
 
-      <CommandPalette />
-      <SettingsDialog />
+      {paletteOpen ? (
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+      ) : null}
+      {settingsOpen ? (
+        <Suspense fallback={null}>
+          <SettingsDialog />
+        </Suspense>
+      ) : null}
       <QuickConnectDialog />
       <HostKeyDialog />
     </div>

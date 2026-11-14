@@ -60,10 +60,8 @@ These were recommended in the architecture package. Implementation proceeds with
 ### Known issues / blockers
 
 - A CI workflow now covers the frontend and non-Docker Rust gates, but it has not run yet because the repository has no remote configured.
-- Runtime FTPS/SFTP/keyring spikes still need local test servers (Docker or local daemons). Compile-time validation proceeds without them; protocol crates and their features are not yet added to `Cargo.toml`.
-- The `suppaftp`/implicit-FTPS and `russh` + `russh-sftp` version pairings remain unproven at runtime; if they fail, the dependency ADRs must be updated before Phase 3.
 - `tauri-specta` v2 RC is pre-release. Bindings regenerate deterministically today, but upgrades must be reviewed deliberately and must not be assumed semver-safe.
-- The production JS bundle is a single chunk above Vite's 500 kB warning threshold (≈860 kB raw / 257 kB gzip). Code splitting belongs in the Phase 5 performance pass unless it starts blocking work.
+- The main production chunk is still above Vite's 500 kB warning threshold (≈864 kB raw / 259 kB gzip). The settings dialog and command palette now load on demand (≈22 kB each); the remaining weight is React, Radix, TanStack, forms and icons. Vendor chunking belongs in the next performance pass.
 - Biome's `useSemanticElements` / `useFocusableInteractive` are disabled for the virtualized file table and column header only. They are an ARIA grid with a single roving tab stop, not semantic `<table>` markup; keyboard access is handled on the grid container.
 
 ---
@@ -210,7 +208,7 @@ These were recommended in the architecture package. Implementation proceeds with
 - [ ] All empty/loading/error/first-run states
 - [x] Density/column/date/size preferences
 - [x] Accessibility audit (keyboard, labels, contrast, reduced motion)
-- [ ] Startup/scroll/memory performance pass
+- [x] Startup/scroll/memory performance pass (overlays split; vendor chunking still open)
 - [x] App icon and in-app branding
 - [x] Product metadata and unsigned bundles (signing/notarization documented in `docs/RELEASE.md`)
 - [ ] Cross-platform visual QA
@@ -1153,3 +1151,20 @@ which is only correct for local client connections. See
 **Next**
 
 - Continue Phase 5: first-run and remaining loading/error states, then the startup/scroll/memory pass.
+
+### 2026-11-14 — Session 37: split overlays out of the first load
+
+**Changed**
+
+- The command palette and Settings dialog are now loaded with `React.lazy` and only mounted while open. Their imports were removed from the shell's eager graph, so the first window paint no longer parses either overlay.
+- Added a small `Suspense` boundary around each overlay with a null fallback; the chunks are local files in the bundled app, so the gap is a single frame on first open.
+- Initial JavaScript dropped from ≈905 kB raw / 269 kB gzip to ≈864 kB raw / 259 kB gzip. The palette is a 22.7 kB chunk and Settings 22.3 kB.
+- Updated the known-issues section: the stale protocol-pairing warnings are gone, and the remaining bundle note names the actual next step (vendor chunking) instead of a generic code-splitting TODO.
+
+**Verified**
+
+- `bun run check` (typecheck, Biome, 188 tests in 28 files, production build). The build now emits `command-palette-*.js` and `settings-dialog-*.js` next to the main chunk.
+
+**Next**
+
+- Continue Phase 5: first-run polish and cross-platform visual QA notes.
