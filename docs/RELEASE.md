@@ -51,6 +51,50 @@ Portable caveats:
   `--appimage-extract-and-run`) and the WebKitGTK libraries provided by the
   distribution. It is built on Ubuntu 22.04 to keep the glibc baseline low.
 
+## Troubleshooting first launch
+
+### macOS: "cannot be opened because the developer cannot be verified"
+
+The `.app` is ad-hoc signed but not notarized, so Gatekeeper quarantines the
+download. Pick either path:
+
+1. **Finder**: right-click `sftply.app` → **Open** → **Open**. macOS remembers
+   the choice, so later launches are normal.
+2. **Settings**: System Settings → Privacy & Security → scroll to the blocked-app
+   notice → **Open Anyway**.
+3. **Terminal** after copying the app to `/Applications`:
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/sftply.app
+   ```
+
+"The app is damaged and should be moved to the Trash" is the same quarantine
+flag, not a corrupt binary; the `xattr` command fixes it. If the app moved from
+`/Applications` still fails, confirm the binary is executable:
+
+```sh
+ls -l /Applications/sftply.app/Contents/MacOS/sftply
+```
+
+### Windows: the portable `.exe` opens a blank window
+
+Install the Microsoft Edge WebView2 Runtime (already present on Windows 10 1803+
+and Windows 11). The NSIS setup also installs it when missing.
+
+### Linux: AppImage does not start
+
+Install FUSE 2 (`libfuse2` on Debian/Ubuntu, `fuse2` on Fedora) or run the image
+with `--appimage-extract-and-run`. WebKitGTK 4.1 must be installed by the
+distribution; a missing `libwebkit2gtk-4.1.so.0` is the usual cause.
+
+## Licensing
+
+The repository and the published binaries currently have no license file. Public
+visibility is not a grant of rights: without a license, others may not legally
+use, modify or redistribute the app. Add a `LICENSE` before asking anyone to
+download it for real use, and align the text with whichever model is chosen
+(permissive, copyleft or source-available).
+
 ## Version bump
 
 Update the version in all three places, then regenerate the bindings so the

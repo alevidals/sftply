@@ -2,12 +2,35 @@
 
 A modern, keyboard-first desktop client for FTP, FTPS and SFTP. Built with Tauri 2, React, TypeScript and Rust.
 
-> **Status: architecture and design phase.** The repository currently contains the Tauri starter template. No product features have been implemented yet. The documents below define the approved scope before implementation begins.
+> **Status: pre-1.0.** `v0.1.0` is published as portable builds and installers for macOS, Windows and Linux. The source is usable and tested, but the product is still under active development; expect breaking behaviour changes before 1.0.
+
+## Download
+
+Grab the latest build from [Releases](https://github.com/alevidals/sftply/releases/latest):
+
+| Platform                      | Portable (no install)                                                          | Installer           |
+| ----------------------------- | ------------------------------------------------------------------------------ | ------------------- |
+| macOS (Intel + Apple Silicon) | `*_macos-universal_portable.zip` — unzip and drag `sftply.app` to Applications | `.dmg`              |
+| Windows 10/11 x64             | `*_windows-x64_portable.zip` — unzip and run `sftply.exe`                      | `-setup.exe` (NSIS) |
+| Linux x64                     | `.AppImage` — `chmod +x` and run                                               | `.deb`              |
+
+`SHA256SUMS` accompanies every release.
+
+**First launch on macOS** is blocked by Gatekeeper because the build is ad-hoc
+signed and not notarized. Right-click the app → **Open** → **Open**, or run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/sftply.app
+```
+
+See [Release and packaging](docs/RELEASE.md) for the full caveats, including the
+WebView2 requirement on Windows and FUSE on Linux.
 
 ## Design documents
 
 - [Architecture](docs/ARCHITECTURE.md) — layers, module boundaries, IPC contract, security model, design system
 - [Dependency evaluation](docs/DEPENDENCIES.md) — protocol libraries, Rust/frontend dependencies, rejected alternatives
+- [Release and packaging](docs/RELEASE.md) — CI, artifacts, portable caveats, signing
 - [Roadmap](docs/ROADMAP.md) — phased milestones with exit criteria
 - [Progress log](docs/PROGRESS.md) — what is built, verified, and what comes next
 - [ADRs](docs/adr/README.md) — architectural decision records
@@ -31,11 +54,18 @@ Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies.
 
 ```bash
 bun install
-bun run tauri dev
+bun run tauri dev      # desktop app with hot reload
+bun run check          # typecheck, Biome, Vitest and production build
 ```
 
-These commands run the current template. The product build, test and lint scripts will be introduced in Phase 0/1 as described in the roadmap.
+Rust gates run from `src-tauri`:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+```
 
 ## License
 
-To be decided before distribution.
+Not decided yet. See the licensing note in [Release and packaging](docs/RELEASE.md).
