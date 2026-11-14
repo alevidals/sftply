@@ -6,6 +6,10 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.3] - 2026-11-14
+
 ### Fixed
 
 - After a failed transfer left the browsing session lost, retrying the upload
@@ -196,7 +200,8 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.2...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/alevidals/sftply/releases/tag/v0.4.3
 [0.4.2]: https://github.com/alevidals/sftply/releases/tag/v0.4.2
 [0.4.1]: https://github.com/alevidals/sftply/releases/tag/v0.4.1
 [0.4.0]: https://github.com/alevidals/sftply/releases/tag/v0.4.0
