@@ -6,7 +6,11 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- Right-clicking the empty area of a pane now shows a small folder menu (new
+  folder, select all, copy folder path) instead of the full row menu with every
+  row action disabled.
 
 ## [0.4.2] - 2026-11-14
 

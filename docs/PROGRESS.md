@@ -1783,3 +1783,18 @@ which is only correct for local client connections. See
 **Verified**
 
 - Rust 134 tests, clippy clean, 242 frontend tests, typecheck, lint, build.
+
+### 2026-11-14 — Session 59: empty-background context menu
+
+**Changed**
+
+- A right-click on the empty part of a pane used to open the full row menu with
+  every row action disabled, which reads as a broken menu. The grid now tracks
+  whether the click landed on a row and, for the background, shows only
+  **New folder**, **Select all** and **Copy folder path**.
+- Tests cover both paths: background menu has no row actions, and right-clicking
+  a row selects it before the menu opens.
+
+**Verified**
+
+- 18 FileTable tests, full frontend suite, typecheck, lint and build.

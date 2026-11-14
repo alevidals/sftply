@@ -8,6 +8,7 @@ import {
   FolderPlusIcon,
   FolderSearchIcon,
   InfoIcon,
+  MousePointerSquareDashedIcon,
   PencilIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -278,6 +279,11 @@ export function FileTable({
           }
           tabIndex={0}
           onKeyDown={handleKeyDown}
+          onContextMenu={(event) => {
+            // Rows set their own index. Anything else is the empty background,
+            // where row actions make no sense.
+            if (!(event.target as Element).closest('[role="row"]')) setContextIndex(null)
+          }}
           className="relative min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:ring-inset"
         >
           <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
@@ -440,72 +446,96 @@ export function FileTable({
         }}
       >
         <ContextMenuLabel className="max-w-52 truncate font-normal">
-          {contextIndex === null ? "Actions" : (entries[contextIndex]?.name ?? "Actions")}
+          {contextIndex === null ? "Folder" : (entries[contextIndex]?.name ?? "Actions")}
         </ContextMenuLabel>
         <ContextMenuSeparator />
-        <ContextMenuItem disabled={actionDisabled("open")} onSelect={() => onAction("open")}>
-          <ArrowDownToLineIcon />
-          Open
-          <ContextMenuShortcut>{shortcutLabel("open")}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem disabled={actionDisabled("edit")} onSelect={() => onAction("edit")}>
-          <FileTextIcon />
-          Edit text…
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={actionDisabled("transfer")}
-          onSelect={() => onAction("transfer")}
-        >
-          {transferDirection === "upload" ? <ArrowUpFromLineIcon /> : <ArrowDownToLineIcon />}
-          {transferLabel}
-        </ContextMenuItem>
-        {allowReveal ? (
-          <ContextMenuItem disabled={actionDisabled("reveal")} onSelect={() => onAction("reveal")}>
-            <FolderSearchIcon />
-            Reveal in file manager
-          </ContextMenuItem>
-        ) : null}
-        <ContextMenuItem onSelect={() => onAction("copy-path")}>
-          <CopyIcon />
-          Copy path
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          disabled={actionDisabled("rename")}
-          onSelect={() => {
-            renameFocusPending.current = true
-            onAction("rename")
-          }}
-        >
-          <PencilIcon />
-          Rename
-          <ContextMenuShortcut>F2</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onAction("new-folder")}>
-          <FolderPlusIcon />
-          New folder
-          <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem
-          variant="destructive"
-          disabled={actionDisabled("delete")}
-          onSelect={() => onAction("delete")}
-        >
-          <Trash2Icon />
-          Delete
-          <ContextMenuShortcut>{shortcutLabel("delete")}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          disabled={actionDisabled("permissions")}
-          onSelect={() => onAction("permissions")}
-        >
-          <InfoIcon />
-          Permissions…
-          {!canChmod ? (
-            <span className="ml-auto text-2xs text-muted-foreground">Unavailable</span>
-          ) : null}
-        </ContextMenuItem>
+        {contextIndex === null ? (
+          <>
+            <ContextMenuItem onSelect={() => onAction("new-folder")}>
+              <FolderPlusIcon />
+              New folder
+              <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onSelectAll}>
+              <MousePointerSquareDashedIcon />
+              Select all
+              <ContextMenuShortcut>{shortcutLabel("select-all")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onAction("copy-path")}>
+              <CopyIcon />
+              Copy folder path
+            </ContextMenuItem>
+          </>
+        ) : (
+          <>
+            <ContextMenuItem disabled={actionDisabled("open")} onSelect={() => onAction("open")}>
+              <ArrowDownToLineIcon />
+              Open
+              <ContextMenuShortcut>{shortcutLabel("open")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem disabled={actionDisabled("edit")} onSelect={() => onAction("edit")}>
+              <FileTextIcon />
+              Edit text…
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={actionDisabled("transfer")}
+              onSelect={() => onAction("transfer")}
+            >
+              {transferDirection === "upload" ? <ArrowUpFromLineIcon /> : <ArrowDownToLineIcon />}
+              {transferLabel}
+            </ContextMenuItem>
+            {allowReveal ? (
+              <ContextMenuItem
+                disabled={actionDisabled("reveal")}
+                onSelect={() => onAction("reveal")}
+              >
+                <FolderSearchIcon />
+                Reveal in file manager
+              </ContextMenuItem>
+            ) : null}
+            <ContextMenuItem onSelect={() => onAction("copy-path")}>
+              <CopyIcon />
+              Copy path
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={actionDisabled("rename")}
+              onSelect={() => {
+                renameFocusPending.current = true
+                onAction("rename")
+              }}
+            >
+              <PencilIcon />
+              Rename
+              <ContextMenuShortcut>F2</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => onAction("new-folder")}>
+              <FolderPlusIcon />
+              New folder
+              <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              disabled={actionDisabled("delete")}
+              onSelect={() => onAction("delete")}
+            >
+              <Trash2Icon />
+              Delete
+              <ContextMenuShortcut>{shortcutLabel("delete")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={actionDisabled("permissions")}
+              onSelect={() => onAction("permissions")}
+            >
+              <InfoIcon />
+              Permissions…
+              {!canChmod ? (
+                <span className="ml-auto text-2xs text-muted-foreground">Unavailable</span>
+              ) : null}
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   )

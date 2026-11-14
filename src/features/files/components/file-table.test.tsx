@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileTable } from "@/features/files/components/file-table"
@@ -96,6 +96,28 @@ function renderTable(
   )
   return { handlers, grid: screen.getByRole("grid", { name: "Folder contents" }) }
 }
+
+describe("FileTable background menu", () => {
+  it("offers folder actions on the empty background", async () => {
+    const { grid } = renderTable({ selection: selection(null, []) })
+
+    fireEvent.contextMenu(grid)
+
+    expect(await screen.findByRole("menuitem", { name: /New folder/ })).toBeInTheDocument()
+    expect(screen.getByRole("menuitem", { name: /Select all/ })).toBeInTheDocument()
+    expect(screen.getByRole("menuitem", { name: /Copy folder path/ })).toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: /Rename/ })).not.toBeInTheDocument()
+  })
+
+  it("selects the row under the cursor when the menu opens", async () => {
+    const { handlers } = renderTable({ selection: selection(null, []) })
+
+    fireEvent.contextMenu(screen.getByText("alpha.txt"))
+
+    await waitFor(() => expect(handlers.onSelect).toHaveBeenCalledWith(0, "replace"))
+    expect(await screen.findByRole("menuitem", { name: /Rename/ })).toBeInTheDocument()
+  })
+})
 
 describe("FileTable keyboard model", () => {
   it("moves the active row and extends selection with shift", () => {
