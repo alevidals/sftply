@@ -14,6 +14,11 @@ All notable changes to sftply. The format follows
 
 ### Fixed
 
+- Windows and Linux kept an 84 px gap at the start of the title bar, reserved for
+  macOS traffic lights. The padding now applies only on macOS.
+- The connection and quick-connect dialogs showed a horizontal scrollbar on
+  Windows: the footer used negative margins inside the scrolling form. The
+  footer now sits outside the scroll area, so only the body scrolls.
 - Save buttons flashed a spinner for a few milliseconds, because a settings or
   connection save finishes faster than the frame that shows it. The spinner now
   waits 200 ms before appearing; quick saves keep the label.

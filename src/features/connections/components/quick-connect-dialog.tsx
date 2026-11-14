@@ -152,341 +152,343 @@ export function QuickConnectDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !connecting && setOpen(next)}>
-      <DialogContent className="sm:max-w-lg">
-        <form onSubmit={submit} className="max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ZapIcon className="size-4 text-primary" />
-              Quick connect
-            </DialogTitle>
-            <DialogDescription>
-              Connect with credentials for this session. Secrets stay in memory unless you save the
-              connection.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <form onSubmit={submit} className="flex max-h-[calc(100vh-4rem)] min-h-0 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ZapIcon className="size-4 text-primary" />
+                Quick connect
+              </DialogTitle>
+              <DialogDescription>
+                Connect with credentials for this session. Secrets stay in memory unless you save
+                the connection.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-protocol">Protocol</Label>
-                <Controller
-                  control={form.control}
-                  name="protocol"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => changeProtocol(value, field.onChange)}
-                    >
-                      <SelectTrigger id="quick-connect-protocol" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(PROTOCOL_LABELS) as ConnectionProtocol[]).map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {PROTOCOL_LABELS[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-port">Port</Label>
-                <Input
-                  id="quick-connect-port"
-                  {...form.register("port")}
-                  inputMode="numeric"
-                  aria-invalid={Boolean(form.formState.errors.port)}
-                  className="font-mono"
-                />
-                <FieldMessage message={form.formState.errors.port?.message} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-host">Host</Label>
-                <Input
-                  id="quick-connect-host"
-                  {...form.register("host")}
-                  aria-invalid={Boolean(form.formState.errors.host)}
-                  placeholder="ftp.example.com"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <FieldMessage message={form.formState.errors.host?.message} />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-username">Username</Label>
-                <Input
-                  id="quick-connect-username"
-                  {...form.register("username")}
-                  aria-invalid={Boolean(form.formState.errors.username)}
-                  placeholder={protocol === "sftp" ? "ada" : "anonymous"}
-                  autoComplete="username"
-                  spellCheck={false}
-                />
-                <FieldMessage message={form.formState.errors.username?.message} />
-                {protocol !== "sftp" ? (
-                  <p className="text-2xs text-muted-foreground">
-                    Leave blank to connect anonymously. The password is optional.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="quick-connect-auth">Authentication</Label>
-              <Controller
-                control={form.control}
-                name="authKind"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="quick-connect-auth" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="password">
-                        <LockKeyholeIcon />
-                        Password
-                      </SelectItem>
-                      <SelectItem value="key" disabled={protocol !== "sftp"}>
-                        <KeyRoundIcon />
-                        SSH key
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldMessage message={form.formState.errors.authKind?.message} />
-            </div>
-
-            {authKind === "key" ? (
-              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-connect-key">Private key</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="quick-connect-key"
-                      {...form.register("keyPath")}
-                      aria-invalid={Boolean(form.formState.errors.keyPath)}
-                      placeholder="/Users/you/.ssh/id_ed25519"
-                      spellCheck={false}
-                      className="font-mono text-xs"
-                    />
-                    <Button type="button" variant="outline" size="sm" onClick={pickKey}>
-                      <FolderOpenIcon />
-                      Choose…
-                    </Button>
-                  </div>
-                  <FieldMessage message={form.formState.errors.keyPath?.message} />
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="quick-connect-passphrase">Key needs a passphrase</Label>
-                    <p className="text-2xs text-muted-foreground">
-                      {save
-                        ? "The passphrase is stored in the keychain."
-                        : "The passphrase is kept in memory for this session."}
-                    </p>
-                  </div>
-                  <Controller
-                    control={form.control}
-                    name="passphraseProtected"
-                    render={({ field }) => (
-                      <Switch
-                        id="quick-connect-passphrase"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="quick-connect-secret">
-                {authKind === "key" ? "Passphrase" : "Password"}
-              </Label>
-              <Input
-                id="quick-connect-secret"
-                type="password"
-                {...form.register("secret")}
-                autoComplete="off"
-                placeholder={
-                  authKind === "key" && !form.watch("passphraseProtected")
-                    ? "Optional"
-                    : save
-                      ? "Stored in your keychain"
-                      : "Used for this session only"
-                }
-              />
-              <FieldMessage message={form.formState.errors.secret?.message} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="quick-connect-path">Start folder</Label>
-              <Input
-                id="quick-connect-path"
-                {...form.register("initialPath")}
-                aria-invalid={Boolean(form.formState.errors.initialPath)}
-                placeholder="/"
-                spellCheck={false}
-                className="font-mono text-xs"
-              />
-              <FieldMessage message={form.formState.errors.initialPath?.message} />
-            </div>
-
-            {protocolUsesDataMode(protocol) ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-data-mode">Data channel</Label>
-                <Controller
-                  control={form.control}
-                  name="ftpDataMode"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="quick-connect-data-mode" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="passive">Passive (PASV)</SelectItem>
-                        <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
-                        <SelectItem value="active">Active (PORT)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-            ) : null}
-
-            {protocolIsFtps(protocol) ? (
-              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-connect-ca-file">Custom CA file (optional)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="quick-connect-ca-file"
-                      {...form.register("tlsCaFile")}
-                      aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
-                      placeholder="/etc/ssl/certs/private-ca.pem"
-                      spellCheck={false}
-                      className="font-mono text-xs"
-                    />
-                    <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
-                      <FolderOpenIcon />
-                      Choose…
-                    </Button>
-                  </div>
-                  <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-connect-pin">Certificate pin (optional)</Label>
-                  <Input
-                    id="quick-connect-pin"
-                    {...form.register("tlsCertificatePin")}
-                    aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
-                    placeholder="SHA-256 fingerprint"
-                    spellCheck={false}
-                    className="font-mono text-xs"
-                  />
-                  <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="quick-connect-invalid">Allow invalid certificates</Label>
-                    <p className="text-2xs text-muted-foreground">
-                      Only use this on a trusted network.
-                    </p>
-                  </div>
-                  <Controller
-                    control={form.control}
-                    name="tlsAllowInvalid"
-                    render={({ field }) => (
-                      <Switch
-                        id="quick-connect-invalid"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-
-                {tlsAllowInvalid ? (
-                  <p className="text-2xs font-medium text-destructive" role="alert">
-                    TLS certificate verification is disabled for this connection.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
-              <div className="space-y-0.5">
-                <Label htmlFor="quick-connect-save">Save this connection</Label>
-                <p className="text-2xs text-muted-foreground">
-                  {save
-                    ? "The profile is saved and the secret goes to your keychain."
-                    : "Nothing is written to the config or the keychain."}
-                </p>
-              </div>
-              <Controller
-                control={form.control}
-                name="save"
-                render={({ field }) => (
-                  <Switch
-                    id="quick-connect-save"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-            </div>
-
-            {save ? (
+            <div className="grid gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="quick-connect-name">Name</Label>
-                  <Input
-                    id="quick-connect-name"
-                    {...form.register("name")}
-                    aria-invalid={Boolean(form.formState.errors.name)}
-                    placeholder="Production server"
-                    autoComplete="off"
+                  <Label htmlFor="quick-connect-protocol">Protocol</Label>
+                  <Controller
+                    control={form.control}
+                    name="protocol"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => changeProtocol(value, field.onChange)}
+                      >
+                        <SelectTrigger id="quick-connect-protocol" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(PROTOCOL_LABELS) as ConnectionProtocol[]).map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {PROTOCOL_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   />
-                  <FieldMessage message={form.formState.errors.name?.message} />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="quick-connect-group">Group (optional)</Label>
+                  <Label htmlFor="quick-connect-port">Port</Label>
                   <Input
-                    id="quick-connect-group"
-                    {...form.register("group")}
-                    aria-invalid={Boolean(form.formState.errors.group)}
-                    placeholder="Work"
-                    autoComplete="off"
+                    id="quick-connect-port"
+                    {...form.register("port")}
+                    inputMode="numeric"
+                    aria-invalid={Boolean(form.formState.errors.port)}
+                    className="font-mono"
                   />
-                  <FieldMessage message={form.formState.errors.group?.message} />
+                  <FieldMessage message={form.formState.errors.port?.message} />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-host">Host</Label>
+                  <Input
+                    id="quick-connect-host"
+                    {...form.register("host")}
+                    aria-invalid={Boolean(form.formState.errors.host)}
+                    placeholder="ftp.example.com"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <FieldMessage message={form.formState.errors.host?.message} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-username">Username</Label>
+                  <Input
+                    id="quick-connect-username"
+                    {...form.register("username")}
+                    aria-invalid={Boolean(form.formState.errors.username)}
+                    placeholder={protocol === "sftp" ? "ada" : "anonymous"}
+                    autoComplete="username"
+                    spellCheck={false}
+                  />
+                  <FieldMessage message={form.formState.errors.username?.message} />
+                  {protocol !== "sftp" ? (
+                    <p className="text-2xs text-muted-foreground">
+                      Leave blank to connect anonymously. The password is optional.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="quick-connect-auth">Authentication</Label>
+                <Controller
+                  control={form.control}
+                  name="authKind"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="quick-connect-auth" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="password">
+                          <LockKeyholeIcon />
+                          Password
+                        </SelectItem>
+                        <SelectItem value="key" disabled={protocol !== "sftp"}>
+                          <KeyRoundIcon />
+                          SSH key
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldMessage message={form.formState.errors.authKind?.message} />
+              </div>
+
+              {authKind === "key" ? (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-connect-key">Private key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="quick-connect-key"
+                        {...form.register("keyPath")}
+                        aria-invalid={Boolean(form.formState.errors.keyPath)}
+                        placeholder="/Users/you/.ssh/id_ed25519"
+                        spellCheck={false}
+                        className="font-mono text-xs"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={pickKey}>
+                        <FolderOpenIcon />
+                        Choose…
+                      </Button>
+                    </div>
+                    <FieldMessage message={form.formState.errors.keyPath?.message} />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="quick-connect-passphrase">Key needs a passphrase</Label>
+                      <p className="text-2xs text-muted-foreground">
+                        {save
+                          ? "The passphrase is stored in the keychain."
+                          : "The passphrase is kept in memory for this session."}
+                      </p>
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="passphraseProtected"
+                      render={({ field }) => (
+                        <Switch
+                          id="quick-connect-passphrase"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="quick-connect-secret">
+                  {authKind === "key" ? "Passphrase" : "Password"}
+                </Label>
+                <Input
+                  id="quick-connect-secret"
+                  type="password"
+                  {...form.register("secret")}
+                  autoComplete="off"
+                  placeholder={
+                    authKind === "key" && !form.watch("passphraseProtected")
+                      ? "Optional"
+                      : save
+                        ? "Stored in your keychain"
+                        : "Used for this session only"
+                  }
+                />
+                <FieldMessage message={form.formState.errors.secret?.message} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="quick-connect-path">Start folder</Label>
+                <Input
+                  id="quick-connect-path"
+                  {...form.register("initialPath")}
+                  aria-invalid={Boolean(form.formState.errors.initialPath)}
+                  placeholder="/"
+                  spellCheck={false}
+                  className="font-mono text-xs"
+                />
+                <FieldMessage message={form.formState.errors.initialPath?.message} />
+              </div>
+
+              {protocolUsesDataMode(protocol) ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-data-mode">Data channel</Label>
+                  <Controller
+                    control={form.control}
+                    name="ftpDataMode"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="quick-connect-data-mode" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="passive">Passive (PASV)</SelectItem>
+                          <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
+                          <SelectItem value="active">Active (PORT)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              ) : null}
+
+              {protocolIsFtps(protocol) ? (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-connect-ca-file">Custom CA file (optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="quick-connect-ca-file"
+                        {...form.register("tlsCaFile")}
+                        aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
+                        placeholder="/etc/ssl/certs/private-ca.pem"
+                        spellCheck={false}
+                        className="font-mono text-xs"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
+                        <FolderOpenIcon />
+                        Choose…
+                      </Button>
+                    </div>
+                    <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-connect-pin">Certificate pin (optional)</Label>
+                    <Input
+                      id="quick-connect-pin"
+                      {...form.register("tlsCertificatePin")}
+                      aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
+                      placeholder="SHA-256 fingerprint"
+                      spellCheck={false}
+                      className="font-mono text-xs"
+                    />
+                    <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="quick-connect-invalid">Allow invalid certificates</Label>
+                      <p className="text-2xs text-muted-foreground">
+                        Only use this on a trusted network.
+                      </p>
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="tlsAllowInvalid"
+                      render={({ field }) => (
+                        <Switch
+                          id="quick-connect-invalid"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  {tlsAllowInvalid ? (
+                    <p className="text-2xs font-medium text-destructive" role="alert">
+                      TLS certificate verification is disabled for this connection.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="quick-connect-save">Save this connection</Label>
+                  <p className="text-2xs text-muted-foreground">
+                    {save
+                      ? "The profile is saved and the secret goes to your keychain."
+                      : "Nothing is written to the config or the keychain."}
+                  </p>
+                </div>
+                <Controller
+                  control={form.control}
+                  name="save"
+                  render={({ field }) => (
+                    <Switch
+                      id="quick-connect-save"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+              </div>
+
+              {save ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-connect-name">Name</Label>
+                    <Input
+                      id="quick-connect-name"
+                      {...form.register("name")}
+                      aria-invalid={Boolean(form.formState.errors.name)}
+                      placeholder="Production server"
+                      autoComplete="off"
+                    />
+                    <FieldMessage message={form.formState.errors.name?.message} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-connect-group">Group (optional)</Label>
+                    <Input
+                      id="quick-connect-group"
+                      {...form.register("group")}
+                      aria-invalid={Boolean(form.formState.errors.group)}
+                      placeholder="Work"
+                      autoComplete="off"
+                    />
+                    <FieldMessage message={form.formState.errors.group?.message} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {formError ? (
+              <p
+                className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                role="alert"
+              >
+                {formError}
+              </p>
             ) : null}
           </div>
 
-          {formError ? (
-            <p
-              className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              role="alert"
-            >
-              {formError}
-            </p>
-          ) : null}
-
-          <DialogFooter>
+          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-t px-4 py-3">
             <Button
               type="button"
               variant="ghost"

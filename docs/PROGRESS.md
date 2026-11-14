@@ -1737,3 +1737,19 @@ which is only correct for local client connections. See
 
 - Settings dialog test updated to assert the first frame has no spinner and the
   delayed frame does. Frontend 246 tests, typecheck, lint and build green.
+
+### 2026-11-14 — Session 57: Windows layout fixes
+
+**Fixed**
+
+- The title bar hardcoded `pl-[84px]` for the macOS traffic lights, which left a
+  gap before the brand on Windows and Linux. It now applies `isMacPlatform`.
+- Connection dialogs had both scrollbars on Windows: `DialogFooter` uses
+  `-mx-4 -mb-4` to bleed to the dialog edges, and it sat inside the scrolling
+  form, so the negative margins created horizontal overflow. On macOS the overlay
+  scrollbars hid it. Both dialogs now follow the settings dialog layout: a flex
+  column with a scrollable body (`overflow-x-hidden`) and the footer outside it.
+
+**Verified**
+
+- Typecheck, lint, 246 frontend tests and the production build.

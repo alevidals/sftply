@@ -1,3 +1,4 @@
+import { cn } from "cn"
 import { CircleDotIcon, SearchIcon, Settings2Icon } from "lucide-react"
 import { Fragment, memo } from "react"
 import { toast } from "sonner"
@@ -15,14 +16,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSettings } from "@/features/settings/settings-context"
+import { useAppInfo } from "@/hooks/use-app-info"
 import { errorMessage } from "@/lib/errors"
 import type { ThemeMode } from "@/lib/ipc/bindings"
-import { shortcutLabel } from "@/lib/shortcuts"
+import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts"
 import { THEME_OPTIONS, themeOption } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
 function TitleBarImpl() {
   const { settings, updateSettings } = useSettings()
+  const appInfo = useAppInfo()
+  // macOS draws its traffic lights over the window; the padding keeps the
+  // brand clear of them. Windows and Linux have native controls elsewhere.
+  const isMac = isMacPlatform(appInfo.data?.platform)
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
   const ThemeIcon = themeOption(settings.theme).icon
@@ -36,7 +42,10 @@ function TitleBarImpl() {
   return (
     <header
       data-tauri-drag-region
-      className="flex h-12 shrink-0 items-center gap-3 border-b border-border/70 bg-chrome px-3 pl-[84px] text-chrome-foreground select-none"
+      className={cn(
+        "flex h-12 shrink-0 items-center gap-3 border-b border-border/70 bg-chrome px-3 text-chrome-foreground select-none",
+        isMac && "pl-[84px]",
+      )}
     >
       <div data-tauri-drag-region className="flex items-center gap-2">
         <BrandMark className="size-6" />

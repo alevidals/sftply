@@ -188,358 +188,360 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
 
   return (
     <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-lg">
-        <form onSubmit={submit} className="max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto pr-1">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ServerIcon className="size-4 text-primary" />
-              {connection ? "Edit connection" : "New connection"}
-            </DialogTitle>
-            <DialogDescription>
-              Credentials are stored in your OS keychain, never in the app config.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <form onSubmit={submit} className="flex max-h-[calc(100vh-4rem)] min-h-0 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ServerIcon className="size-4 text-primary" />
+                {connection ? "Edit connection" : "New connection"}
+              </DialogTitle>
+              <DialogDescription>
+                Credentials are stored in your OS keychain, never in the app config.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="grid gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="connection-name">Name</Label>
-              <Input
-                id="connection-name"
-                {...form.register("name")}
-                aria-invalid={Boolean(form.formState.errors.name)}
-                placeholder="Production server"
-                autoComplete="off"
-              />
-              <FieldMessage message={form.formState.errors.name?.message} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="connection-protocol">Protocol</Label>
-                <Controller
-                  control={form.control}
-                  name="protocol"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => changeProtocol(value, field.onChange)}
-                    >
-                      <SelectTrigger id="connection-protocol" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(PROTOCOL_LABELS) as ConnectionProtocol[]).map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {PROTOCOL_LABELS[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-port">Port</Label>
+                <Label htmlFor="connection-name">Name</Label>
                 <Input
-                  id="connection-port"
-                  {...form.register("port")}
-                  inputMode="numeric"
-                  aria-invalid={Boolean(form.formState.errors.port)}
-                  className="font-mono"
-                />
-                <FieldMessage message={form.formState.errors.port?.message} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-host">Host</Label>
-                <Input
-                  id="connection-host"
-                  {...form.register("host")}
-                  aria-invalid={Boolean(form.formState.errors.host)}
-                  placeholder="ftp.example.com"
+                  id="connection-name"
+                  {...form.register("name")}
+                  aria-invalid={Boolean(form.formState.errors.name)}
+                  placeholder="Production server"
                   autoComplete="off"
-                  spellCheck={false}
                 />
-                <FieldMessage message={form.formState.errors.host?.message} />
+                <FieldMessage message={form.formState.errors.name?.message} />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-username">Username</Label>
-                <Input
-                  id="connection-username"
-                  {...form.register("username")}
-                  aria-invalid={Boolean(form.formState.errors.username)}
-                  placeholder={protocol === "sftp" ? "ada" : "anonymous"}
-                  autoComplete="username"
-                  spellCheck={false}
-                />
-                <FieldMessage message={form.formState.errors.username?.message} />
-                {protocol !== "sftp" ? (
-                  <p className="text-2xs text-muted-foreground">
-                    Leave blank to connect anonymously. The password is optional.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="connection-auth">Authentication</Label>
-              <Controller
-                control={form.control}
-                name="authKind"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="connection-auth" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="password">
-                        <LockKeyholeIcon />
-                        Password
-                      </SelectItem>
-                      <SelectItem value="key" disabled={protocol !== "sftp"}>
-                        <KeyRoundIcon />
-                        SSH key
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldMessage message={form.formState.errors.authKind?.message} />
-            </div>
-
-            {authKind === "key" ? (
-              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="connection-key">Private key</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="connection-key"
-                      {...form.register("keyPath")}
-                      aria-invalid={Boolean(form.formState.errors.keyPath)}
-                      placeholder="/Users/you/.ssh/id_ed25519"
-                      spellCheck={false}
-                      className="font-mono text-xs"
-                    />
-                    <Button type="button" variant="outline" size="sm" onClick={pickKey}>
-                      <FolderOpenIcon />
-                      Choose…
-                    </Button>
-                  </div>
-                  <FieldMessage message={form.formState.errors.keyPath?.message} />
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="connection-passphrase">Key needs a passphrase</Label>
-                    <p className="text-2xs text-muted-foreground">
-                      The passphrase is stored in the keychain.
-                    </p>
-                  </div>
+                  <Label htmlFor="connection-protocol">Protocol</Label>
                   <Controller
                     control={form.control}
-                    name="passphraseProtected"
+                    name="protocol"
                     render={({ field }) => (
-                      <Switch
-                        id="connection-passphrase"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => changeProtocol(value, field.onChange)}
+                      >
+                        <SelectTrigger id="connection-protocol" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(PROTOCOL_LABELS) as ConnectionProtocol[]).map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {PROTOCOL_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
                   />
                 </div>
-              </div>
-            ) : null}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="connection-secret">
-                {authKind === "key" ? "Passphrase" : "Password"}
-              </Label>
-              <Input
-                id="connection-secret"
-                type="password"
-                {...form.register("secret")}
-                autoComplete="new-password"
-                placeholder={
-                  existingSecret
-                    ? "Saved in keychain — leave blank to keep"
-                    : "Not saved yet — enter to store in keychain"
-                }
-              />
-              <div className="flex items-center justify-between gap-2">
-                <FieldMessage message={form.formState.errors.secret?.message} />
-                {existingSecret ? (
-                  <button
-                    type="button"
-                    onClick={removeSecret}
-                    className="text-2xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
-                  >
-                    Remove saved secret
-                  </button>
-                ) : null}
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-port">Port</Label>
+                  <Input
+                    id="connection-port"
+                    {...form.register("port")}
+                    inputMode="numeric"
+                    aria-invalid={Boolean(form.formState.errors.port)}
+                    className="font-mono"
+                  />
+                  <FieldMessage message={form.formState.errors.port?.message} />
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-host">Host</Label>
+                  <Input
+                    id="connection-host"
+                    {...form.register("host")}
+                    aria-invalid={Boolean(form.formState.errors.host)}
+                    placeholder="ftp.example.com"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <FieldMessage message={form.formState.errors.host?.message} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-username">Username</Label>
+                  <Input
+                    id="connection-username"
+                    {...form.register("username")}
+                    aria-invalid={Boolean(form.formState.errors.username)}
+                    placeholder={protocol === "sftp" ? "ada" : "anonymous"}
+                    autoComplete="username"
+                    spellCheck={false}
+                  />
+                  <FieldMessage message={form.formState.errors.username?.message} />
+                  {protocol !== "sftp" ? (
+                    <p className="text-2xs text-muted-foreground">
+                      Leave blank to connect anonymously. The password is optional.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="connection-path">Start folder</Label>
-                <Input
-                  id="connection-path"
-                  {...form.register("initialPath")}
-                  aria-invalid={Boolean(form.formState.errors.initialPath)}
-                  placeholder="/"
-                  spellCheck={false}
-                  className="font-mono text-xs"
-                />
-                <FieldMessage message={form.formState.errors.initialPath?.message} />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-group">Group (optional)</Label>
-                <Input
-                  id="connection-group"
-                  {...form.register("group")}
-                  aria-invalid={Boolean(form.formState.errors.group)}
-                  placeholder="Work"
-                  autoComplete="off"
-                />
-                <FieldMessage message={form.formState.errors.group?.message} />
-              </div>
-            </div>
-
-            {protocolUsesDataMode(protocol) ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-data-mode">Data channel</Label>
+                <Label htmlFor="connection-auth">Authentication</Label>
                 <Controller
                   control={form.control}
-                  name="ftpDataMode"
+                  name="authKind"
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="connection-data-mode" className="w-full">
+                      <SelectTrigger id="connection-auth" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="passive">Passive (PASV)</SelectItem>
-                        <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
-                        <SelectItem value="active">Active (PORT)</SelectItem>
+                        <SelectItem value="password">
+                          <LockKeyholeIcon />
+                          Password
+                        </SelectItem>
+                        <SelectItem value="key" disabled={protocol !== "sftp"}>
+                          <KeyRoundIcon />
+                          SSH key
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   )}
                 />
-                <p className="text-2xs text-muted-foreground">
-                  Passive works through most firewalls. Active requires the server to reach this
-                  machine.
-                </p>
+                <FieldMessage message={form.formState.errors.authKind?.message} />
               </div>
-            ) : null}
 
-            {protocolIsFtps(protocol) ? (
-              <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                <div className="space-y-0.5">
-                  <p className="text-xs font-medium text-foreground">TLS verification</p>
-                  <p className="text-2xs text-muted-foreground">
-                    The system trust store is used unless you choose a CA or pin a certificate.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="connection-ca-file">Custom CA file (optional)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="connection-ca-file"
-                      {...form.register("tlsCaFile")}
-                      aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
-                      placeholder="/etc/ssl/certs/private-ca.pem"
-                      spellCheck={false}
-                      className="font-mono text-xs"
-                    />
-                    <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
-                      <FolderOpenIcon />
-                      Choose…
-                    </Button>
+              {authKind === "key" ? (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="connection-key">Private key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="connection-key"
+                        {...form.register("keyPath")}
+                        aria-invalid={Boolean(form.formState.errors.keyPath)}
+                        placeholder="/Users/you/.ssh/id_ed25519"
+                        spellCheck={false}
+                        className="font-mono text-xs"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={pickKey}>
+                        <FolderOpenIcon />
+                        Choose…
+                      </Button>
+                    </div>
+                    <FieldMessage message={form.formState.errors.keyPath?.message} />
                   </div>
-                  <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
-                </div>
 
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="connection-passphrase">Key needs a passphrase</Label>
+                      <p className="text-2xs text-muted-foreground">
+                        The passphrase is stored in the keychain.
+                      </p>
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="passphraseProtected"
+                      render={({ field }) => (
+                        <Switch
+                          id="connection-passphrase"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="connection-secret">
+                  {authKind === "key" ? "Passphrase" : "Password"}
+                </Label>
+                <Input
+                  id="connection-secret"
+                  type="password"
+                  {...form.register("secret")}
+                  autoComplete="new-password"
+                  placeholder={
+                    existingSecret
+                      ? "Saved in keychain — leave blank to keep"
+                      : "Not saved yet — enter to store in keychain"
+                  }
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <FieldMessage message={form.formState.errors.secret?.message} />
+                  {existingSecret ? (
+                    <button
+                      type="button"
+                      onClick={removeSecret}
+                      className="text-2xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
+                    >
+                      Remove saved secret
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="connection-pin">Certificate pin (optional)</Label>
+                  <Label htmlFor="connection-path">Start folder</Label>
                   <Input
-                    id="connection-pin"
-                    {...form.register("tlsCertificatePin")}
-                    aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
-                    placeholder="SHA-256 fingerprint"
+                    id="connection-path"
+                    {...form.register("initialPath")}
+                    aria-invalid={Boolean(form.formState.errors.initialPath)}
+                    placeholder="/"
                     spellCheck={false}
                     className="font-mono text-xs"
                   />
-                  <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
-                  <p className="text-2xs text-muted-foreground">
-                    Pinning rejects any server certificate whose SHA-256 fingerprint differs.
-                  </p>
+                  <FieldMessage message={form.formState.errors.initialPath?.message} />
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="connection-allow-invalid">Allow invalid certificates</Label>
-                    <p className="text-2xs text-muted-foreground">
-                      Accepts self-signed or expired certificates. Only use this on a trusted
-                      network.
-                    </p>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-group">Group (optional)</Label>
+                  <Input
+                    id="connection-group"
+                    {...form.register("group")}
+                    aria-invalid={Boolean(form.formState.errors.group)}
+                    placeholder="Work"
+                    autoComplete="off"
+                  />
+                  <FieldMessage message={form.formState.errors.group?.message} />
+                </div>
+              </div>
+
+              {protocolUsesDataMode(protocol) ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-data-mode">Data channel</Label>
                   <Controller
                     control={form.control}
-                    name="tlsAllowInvalid"
+                    name="ftpDataMode"
                     render={({ field }) => (
-                      <Switch
-                        id="connection-allow-invalid"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="connection-data-mode" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="passive">Passive (PASV)</SelectItem>
+                          <SelectItem value="extendedPassive">Extended passive (EPSV)</SelectItem>
+                          <SelectItem value="active">Active (PORT)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     )}
                   />
-                </div>
-
-                {tlsAllowInvalid ? (
-                  <p className="text-2xs font-medium text-destructive" role="alert">
-                    TLS certificate verification is disabled for this connection.
+                  <p className="text-2xs text-muted-foreground">
+                    Passive works through most firewalls. Active requires the server to reach this
+                    machine.
                   </p>
-                ) : null}
-              </div>
-            ) : null}
+                </div>
+              ) : null}
 
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
-              <div className="space-y-0.5">
-                <Label htmlFor="connection-favorite">Pin to favorites</Label>
-                <p className="text-2xs text-muted-foreground">
-                  Favorites stay at the top of the sidebar.
-                </p>
+              {protocolIsFtps(protocol) ? (
+                <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium text-foreground">TLS verification</p>
+                    <p className="text-2xs text-muted-foreground">
+                      The system trust store is used unless you choose a CA or pin a certificate.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="connection-ca-file">Custom CA file (optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="connection-ca-file"
+                        {...form.register("tlsCaFile")}
+                        aria-invalid={Boolean(form.formState.errors.tlsCaFile)}
+                        placeholder="/etc/ssl/certs/private-ca.pem"
+                        spellCheck={false}
+                        className="font-mono text-xs"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={pickCaFile}>
+                        <FolderOpenIcon />
+                        Choose…
+                      </Button>
+                    </div>
+                    <FieldMessage message={form.formState.errors.tlsCaFile?.message} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="connection-pin">Certificate pin (optional)</Label>
+                    <Input
+                      id="connection-pin"
+                      {...form.register("tlsCertificatePin")}
+                      aria-invalid={Boolean(form.formState.errors.tlsCertificatePin)}
+                      placeholder="SHA-256 fingerprint"
+                      spellCheck={false}
+                      className="font-mono text-xs"
+                    />
+                    <FieldMessage message={form.formState.errors.tlsCertificatePin?.message} />
+                    <p className="text-2xs text-muted-foreground">
+                      Pinning rejects any server certificate whose SHA-256 fingerprint differs.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="connection-allow-invalid">Allow invalid certificates</Label>
+                      <p className="text-2xs text-muted-foreground">
+                        Accepts self-signed or expired certificates. Only use this on a trusted
+                        network.
+                      </p>
+                    </div>
+                    <Controller
+                      control={form.control}
+                      name="tlsAllowInvalid"
+                      render={({ field }) => (
+                        <Switch
+                          id="connection-allow-invalid"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  {tlsAllowInvalid ? (
+                    <p className="text-2xs font-medium text-destructive" role="alert">
+                      TLS certificate verification is disabled for this connection.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="connection-favorite">Pin to favorites</Label>
+                  <p className="text-2xs text-muted-foreground">
+                    Favorites stay at the top of the sidebar.
+                  </p>
+                </div>
+                <Controller
+                  control={form.control}
+                  name="favorite"
+                  render={({ field }) => (
+                    <Switch
+                      id="connection-favorite"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
               </div>
-              <Controller
-                control={form.control}
-                name="favorite"
-                render={({ field }) => (
-                  <Switch
-                    id="connection-favorite"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
             </div>
+
+            {formError ? (
+              <p
+                className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                role="alert"
+              >
+                {formError}
+              </p>
+            ) : null}
           </div>
 
-          {formError ? (
-            <p
-              className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              role="alert"
-            >
-              {formError}
-            </p>
-          ) : null}
-
-          <DialogFooter>
+          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-t px-4 py-3">
             <Button
               type="button"
               variant="ghost"
