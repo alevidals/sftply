@@ -229,6 +229,44 @@ Split into three reviewable increments.
 
 ---
 
+## Release scope
+
+The 1.0 milestone is **hardening, not features**. Sync, diff and previews are
+deliberately excluded: they are additive, and shipping them before the test
+matrix runs would mix new failures with baseline ones.
+
+### 1.0 — the contract is stable
+
+- The full Phase 7 checklist: real-server matrix, soak tests, parser fuzzing,
+  dependency audits, secret-leak checks, unsigned-build documentation.
+- No new product surface. Fixes and error-message polish only.
+- Portable builds and installers for macOS, Windows and Linux.
+
+### 1.1 — comparison and one-way sync
+
+Ship only when every point below is true:
+
+1. Directory diff (name, size, mtime) with a virtualized view and explicit
+   "unknown" when the server gives no reliable mtime.
+2. Synchronization **local → remote only**, with a mandatory dry-run: applying is
+   disabled until the plan is visible.
+3. **No delete propagation** in the first release. A mirror that removes remote
+   files is a 1.2 decision, with its own confirmation flow.
+4. Include/exclude globs, conflict policy and a preview of every enqueued
+   transfer through the existing queue.
+5. Comparison is metadata-first. Content hashing is opt-in and bounded, never
+   the default on large trees.
+6. Tests cover classification (new/changed/equal/unknown), planner output and
+   cancellation; integration tests run against the loopback FTP/FTPS/SFTP stack.
+
+### 1.2 — bidirectional sync and previews
+
+- Reverse direction and delete propagation, each behind a separate confirmation.
+- Remote previews for text and images with size caps and no HTML execution.
+- Only after 1.1 has run on real servers without data-loss reports.
+
+---
+
 ## Cross-cutting definition of done
 
 A feature is done only when:
