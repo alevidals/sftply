@@ -6,11 +6,20 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.0] - 2026-11-14
+
 ### Added
 
 - **Preserve permissions on upload** in Settings → Transfers. When enabled and
   the server supports `chmod`, an uploaded file copies the local Unix mode
   instead of keeping the server default. Off by default to avoid widening access.
+
+### Changed
+
+- The delete confirmation shows a **Local** or **Remote** badge next to the title
+  and names the target in the description.
 
 ### Fixed
 
@@ -22,9 +31,10 @@ All notable changes to sftply. The format follows
 - Save buttons flashed a spinner for a few milliseconds, because a settings or
   connection save finishes faster than the frame that shows it. The spinner now
   waits 200 ms before appearing; quick saves keep the label.
-- Renaming from the menu still lost focus to the row. The inline input retries
-  focus for a short window and ignores the transient blur caused by the menu
-  restoring focus, so the rename stays open and selected.
+- Renaming from a menu lost focus to the row, and the input's blur handler
+  treated that as leaving and cancelled the rename. The field retries focus for
+  a short window, ignores the transient blur, and both menus skip their focus
+  restore.
 - The transfer queue re-sorted every row on each progress event. With hundreds
   of files and eight concurrent transfers the window froze and cancelling became
   impossible. Rows now reorder only when they appear or disappear, and the
@@ -33,9 +43,6 @@ All notable changes to sftply. The format follows
   the release profile set `panic = "abort"`. Panics are now logged to the app log
   and turn into a failed row that can be retried.
 - Cancelling a transfer now responds while its connection is still opening.
-- Choosing **Rename** from the row context menu or the pane actions menu left
-  focus on the row. The menus no longer restore focus to their trigger, so the
-  inline input keeps it.
 
 ## [0.3.0] - 2026-11-14
 
@@ -145,7 +152,8 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/alevidals/sftply/releases/tag/v0.4.0
 [0.3.0]: https://github.com/alevidals/sftply/releases/tag/v0.3.0
 [0.2.0]: https://github.com/alevidals/sftply/releases/tag/v0.2.0
 [0.1.0]: https://github.com/alevidals/sftply/releases/tag/v0.1.0
