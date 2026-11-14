@@ -235,7 +235,11 @@ impl FtpRemote {
                 port = profile.port,
                 "FTP connect: timed out during the handshake"
             );
-            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+            AppError::new(
+                ErrorCode::Timeout,
+                "The server did not answer in time. Check the host and firewall, then try again.",
+            )
+            .retryable()
         })??;
 
         let mlsd = feature_present(&features, "MLSD");
@@ -598,7 +602,7 @@ fn map_ftp_error(error: FtpError) -> AppError {
         FtpError::UnexpectedResponse(response) => map_status(response.status, &response.body),
         FtpError::SecureError(detail) => AppError::new(
             ErrorCode::TlsCertificate,
-            "The secure connection could not be verified.",
+            "The secure connection could not be verified. Check the certificate, or configure a CA file for this connection.",
         )
         .with_detail(detail),
         FtpError::BadResponse => {
@@ -621,7 +625,7 @@ fn map_connection_error(error: std::io::Error) -> AppError {
 
     match error.kind() {
         ErrorKind::TimedOut => {
-            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+            AppError::new(ErrorCode::Timeout, "The server did not answer in time. Check the host and firewall, then try again.").retryable()
         }
         ErrorKind::ConnectionRefused => {
             AppError::new(ErrorCode::Network, "The server refused the connection.")

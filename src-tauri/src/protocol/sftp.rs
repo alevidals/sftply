@@ -199,7 +199,11 @@ impl SftpRemote {
         )
         .await
         .map_err(|_| {
-            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+            AppError::new(
+                ErrorCode::Timeout,
+                "The server did not answer in time. Check the host and firewall, then try again.",
+            )
+            .retryable()
         })?
         .map_err(|error| map_connect_error(error, profile))?;
 
@@ -610,9 +614,11 @@ fn map_sftp_error(error: SftpError) -> AppError {
                 protocol_error(code, message, detail)
             }
         }
-        SftpError::Timeout => {
-            AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
-        }
+        SftpError::Timeout => AppError::new(
+            ErrorCode::Timeout,
+            "The server did not answer in time. Check the host and firewall, then try again.",
+        )
+        .retryable(),
         SftpError::IO(detail) => AppError::new(ErrorCode::Network, "The SFTP connection failed.")
             .with_detail(sanitize_detail(&detail))
             .retryable(),

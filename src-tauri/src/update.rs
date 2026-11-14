@@ -47,16 +47,19 @@ pub fn check(current_version: &str) -> Result<UpdateStatus, AppError> {
         .header("Accept", "application/vnd.github+json")
         .call()
         .map_err(|error| {
-            AppError::new(ErrorCode::Network, "Could not reach the release server.")
-                .with_detail(error.to_string())
-                .retryable()
+            AppError::new(
+                ErrorCode::Network,
+                "Could not reach the release server. Check your connection and try again.",
+            )
+            .with_detail(error.to_string())
+            .retryable()
         })?
         .body_mut()
         .read_to_string()
         .map_err(|error| {
             AppError::new(
                 ErrorCode::Network,
-                "The release server sent an unreadable answer.",
+                "The release server sent an unreadable answer. Try again in a moment.",
             )
             .with_detail(error.to_string())
             .retryable()

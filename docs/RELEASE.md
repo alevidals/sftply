@@ -68,7 +68,7 @@ download. Pick either path:
    xattr -dr com.apple.quarantine /Applications/sftply.app
    ```
 
-"The app is damaged and should be moved to the Trash" is the same quarantine
+“The app is damaged and should be moved to the Trash” is the same quarantine
 flag, not a corrupt binary; the `xattr` command fixes it. If the app moved from
 `/Applications` still fails, confirm the binary is executable:
 
@@ -124,7 +124,7 @@ new version. Add it in **Settings → Environments → github-pages → Deployme
 branches and tags → Add a tag rule → `v*`**, or with the API:
 
 ```sh
-gh api -X POST repos/OWNER/REPO/environments/github-pages/deployment-branch-policies \
+gh api -X POST repos/your_owner/your_repo/environments/github-pages/deployment-branch-policies \
   -f name='v*' -f type=tag
 ```
 
@@ -140,7 +140,7 @@ Point the project at the `web/` root directory and use `bun run build` with
 
 sftply is MIT licensed (`LICENSE`). Anyone may use, modify, redistribute and sell
 it, provided the copyright notice and permission notice are kept. That matches
-the intent: free to use, easy to contribute to, no adoption friction.
+the intent: free to use, contributions welcome, no licensing paperwork.
 
 Third-party dependencies keep their own licenses. `cargo deny`/`cargo license`
 would be the next step if the app is ever distributed commercially.

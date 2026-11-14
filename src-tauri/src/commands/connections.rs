@@ -300,7 +300,11 @@ pub async fn connection_test(
     )
     .await
     .map_err(|_| {
-        AppError::new(ErrorCode::Timeout, "The server did not answer in time.").retryable()
+        AppError::new(
+            ErrorCode::Timeout,
+            "The server did not answer in time. Check the host and firewall, then try again.",
+        )
+        .retryable()
     })??;
     let latency_ms = started.elapsed().as_millis() as f64;
 

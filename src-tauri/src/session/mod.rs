@@ -151,7 +151,7 @@ pub fn session_lost() -> AppError {
 }
 
 pub fn timeout_error() -> AppError {
-    AppError::new(ErrorCode::Timeout, "The server took too long to respond.").retryable()
+    AppError::new(ErrorCode::Timeout, "The server took too long to respond. Try again, or raise the operation timeout in Settings.").retryable()
 }
 
 fn cancelled_error() -> AppError {

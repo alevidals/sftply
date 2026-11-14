@@ -1,6 +1,6 @@
-# sftply — Dependency Evaluation
+# sftply: Dependency evaluation
 
-**Status:** Approved; implementation in progress — versions verified 2026-11-05/06 against crates.io / npm. Compile spike for the protocol stack passed 2026-11-07.  
+**Status:** Approved and implemented. Versions verified 2026-11-05/06 against crates.io and npm. Compile spike for the protocol stack passed 2026-11-07.  
 **Policy:** Pin exact versions in `Cargo.toml` / `package.json`, commit both lockfiles, and review upgrades deliberately. Every dependency must earn its place: it is maintained, permissively licensed, cross-platform, and does not require a system binary at runtime.
 
 ---
@@ -21,7 +21,7 @@
 
 ## 2. Networking and protocol libraries
 
-### 2.1 FTP / FTPS — chosen: `suppaftp 12.2.1`
+### 2.1 FTP / FTPS: chosen: `suppaftp 12.2.1`
 
 | Attribute         | Finding                                                                                                                                                                                                   |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,7 +33,7 @@
 | TLS               | Pluggable `AsyncTlsConnector`; rustls and native-tls backends; custom connector supported                                                                                                                 |
 | Listing           | `MLSD` and `LIST` + `NLST`; structured parser                                                                                                                                                             |
 | Transfer control  | `retr_as_stream`, `put_with_stream`, `append_with_stream`, `abort`, `resume_transfer(offset)`, `active_mode`, `passive_mode`                                                                              |
-| Security relevant | `ActivePeerCheck::ControlPeer` by default — prevents the classic FTP bounce/data-redirection problem; configurable for NAT                                                                                |
+| Security relevant | `ActivePeerCheck::ControlPeer` by default; prevents the classic FTP bounce/data-redirection problem; configurable for NAT                                                                                 |
 | Timeouts          | Connect/read/write and data timeouts configurable                                                                                                                                                         |
 | Risks             | Implicit FTPS is behind the `deprecated` Cargo feature (the protocol is deprecated, not the API); LIST output variance across servers; FTPS data-channel TLS session reuse behavior depends on the server |
 
@@ -47,7 +47,7 @@
 | `async-ftp`                    | Thin, sync core, less complete FTPS/listing support     |
 | Custom protocol implementation | Large security-sensitive surface for no product benefit |
 
-### 2.2 SFTP — chosen: `russh 0.65.1` + `russh-sftp 3.0.1`
+### 2.2 SFTP: chosen: `russh 0.65.1` + `russh-sftp 3.0.1`
 
 | Attribute   | Finding                                                                                                                                                                                |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

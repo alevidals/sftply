@@ -1,13 +1,13 @@
-# sftply — Implementation Roadmap
+# sftply: Implementation Roadmap
 
-**Status:** Proposed — no implementation starts until approved.  
+**Status:** Implemented through 0.2.0. Release 1.0 is hardening; 1.1 and 1.2 are planned.
 **Method:** Incremental phases with explicit exit criteria. Each phase ends with a runnable build and a review gate. Later phases are not started while an earlier phase has unresolved reliability or security defects.
 
 Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar commitments. The critical-path risk is protocol/FTPS/SFTP correctness, so Phase 0 exists specifically to retire it before UI work expands.
 
 ---
 
-## Phase 0 — Validation spikes and project hygiene
+## Phase 0: Validation spikes and project hygiene
 
 **Goal:** Retire protocol and toolchain uncertainty. Produce evidence, not assumptions.
 
@@ -33,7 +33,7 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 ---
 
-## Phase 1 — Foundation: shell, design system, typed boundary
+## Phase 1: Foundation: shell, design system, typed boundary
 
 **Goal:** A polished, empty application that already behaves like a serious desktop tool.
 
@@ -61,7 +61,7 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 ---
 
-## Phase 2 — Local filesystem and file browser
+## Phase 2: Local filesystem and file browser
 
 **Goal:** A genuinely usable local file manager before any network is involved.
 
@@ -88,7 +88,7 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 ---
 
-## Phase 3 — Connections: profiles, credentials, FTP/FTPS/SFTP browsing
+## Phase 3: Connections: profiles, credentials, FTP/FTPS/SFTP browsing
 
 **Goal:** Real remote browsing over all three protocol families with strict security.
 
@@ -121,13 +121,13 @@ Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar 
 
 ---
 
-## Phase 4 — Transfers
+## Phase 4: Transfers
 
 **Goal:** Trustworthy upload/download, including large trees, failures, cancellation, and honest progress.
 
 Split into three reviewable increments.
 
-### 4a — Single-file pipeline
+### 4a: Single-file pipeline
 
 - Transfer job/item model, queue, global semaphore (1–8, default 3).
 - Streaming reader/writer handles with explicit `finish()`/`abort()`.
@@ -137,7 +137,7 @@ Split into three reviewable increments.
 - Events, store projection, transfer panel rows, status bar.
 - Unit tests for counting/finalization/conflicts; integration across FTP, FTPS, SFTP.
 
-### 4b — Recursive jobs and queue control
+### 4b: Recursive jobs and queue control
 
 - Recursive upload/download with directory creation, empty directories, symlink policy, cycle guards.
 - Folder jobs with child items and aggregate progress.
@@ -147,7 +147,7 @@ Split into three reviewable increments.
 - Drag-and-drop between panes; external OS drop onto panes.
 - Conflict handling for folder merges; skip/rename semantics.
 
-### 4c — Hardening
+### 4c: Hardening
 
 - Server matrix tests: resume, aborts, broken connections, DNS failure, auth expiry, disk-full, permission changes.
 - Large files (>4 GiB), non-ASCII names, long paths, many small files.
@@ -166,7 +166,7 @@ Split into three reviewable increments.
 
 ---
 
-## Phase 5 — Desktop polish and productivity
+## Phase 5: Desktop polish and productivity
 
 **Goal:** Make the product feel like Linear/VS Code rather than a utility window.
 
@@ -195,7 +195,7 @@ Split into three reviewable increments.
 
 ---
 
-## Phase 6 — Advanced features
+## Phase 6: Advanced features
 
 **Order is deliberate; each item ships only after the previous is stable.**
 
@@ -216,7 +216,7 @@ Split into three reviewable increments.
 
 ---
 
-## Phase 7 — Release hardening
+## Phase 7: Release hardening
 
 | Area             | Deliverable                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -235,14 +235,14 @@ The 1.0 milestone is **hardening, not features**. Sync, diff and previews are
 deliberately excluded: they are additive, and shipping them before the test
 matrix runs would mix new failures with baseline ones.
 
-### 1.0 — the contract is stable
+### 1.0: the contract is stable
 
 - The full Phase 7 checklist: real-server matrix, soak tests, parser fuzzing,
   dependency audits, secret-leak checks, unsigned-build documentation.
 - No new product surface. Fixes and error-message polish only.
 - Portable builds and installers for macOS, Windows and Linux.
 
-### 1.1 — comparison and one-way sync
+### 1.1: comparison and one-way sync
 
 Ship only when every point below is true:
 
@@ -259,7 +259,7 @@ Ship only when every point below is true:
 6. Tests cover classification (new/changed/equal/unknown), planner output and
    cancellation; integration tests run against the loopback FTP/FTPS/SFTP stack.
 
-### 1.2 — bidirectional sync and previews
+### 1.2: bidirectional sync and previews
 
 - Reverse direction and delete propagation, each behind a separate confirmation.
 - Remote previews for text and images with size caps and no HTML execution.
@@ -285,7 +285,7 @@ A feature is done only when:
 
 ## Sequencing and review gates
 
-```
+```text
 Phase 0  spikes ──► gate: protocol feasibility + security policy proven
 Phase 1  shell ───► gate: design system + typed IPC + config foundation
 Phase 2  local ───► gate: local manager usable, fast, tested
@@ -302,4 +302,4 @@ Phase 7  release ─► gate: security + platform packaging sign-off
 
 ## First implementation slice after approval
 
-If approved, the first concrete work is Phase 0, followed immediately by the Phase 1 shell. The first visible milestone will be a polished, themeable application shell with a real local file browser — no fake remote data, no transfer placeholders presented as working features.
+If approved, the first concrete work is Phase 0, followed immediately by the Phase 1 shell. The first visible milestone was a polished, themeable application shell with a real local file browser: no fake remote data, no transfer placeholders presented as working features.

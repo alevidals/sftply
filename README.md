@@ -25,15 +25,13 @@
   <a href="docs/ARCHITECTURE.md">Architecture</a>
 </p>
 
----
-
 ## Download
 
-| Platform                      | Portable (no install)                                                          | Installer           |
-| ----------------------------- | ------------------------------------------------------------------------------ | ------------------- |
-| macOS (Intel + Apple Silicon) | `*_macos-universal_portable.zip` — unzip and drag `sftply.app` to Applications | `.dmg`              |
-| Windows 10/11 x64             | `*_windows-x64_portable.zip` — unzip and run `sftply.exe`                      | `-setup.exe` (NSIS) |
-| Linux x64                     | `.AppImage` — `chmod +x` and run                                               | `.deb`              |
+| Platform                      | Portable (no install)                                                         | Installer           |
+| ----------------------------- | ----------------------------------------------------------------------------- | ------------------- |
+| macOS (Intel + Apple Silicon) | `*_macos-universal_portable.zip`: unzip and drag `sftply.app` to Applications | `.dmg`              |
+| Windows 10/11 x64             | `*_windows-x64_portable.zip`: unzip and run `sftply.exe`                      | `-setup.exe` (NSIS) |
+| Linux x64                     | `.AppImage`: `chmod +x` and run                                               | `.deb`              |
 
 Every release ships `SHA256SUMS`.
 
@@ -58,20 +56,20 @@ Every release ships `SHA256SUMS`.
 Pre-1.0. The app is usable and tested, but behaviour can still change before
 1.0. The roadmap is explicit about what comes next:
 
-- **1.0** — hardening: real-server matrix, soak tests, parser fuzzing, audits.
-- **1.1** — directory diff and one-way sync with a mandatory dry-run.
-- **1.2** — bidirectional sync and remote previews.
+- **1.0**: hardening: real-server matrix, soak tests, parser fuzzing, audits.
+- **1.1**: directory diff and one-way sync with a mandatory dry-run.
+- **1.2**: bidirectional sync and remote previews.
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md) — connections, host keys, transfers, troubleshooting
-- [Release and packaging](docs/RELEASE.md) — CI, artifacts, unsigned builds
-- [Changelog](CHANGELOG.md) — what changed in each release
-- [Architecture](docs/ARCHITECTURE.md) — layers, IPC contract, security model
-- [Roadmap](docs/ROADMAP.md) — milestones and exit criteria
-- [Dependency evaluation](docs/DEPENDENCIES.md) — protocol libraries and rejected alternatives
-- [Progress log](docs/PROGRESS.md) — what is built, verified and next
-- [ADRs](docs/adr/README.md) — architectural decision records
+- [User guide](docs/USER_GUIDE.md): connections, host keys, transfers, troubleshooting
+- [Release and packaging](docs/RELEASE.md): CI, artifacts, unsigned builds
+- [Changelog](CHANGELOG.md): what changed in each release
+- [Architecture](docs/ARCHITECTURE.md): layers, IPC contract, security model
+- [Roadmap](docs/ROADMAP.md): milestones and exit criteria
+- [Dependency evaluation](docs/DEPENDENCIES.md): protocol libraries and rejected alternatives
+- [Progress log](docs/PROGRESS.md): what is built, verified and next
+- [ADRs](docs/adr/README.md): architectural decision records
 
 ## Development
 

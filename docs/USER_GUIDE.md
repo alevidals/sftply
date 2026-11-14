@@ -79,7 +79,7 @@ Only disable certificate validation for a host you control and understand.
 - Arrow keys move, `Shift` extends, `Space` toggles, `Enter` opens, `F2` renames.
 - `⌘A` selects everything, `Esc` clears the selection.
 - Drag a selection between panes to transfer; the destination refreshes when the
-  transfer lands.
+  transfer completes.
 
 The transfers and activity panel toggles with `⌘J` (`Ctrl+J`).
 
@@ -161,10 +161,10 @@ by a firewall. sftply falls back to `LIST` when `MLSD` is unavailable.
 the CA bundle in the connection; for self-signed certificates, pin the SHA-256
 fingerprint instead of disabling validation.
 
-**"Permission denied" when writing.** SFTP returns the server's error for the
+**“Permission denied” when writing.** SFTP returns the server's error for the
 remote path; check the parent directory mode with the permissions dialog. FTP
 servers often report a generic 550 for both missing folders and denied writes.
 
-**Timeouts during transfers.** Very large files over slow links can exceed the
-server's idle timeout. Retry resumes on servers that support it; otherwise the
+**Timeouts during transfers.** Files larger than a few GB over slow links can exceed
+the server's idle timeout. Retry resumes on servers that support it; otherwise the
 transfer restarts.

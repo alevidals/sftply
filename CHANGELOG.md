@@ -31,6 +31,11 @@ Nothing yet.
 
 ### Changed
 
+- Documentation and interface copy follow the writing guidelines: sentence-case
+  headings, no em dashes, ellipses instead of three dots, and units with a
+  space. Error messages now say what to try next.
+- The landing page no longer claims that packages are signed; it says they ship
+  with a checksum.
 - The project is MIT licensed.
 - `shadcn` moved to `devDependencies`; it is only needed to build the CSS.
 - The production bundle is split into long-lived vendor chunks instead of a

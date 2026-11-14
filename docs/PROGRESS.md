@@ -1598,3 +1598,50 @@ which is only correct for local client connections. See
 - Soak tests: a >4 GiB round trip, thousands of small files, and a reconnect
   mid-transfer against the loopback stack.
 - CSP and Tauri capability review, then the real-machine matrix.
+
+### 2026-11-14 — Session 52: guideline audits
+
+**React best practices**
+
+- Deferred the folder filter so typing stays responsive, reset pane state during
+  render instead of in an effect, hoisted the file grid template, memoized the
+  shell sections, replaced the per-row session scan with a map and parallelized
+  two invalidations.
+- Fixed a real bug found during the pass: `useDebouncedSettingsPatch` dropped the
+  pending patch on unmount. It now flushes, with two tests.
+- Documented the rules that do not apply (Next.js, RSC, SSR) and the changes
+  rejected on purpose: `keepPreviousData` would let actions target the previous
+  folder, lazy dialogs cost the open animation for ~20 kB, and memoizing rows
+  buys nothing while their props change on every delta.
+
+**Web interface guidelines**
+
+- Added a skip link, `role="main"` on the pane group and a hidden `h1`; matched
+  `theme-color` to the surface, contained overscroll in overlays, balanced
+  headings, enabled `touch-action: manipulation` and replaced `...` in the
+  palette and spinner.
+- Verified every icon-only button has `aria-label`, every control has a label,
+  every `outline-none` has a focus-visible replacement, and lists over 50 rows
+  are virtualized.
+- Left the vendored shadcn `transition-all` alone and kept sentence case in
+  buttons (VS Code and Linear do the same).
+
+**Writing guidelines**
+
+- Removed the em dashes from README, roadmap, architecture and dependency docs;
+  headings use colons (`Phase 4: Transfers`). Dropped the horizontal rules in the
+  architecture doc, tagged the ASCII diagrams as `text`, and replaced the
+  `OWNER/REPO` placeholder with `your_owner/your_repo`.
+- Rewrote stale status lines: the roadmap and architecture docs still said
+  "Proposed, no implementation starts until approved", and the architecture
+  described the repository as an untouched starter template.
+- Fixed prose: "the transfer lands" became "completes", straight quotes became
+  curly, "Very large files" became "Files larger than a few GB", and the landing
+  page stopped implying that packages are signed.
+- Kept 80-column prose wrapping in docs (repo convention) and left
+  `docs/PROGRESS.md` and the ADRs untouched as historical records.
+
+**Verified**
+
+- Rust: 132 passed, 19 ignored, clippy clean. Frontend: 245 tests. `astro check`
+  and the production build green. CI and the site deploy run after the push.

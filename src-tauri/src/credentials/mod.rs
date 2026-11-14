@@ -96,7 +96,7 @@ fn keychain_error(error: keyring::Error) -> AppError {
     // Keyring errors describe the store, never the secret itself.
     AppError::new(
         ErrorCode::KeychainUnavailable,
-        "The system keychain could not be accessed.",
+        "The system keychain could not be accessed. Unlock the keychain and try again.",
     )
     .with_detail(error.to_string())
     .retryable()

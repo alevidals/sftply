@@ -66,7 +66,7 @@ describe("UpdateCheck", () => {
   it("surfaces a network failure without leaving the button disabled", async () => {
     checkUpdate.mockRejectedValue({
       code: "NETWORK",
-      message: "Could not reach the release server.",
+      message: "Could not reach the release server. Check your connection and try again.",
       detail: null,
       retryable: true,
     })
@@ -76,7 +76,9 @@ describe("UpdateCheck", () => {
 
     expect(error).toHaveBeenCalledWith(
       "Could not check for updates",
-      expect.objectContaining({ description: "Could not reach the release server." }),
+      expect.objectContaining({
+        description: "Could not reach the release server. Check your connection and try again.",
+      }),
     )
     expect(screen.getByRole("button", { name: "Check for updates" })).toBeEnabled()
   })
