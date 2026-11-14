@@ -14,6 +14,9 @@ services:
       FTP_PASSWORD: sftply-dev
       FTP_HOME: /home/ftpuser
       FTP_PASSIVE: 30000:30009
+      # Override with FTP_PUBLIC_IP=<host LAN address> to connect from another
+      # device: PASV replies must point at the Mac, not at the client's loopback.
+      FTP_PUBLIC_IP: ${FTP_PUBLIC_IP:-127.0.0.1}
     volumes:
       - ftp-data:/home/ftpuser
 

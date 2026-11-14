@@ -558,11 +558,13 @@ pub fn transfer_cancel(state: State<'_, AppState>, id: String) -> bool {
 
 #[tauri::command]
 #[specta::specta]
-pub fn transfer_retry(
+pub async fn transfer_retry(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
 ) -> Result<TransferItem, AppError> {
+    // Async so Tauri runs it inside the runtime: the retry spawns the transfer
+    // task, and `tokio::spawn` panics on a thread without a runtime context.
     state.transfers.retry(&app, &id)
 }
 

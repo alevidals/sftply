@@ -31,8 +31,9 @@ const CHUNK_SIZE: usize = 64 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 /// A transfer can legitimately run for hours, so this bounds idle time between
 /// chunks and metadata replies, not total duration. A dead socket must not
-/// leave a row "running" and a concurrency slot occupied forever.
-const TRANSFER_IO_TIMEOUT: Duration = Duration::from_secs(60);
+/// leave a row "running" and a concurrency slot occupied forever. 30 seconds is
+/// generous for a 64 KiB chunk and detects a vanished server faster.
+const TRANSFER_IO_TIMEOUT: Duration = Duration::from_secs(30);
 /// Closing a connection is best effort; a dead control channel must not delay
 /// the final status.
 const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -61,6 +62,21 @@ pub struct TransferJob {
 /// In-memory transfer queue. Completed rows stay until the user clears them,
 /// and their jobs are kept so a failed or cancelled transfer can be retried
 /// without asking the frontend to rebuild it.
+/// A panicking task can poison a lock. Recover the data instead of panicking
+/// every later task that touches the same queue.
+fn read_lock<T>(lock: &RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn write_lock<T>(lock: &RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
+    lock.write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn mutex_lock<T>(lock: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub struct TransferManager {
     items: RwLock<HashMap<String, TransferItem>>,
     tasks: Mutex<HashMap<String, CancellationToken>>,
@@ -97,7 +113,7 @@ impl BandwidthLimiter {
             .store(kbps_to_bytes_per_sec(limit_kbps), Ordering::Relaxed);
         // Forget any reservation made under the previous rate, so a faster
         // limit takes effect immediately instead of after a stale long wait.
-        *self.next_slot.lock().expect("bandwidth lock poisoned") = Instant::now();
+        *mutex_lock(&self.next_slot) = Instant::now();
     }
 
     /// Reserve capacity for `bytes` and return how long the caller must wait
@@ -110,7 +126,7 @@ impl BandwidthLimiter {
         }
 
         let duration = Duration::from_secs_f64(bytes as f64 / rate as f64);
-        let mut next = self.next_slot.lock().expect("bandwidth lock poisoned");
+        let mut next = mutex_lock(&self.next_slot);
         let now = Instant::now();
         let start = (*next).max(now);
         *next = start + duration;
@@ -249,10 +265,7 @@ impl TransferManager {
     }
 
     pub fn remember_job(&self, job: TransferJob) {
-        self.jobs
-            .lock()
-            .expect("transfer job lock poisoned")
-            .insert(job.item.id.clone(), job);
+        mutex_lock(&self.jobs).insert(job.item.id.clone(), job);
     }
 
     pub fn is_paused(&self) -> bool {
@@ -277,7 +290,7 @@ impl TransferManager {
         id: &str,
     ) -> Result<TransferItem, AppError> {
         let (status, job) = {
-            let items = self.items.read().expect("transfer lock poisoned");
+            let items = read_lock(&self.items);
             let item = items.get(id).ok_or_else(|| {
                 AppError::new(
                     ErrorCode::NotFound,
@@ -285,18 +298,12 @@ impl TransferManager {
                 )
             })?;
             let status = item.status;
-            let job = self
-                .jobs
-                .lock()
-                .expect("transfer job lock poisoned")
-                .get(id)
-                .cloned()
-                .ok_or_else(|| {
-                    AppError::new(
-                        ErrorCode::NotFound,
-                        "That transfer can no longer be retried. Queue it again.",
-                    )
-                })?;
+            let job = mutex_lock(&self.jobs).get(id).cloned().ok_or_else(|| {
+                AppError::new(
+                    ErrorCode::NotFound,
+                    "That transfer can no longer be retried. Queue it again.",
+                )
+            })?;
             (status, job)
         };
 
@@ -314,29 +321,17 @@ impl TransferManager {
     }
 
     pub fn insert(&self, item: TransferItem) {
-        self.items
-            .write()
-            .expect("transfer lock poisoned")
-            .insert(item.id.clone(), item);
+        write_lock(&self.items).insert(item.id.clone(), item);
     }
 
     pub fn list(&self) -> Vec<TransferItem> {
-        let mut items: Vec<_> = self
-            .items
-            .read()
-            .expect("transfer lock poisoned")
-            .values()
-            .cloned()
-            .collect();
+        let mut items: Vec<_> = read_lock(&self.items).values().cloned().collect();
         items.sort_by(|left, right| right.started_at.total_cmp(&left.started_at));
         items
     }
 
     pub fn publish<R: Runtime>(&self, app: &AppHandle<R>, item: &TransferItem) {
-        self.items
-            .write()
-            .expect("transfer lock poisoned")
-            .insert(item.id.clone(), item.clone());
+        write_lock(&self.items).insert(item.id.clone(), item.clone());
         // `record` ignores queued and running rows, so only the terminal state
         // reaches the persisted history.
         self.history.record(item);
@@ -344,7 +339,7 @@ impl TransferManager {
     }
 
     pub fn cancel(&self, id: &str) -> bool {
-        let tasks = self.tasks.lock().expect("transfer task lock poisoned");
+        let tasks = mutex_lock(&self.tasks);
         match tasks.get(id) {
             Some(token) => {
                 token.cancel();
@@ -356,7 +351,7 @@ impl TransferManager {
 
     pub fn clear_finished<R: Runtime>(&self, app: &AppHandle<R>) -> Vec<String> {
         let removed: Vec<String> = {
-            let mut items = self.items.write().expect("transfer lock poisoned");
+            let mut items = write_lock(&self.items);
             let finished: Vec<String> = items
                 .iter()
                 .filter(|(_, item)| {
@@ -375,7 +370,7 @@ impl TransferManager {
             finished
         };
         if !removed.is_empty() {
-            let mut jobs = self.jobs.lock().expect("transfer job lock poisoned");
+            let mut jobs = mutex_lock(&self.jobs);
             for id in &removed {
                 jobs.remove(id);
             }
@@ -385,17 +380,11 @@ impl TransferManager {
     }
 
     fn register_task(&self, id: &str, token: CancellationToken) {
-        self.tasks
-            .lock()
-            .expect("transfer task lock poisoned")
-            .insert(id.to_string(), token);
+        mutex_lock(&self.tasks).insert(id.to_string(), token);
     }
 
     fn finish_task(&self, id: &str) {
-        self.tasks
-            .lock()
-            .expect("transfer task lock poisoned")
-            .remove(id);
+        mutex_lock(&self.tasks).remove(id);
     }
 }
 
@@ -421,7 +410,9 @@ pub fn spawn_transfer<R: Runtime>(
     manager.register_task(&job.item.id, token.clone());
     let item = job.item.clone();
 
-    tokio::spawn(async move {
+    // Tauri's global runtime, so this also works when the caller is a
+    // synchronous command running outside a Tokio context.
+    tauri::async_runtime::spawn(async move {
         let mut paused = manager.paused.subscribe();
         let slot = match manager.acquire_slot(&token, &mut paused).await {
             Ok(slot) => slot,
@@ -1334,7 +1325,7 @@ mod tests {
         }
 
         async fn stat(&mut self, path: &str) -> Result<FsEntry, AppError> {
-            let state = self.state.lock().expect("mock lock poisoned");
+            let state = mutex_lock(&self.state);
             state
                 .files
                 .get(path)
@@ -1349,7 +1340,7 @@ mod tests {
         async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError> {
             let parent = remote_parent(path)?.unwrap_or_else(|| "/".to_string());
             let target = join_remote(&parent, new_name)?;
-            let mut state = self.state.lock().expect("mock lock poisoned");
+            let mut state = mutex_lock(&self.state);
             state.calls.push(format!("rename {path} -> {target}"));
             if target == path {
                 return state
@@ -1385,7 +1376,7 @@ mod tests {
         }
 
         async fn delete(&mut self, path: &str, _recursive: bool) -> Result<(), AppError> {
-            let mut state = self.state.lock().expect("mock lock poisoned");
+            let mut state = mutex_lock(&self.state);
             state.calls.push(format!("delete {path}"));
             state
                 .files
@@ -1461,10 +1452,7 @@ mod tests {
         }
 
         async fn chmod(&mut self, path: &str, mode: u32) -> Result<(), AppError> {
-            self.calls
-                .lock()
-                .expect("probe lock poisoned")
-                .push((path.to_string(), mode));
+            mutex_lock(&self.calls).push((path.to_string(), mode));
             Ok(())
         }
 
@@ -1538,6 +1526,21 @@ mod tests {
         apply_local_mode(&mut client, source.to_str().unwrap(), "/dir/public.txt").await;
 
         assert!(calls.lock().unwrap().is_empty());
+    }
+
+    /// The retry command used to run on a thread without a Tokio runtime and
+    /// `tokio::spawn` panicked there, closing the app. Spawning must work from
+    /// a plain thread through Tauri's global runtime.
+    #[test]
+    fn spawning_from_a_plain_thread_works() {
+        let (ready, wait) = std::sync::mpsc::channel();
+        tauri::async_runtime::spawn(async move {
+            let _ = ready.send(());
+        });
+        assert!(
+            wait.recv_timeout(Duration::from_secs(5)).is_ok(),
+            "the task never ran"
+        );
     }
 
     #[tokio::test]
@@ -1788,7 +1791,7 @@ mod tests {
     impl FileReader for ScriptedReader {
         async fn read(&mut self, buf: &mut [u8]) -> Result<usize, AppError> {
             let (delay, fail_after) = {
-                let state = self.state.lock().expect("script lock poisoned");
+                let state = mutex_lock(&self.state);
                 (state.chunk_delay, state.read_fail_after)
             };
             if let Some(delay) = delay {
@@ -1827,11 +1830,7 @@ mod tests {
     #[async_trait]
     impl FileWriter for ScriptedWriter {
         async fn write(&mut self, buf: &[u8]) -> Result<usize, AppError> {
-            let fail_after = self
-                .state
-                .lock()
-                .expect("script lock poisoned")
-                .write_fail_after;
+            let fail_after = mutex_lock(&self.state).write_fail_after;
             if let Some(limit) = fail_after {
                 if self.buffer.len() >= limit {
                     return Err(AppError::new(ErrorCode::Network, "The connection dropped."));
@@ -1848,9 +1847,7 @@ mod tests {
         }
 
         async fn finish(mut self: Box<Self>) -> Result<(), AppError> {
-            self.state
-                .lock()
-                .expect("script lock poisoned")
+            mutex_lock(&self.state)
                 .files
                 .insert(self.path.clone(), std::mem::take(&mut self.buffer));
             Ok(())
@@ -1868,7 +1865,7 @@ mod tests {
         }
 
         async fn stat(&mut self, path: &str) -> Result<FsEntry, AppError> {
-            let state = self.state.lock().expect("script lock poisoned");
+            let state = mutex_lock(&self.state);
             if let Some(data) = state.files.get(path) {
                 return Ok(mock_entry(path, data.len()));
             }
@@ -1886,11 +1883,7 @@ mod tests {
 
         async fn mkdir(&mut self, parent: &str, name: &str) -> Result<FsEntry, AppError> {
             let path = join_remote(parent, name)?;
-            self.state
-                .lock()
-                .expect("script lock poisoned")
-                .dirs
-                .insert(path.clone());
+            mutex_lock(&self.state).dirs.insert(path.clone());
             Ok(FsEntry {
                 kind: EntryKind::Directory,
                 ..mock_entry(&path, 0)
@@ -1900,7 +1893,7 @@ mod tests {
         async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError> {
             let parent = remote_parent(path)?.unwrap_or_else(|| "/".to_string());
             let target = join_remote(&parent, new_name)?;
-            let mut state = self.state.lock().expect("script lock poisoned");
+            let mut state = mutex_lock(&self.state);
             if state.deny_rename {
                 return Err(AppError::new(
                     ErrorCode::PermissionDenied,
@@ -1919,7 +1912,7 @@ mod tests {
         }
 
         async fn delete(&mut self, path: &str, recursive: bool) -> Result<(), AppError> {
-            let mut state = self.state.lock().expect("script lock poisoned");
+            let mut state = mutex_lock(&self.state);
             if state.files.remove(path).is_some() {
                 return Ok(());
             }
@@ -1946,10 +1939,7 @@ mod tests {
             path: &str,
             offset: u64,
         ) -> Result<Box<dyn FileReader>, AppError> {
-            let data = self
-                .state
-                .lock()
-                .expect("script lock poisoned")
+            let data = mutex_lock(&self.state)
                 .files
                 .get(path)
                 .cloned()
@@ -1968,12 +1958,7 @@ mod tests {
             path: &str,
             _offset: u64,
         ) -> Result<Box<dyn FileWriter>, AppError> {
-            if let Some(code) = self
-                .state
-                .lock()
-                .expect("script lock poisoned")
-                .open_write_error
-            {
+            if let Some(code) = mutex_lock(&self.state).open_write_error {
                 return Err(AppError::new(code, "The server rejected the sign-in."));
             }
             Ok(Box::new(ScriptedWriter {

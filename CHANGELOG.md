@@ -8,6 +8,17 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [0.4.1] - 2026-11-14
+
+### Fixed
+
+- Retrying a transfer closed the app. `transfer_retry` was a synchronous
+  command, so Tauri ran it outside the Tokio runtime and `tokio::spawn` panicked
+  across the command boundary. The command is async now and the transfer task
+  starts on Tauri's global runtime, which works from any thread.
+- The transfer idle timeout is 30 seconds instead of 60, so a server that
+  disappears mid-transfer is reported sooner.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added
@@ -152,7 +163,8 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/alevidals/sftply/releases/tag/v0.4.1
 [0.4.0]: https://github.com/alevidals/sftply/releases/tag/v0.4.0
 [0.3.0]: https://github.com/alevidals/sftply/releases/tag/v0.3.0
 [0.2.0]: https://github.com/alevidals/sftply/releases/tag/v0.2.0
