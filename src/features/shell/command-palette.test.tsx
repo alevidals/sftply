@@ -65,6 +65,7 @@ const settings: AppSettings_Serialize = {
   dateFormat: "friendly",
   showHiddenFiles: false,
   confirmDelete: true,
+  preservePermissions: false,
   transferConcurrency: 3,
   bandwidthLimitKbps: null,
   connectTimeoutSeconds: 30,

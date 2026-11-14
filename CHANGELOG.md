@@ -6,7 +6,17 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Preserve permissions on upload** in Settings → Transfers. When enabled and
+  the server supports `chmod`, an uploaded file copies the local Unix mode
+  instead of keeping the server default. Off by default to avoid widening access.
+
+### Fixed
+
+- Choosing **Rename** from the row context menu or the pane actions menu left
+  focus on the row. The menus no longer restore focus to their trigger, so the
+  inline input keeps it.
 
 ## [0.3.0] - 2026-11-14
 

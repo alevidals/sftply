@@ -119,6 +119,9 @@ export function FileTable({
     timer: null,
   })
   const [contextIndex, setContextIndex] = useState<number | null>(null)
+  // Radix restores focus to the trigger when a menu closes. A rename opens an
+  // input in the same commit, so restoring focus would steal it back to the row.
+  const renameFocusPending = useRef(false)
   const [dropPath, setDropPath] = useState<string | null>(null)
   const { sizeFormat, dateFormat } = useFormatPreferences()
   // One string for every row: building it inside the row map costs a string
@@ -421,7 +424,14 @@ export function FileTable({
         </div>
       </ContextMenuTrigger>
 
-      <ContextMenuContent className="w-56">
+      <ContextMenuContent
+        className="w-56"
+        onCloseAutoFocus={(event) => {
+          if (!renameFocusPending.current) return
+          renameFocusPending.current = false
+          event.preventDefault()
+        }}
+      >
         <ContextMenuLabel className="max-w-52 truncate font-normal">
           {contextIndex === null ? "Actions" : (entries[contextIndex]?.name ?? "Actions")}
         </ContextMenuLabel>
@@ -453,7 +463,13 @@ export function FileTable({
           Copy path
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem disabled={actionDisabled("rename")} onSelect={() => onAction("rename")}>
+        <ContextMenuItem
+          disabled={actionDisabled("rename")}
+          onSelect={() => {
+            renameFocusPending.current = true
+            onAction("rename")
+          }}
+        >
           <PencilIcon />
           Rename
           <ContextMenuShortcut>F2</ContextMenuShortcut>

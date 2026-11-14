@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event;
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
@@ -512,7 +512,21 @@ async fn run_job<R: Runtime>(
                 AppError::internal("The upload target is not remote.", "missing remote target")
             })?;
             let mut client = connect_remote(access).await?;
-            let result = upload(app, manager, item, &mut client, job.policy, token).await;
+            let preserve_permissions = app
+                .state::<crate::app_state::AppState>()
+                .settings
+                .get()
+                .preserve_permissions;
+            let result = upload(
+                app,
+                manager,
+                item,
+                &mut client,
+                job.policy,
+                token,
+                preserve_permissions,
+            )
+            .await;
             let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
             result
         }
@@ -623,6 +637,7 @@ async fn upload<R: Runtime>(
     client: &mut Box<dyn RemoteFs>,
     policy: ConflictPolicy,
     token: &CancellationToken,
+    preserve_permissions: bool,
 ) -> Result<(), AppError> {
     let target = match policy {
         ConflictPolicy::Overwrite => item.target_path.clone(),
@@ -682,8 +697,37 @@ async fn upload<R: Runtime>(
             }
         }
     }
+
+    if preserve_permissions {
+        apply_local_mode(client, &item.source_path, &target).await;
+    }
     Ok(())
 }
+
+/// Copy the Unix permission bits of the local source to the uploaded file.
+/// Best effort: the content is already in place, so a rejected mode only logs.
+#[cfg(unix)]
+async fn apply_local_mode(client: &mut Box<dyn RemoteFs>, source: &str, target: &str) {
+    use std::os::unix::fs::PermissionsExt;
+
+    if !client.capabilities().chmod {
+        return;
+    }
+    let Ok(metadata) = tokio::fs::metadata(source).await else {
+        return;
+    };
+    let mode = metadata.permissions().mode() & 0o777;
+    match tokio::time::timeout(Duration::from_secs(5), client.chmod(target, mode)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            tracing::warn!(%error, %target, "could not preserve the local file mode")
+        }
+        Err(_) => tracing::warn!(%target, "preserving the file mode timed out"),
+    }
+}
+
+#[cfg(not(unix))]
+async fn apply_local_mode(_client: &mut Box<dyn RemoteFs>, _source: &str, _target: &str) {}
 
 /// Best-effort removal of a partial or backup upload. A failure here must not
 /// replace the original transfer error.
@@ -1343,6 +1387,123 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    struct ChmodProbe {
+        calls: Arc<Mutex<Vec<(String, u32)>>>,
+        can_chmod: bool,
+    }
+
+    #[cfg(unix)]
+    #[async_trait::async_trait]
+    impl RemoteFs for ChmodProbe {
+        async fn list(&mut self, _path: &str) -> Result<crate::domain::fs::Listing, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn stat(&mut self, _path: &str) -> Result<crate::domain::fs::FsEntry, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn mkdir(
+            &mut self,
+            _parent: &str,
+            _name: &str,
+        ) -> Result<crate::domain::fs::FsEntry, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn rename(
+            &mut self,
+            _path: &str,
+            _new_name: &str,
+        ) -> Result<crate::domain::fs::FsEntry, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn delete(&mut self, _path: &str, _recursive: bool) -> Result<(), AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn chmod(&mut self, path: &str, mode: u32) -> Result<(), AppError> {
+            self.calls
+                .lock()
+                .expect("probe lock poisoned")
+                .push((path.to_string(), mode));
+            Ok(())
+        }
+
+        async fn open_read(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn FileReader>, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn open_write(
+            &mut self,
+            _path: &str,
+            _offset: u64,
+        ) -> Result<Box<dyn FileWriter>, AppError> {
+            unimplemented!("not used")
+        }
+
+        async fn disconnect(&mut self) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn capabilities(&self) -> crate::domain::fs::FsCapabilities {
+            let mut capabilities = crate::domain::fs::FsCapabilities::local();
+            capabilities.chmod = self.can_chmod;
+            capabilities
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn upload_mode_matches_the_local_file_when_enabled() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("deploy.sh");
+        tokio::fs::write(&source, b"#!/bin/sh\n").await.unwrap();
+        std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let mut client: Box<dyn RemoteFs> = Box::new(ChmodProbe {
+            calls: calls.clone(),
+            can_chmod: true,
+        });
+
+        apply_local_mode(&mut client, source.to_str().unwrap(), "/dir/deploy.sh").await;
+
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec![("/dir/deploy.sh".to_string(), 0o600)]
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn mode_is_not_applied_when_the_server_lacks_chmod() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("public.txt");
+        tokio::fs::write(&source, b"hello").await.unwrap();
+        std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let mut client: Box<dyn RemoteFs> = Box::new(ChmodProbe {
+            calls: calls.clone(),
+            can_chmod: false,
+        });
+
+        apply_local_mode(&mut client, source.to_str().unwrap(), "/dir/public.txt").await;
+
+        assert!(calls.lock().unwrap().is_empty());
+    }
+
     #[tokio::test]
     async fn atomic_upload_replaces_the_previous_file() {
         let temp = "/dir/.target.txt.sftply-part-abc";
@@ -1965,6 +2126,7 @@ mod tests {
             &mut client,
             ConflictPolicy::Overwrite,
             &token,
+            false,
         )
         .await
         .expect_err("the broken stream must fail");
@@ -2007,6 +2169,7 @@ mod tests {
             &mut client,
             ConflictPolicy::Overwrite,
             &token,
+            false,
         )
         .await
         .expect_err("a denied rename must fail the upload");
@@ -2049,6 +2212,7 @@ mod tests {
             &mut client,
             ConflictPolicy::Overwrite,
             &token,
+            false,
         )
         .await
         .expect_err("an expired session must fail the upload");
@@ -2090,6 +2254,7 @@ mod tests {
             &mut client,
             ConflictPolicy::Overwrite,
             &token,
+            false,
         )
         .await
         .expect("the upload must complete");

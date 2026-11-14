@@ -40,6 +40,7 @@ const settingsSchema = z.object({
   dateFormat: z.enum(["friendly", "iso"]),
   showHiddenFiles: z.boolean(),
   confirmDelete: z.boolean(),
+  preservePermissions: z.boolean(),
   transferConcurrency: z.number().int().min(1).max(8),
   bandwidthLimit: z.string().refine(
     (value) => {
@@ -65,6 +66,7 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
     dateFormat: settings.dateFormat,
     showHiddenFiles: settings.showHiddenFiles,
     confirmDelete: settings.confirmDelete,
+    preservePermissions: settings.preservePermissions,
     transferConcurrency: settings.transferConcurrency,
     bandwidthLimit: settings.bandwidthLimitKbps?.toString() ?? "",
     connectTimeoutSeconds: settings.connectTimeoutSeconds,
@@ -337,6 +339,18 @@ export function SettingsDialog() {
                     <SettingRow
                       title="Confirm destructive actions"
                       description="Ask before deleting files or overwriting an existing item."
+                    >
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </SettingRow>
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="preservePermissions"
+                  render={({ field }) => (
+                    <SettingRow
+                      title="Preserve permissions on upload"
+                      description="Apply the local Unix mode to uploaded files when the server allows chmod. Off by default: a permissive local mode can widen access on a strict server."
                     >
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </SettingRow>

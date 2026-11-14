@@ -1046,6 +1046,8 @@ function ActionsMenu({
   onAction: (action: FileAction) => void
 }) {
   const TransferIcon = transferDirection === "upload" ? ArrowUpFromLineIcon : ArrowDownToLineIcon
+  // Keep focus on the inline rename input instead of the toolbar trigger.
+  const renameFocusPending = useRef(false)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1053,7 +1055,15 @@ function ActionsMenu({
           <MoreHorizontalIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent
+        align="end"
+        className="w-56"
+        onCloseAutoFocus={(event) => {
+          if (!renameFocusPending.current) return
+          renameFocusPending.current = false
+          event.preventDefault()
+        }}
+      >
         <DropdownMenuLabel>File actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={!canOpen} onSelect={() => onAction("open")}>
@@ -1069,7 +1079,13 @@ function ActionsMenu({
           <TransferIcon />
           {transferLabel}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!canRename} onSelect={() => onAction("rename")}>
+        <DropdownMenuItem
+          disabled={!canRename}
+          onSelect={() => {
+            renameFocusPending.current = true
+            onAction("rename")
+          }}
+        >
           <PencilIcon />
           Rename
           <DropdownMenuShortcut>F2</DropdownMenuShortcut>

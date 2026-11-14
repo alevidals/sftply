@@ -65,6 +65,10 @@ pub struct AppSettings {
     pub date_format: DateFormat,
     pub show_hidden_files: bool,
     pub confirm_delete: bool,
+    /// Copy the local permission bits to an uploaded file when the server can
+    /// change modes. Off by default: a permissive local mode could widen access
+    /// on a server that would otherwise create stricter files.
+    pub preserve_permissions: bool,
     pub transfer_concurrency: u8,
     pub bandwidth_limit_kbps: Option<u32>,
     /// Maximum time to establish a connection, in seconds.
@@ -92,6 +96,7 @@ impl Default for AppSettings {
             date_format: DateFormat::Friendly,
             show_hidden_files: false,
             confirm_delete: true,
+            preserve_permissions: false,
             transfer_concurrency: 3,
             bandwidth_limit_kbps: None,
             connect_timeout_seconds: 30,

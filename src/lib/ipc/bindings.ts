@@ -154,6 +154,12 @@ export type AppSettings_Deserialize = {
 	dateFormat?: DateFormat,
 	showHiddenFiles?: boolean,
 	confirmDelete?: boolean,
+	/**
+	 *  Copy the local permission bits to an uploaded file when the server can
+	 *  change modes. Off by default: a permissive local mode could widen access
+	 *  on a server that would otherwise create stricter files.
+	 */
+	preservePermissions?: boolean,
 	transferConcurrency?: number,
 	bandwidthLimitKbps?: number | null,
 	/**  Maximum time to establish a connection, in seconds. */
@@ -180,6 +186,12 @@ export type AppSettings_Serialize = {
 	dateFormat: DateFormat,
 	showHiddenFiles: boolean,
 	confirmDelete: boolean,
+	/**
+	 *  Copy the local permission bits to an uploaded file when the server can
+	 *  change modes. Off by default: a permissive local mode could widen access
+	 *  on a server that would otherwise create stricter files.
+	 */
+	preservePermissions: boolean,
 	transferConcurrency: number,
 	bandwidthLimitKbps: number | null,
 	/**  Maximum time to establish a connection, in seconds. */

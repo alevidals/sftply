@@ -101,6 +101,12 @@ Conflicts are preflighted before a transfer starts: overwrite, skip, rename or
 apply the same choice to everything. History keeps metadata only, never
 credentials, and is bounded.
 
+**Permissions on upload.** A new remote file takes the mode the server assigns,
+usually `0644`. Enable **Settings → Transfers → Preserve permissions on upload**
+to copy the local Unix mode after the upload, when the server supports `chmod`.
+The option is off by default: a permissive local mode can widen access on a
+server that would otherwise create stricter files.
+
 ## Editing remote text files
 
 Open a remote text file with **Edit text…** or by double-clicking it. Limits and

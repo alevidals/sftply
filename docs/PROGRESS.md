@@ -1663,3 +1663,29 @@ which is only correct for local client connections. See
 **Next**
 
 - Measure the cache size after the next CI run; expected around 2 GB.
+
+### 2026-11-14 — Session 54: rename focus and upload permissions
+
+**Fixed**
+
+- **Rename from a menu did not focus the input.** Radix restores focus to the
+  menu trigger when a menu closes, which happened after the inline input
+  mounted. Both the row context menu and the pane actions menu now skip that
+  restore when the chosen action is rename, so the input keeps focus.
+
+**Added**
+
+- **Preserve permissions on upload** (`preservePermissions`, off by default).
+  After a successful upload, `apply_local_mode` copies the local Unix mode with
+  `chmod` when the setting is on and the server advertises the capability. It is
+  best effort: the content is already in place, so a rejected mode only logs a
+  warning. Default off because a permissive local mode can widen access on a
+  server with a strict umask.
+- Tests: the mode is applied when enabled (`0o600` in, `0o600` out) and skipped
+  when the server lacks `chmod`.
+- Settings schema, bindings, form schema and the Transfers tab carry the new
+  field; the user guide explains the default.
+
+**Next**
+
+- Manual check on macOS/Windows/Linux, then retag 0.3.x if the behaviour holds.
