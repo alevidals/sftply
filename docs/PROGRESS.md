@@ -1559,3 +1559,42 @@ which is only correct for local client connections. See
 **Next**
 
 - Real-machine check of the new interactions, then tag 0.2.0.
+
+### 2026-11-14 — Session 51: 0.2.0 shipped and hardening started
+
+**Released**
+
+- Bumped to 0.2.0 in the three version files plus the changelog, tagged
+  `v0.2.0`, and published the release after the workflow built all three
+  platforms: macOS universal 12m, Linux 5m, Windows 6m43s. The draft notes
+  describe the new features, the fixes and the unsigned-build caveats.
+- The `github-pages` environment only allowed the `main` branch, so the
+  release-triggered site rebuild failed at the deploy step with
+  `Tag "v0.2.0" is not allowed to deploy to github-pages`. Added a `v*` tag rule
+  to the environment, reran the job and confirmed the site now lists the 0.2.0
+  assets. The rule and the exact error are documented in `docs/RELEASE.md`.
+- The repository now has a description, a homepage and twelve topics
+  (`ftp`, `ftps`, `sftp`, `tauri`, `rust`, …), and the README opens with the app
+  icon, release/CI/website/license/platform badges and a highlights table.
+
+**Hardening**
+
+- Extracted `parse_listing` from `FtpRemote::entries` so raw `MLSD`/`LIST` lines
+  can be tested without a connection.
+- Added `proptest` properties: arbitrary listing lines never panic, never create
+  more entries than lines, and never place an entry outside the folder (no `..`,
+  no separators in names, no NUL, 255-character cap). Path normalization is
+  property-tested the same way: absolute, no dot segments, never above root.
+- Added a static guard test that fails if any `tracing::`, `println!` or
+  `eprintln!` line mentions a password, passphrase or secret.
+
+**Verified**
+
+- Rust: 131 passed, 19 ignored, clippy clean with the new `proptest` dev
+  dependency. Frontend: 243 tests. CI green on all six jobs before the release.
+
+**Next**
+
+- Soak tests: a >4 GiB round trip, thousands of small files, and a reconnect
+  mid-transfer against the loopback stack.
+- CSP and Tauri capability review, then the real-machine matrix.

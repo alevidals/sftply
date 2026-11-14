@@ -118,6 +118,19 @@ deployment → Source: GitHub Actions**. For a custom domain, add it there (or a
 `web/public/CNAME` file) and create a repository variable `SITE_BASE=/` plus
 `SITE_URL=https://your-domain`.
 
+The `github-pages` environment must also allow **tag** deployments, not only
+`main`: publishing a release triggers a rebuild so the download links move to the
+new version. Add it in **Settings → Environments → github-pages → Deployment
+branches and tags → Add a tag rule → `v*`**, or with the API:
+
+```sh
+gh api -X POST repos/OWNER/REPO/environments/github-pages/deployment-branch-policies \
+  -f name='v*' -f type=tag
+```
+
+Without that rule the build succeeds and the deploy fails with
+`Tag "vX.Y.Z" is not allowed to deploy to github-pages`.
+
 ### Vercel or Cloudflare Pages
 
 Point the project at the `web/` root directory and use `bun run build` with
