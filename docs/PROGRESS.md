@@ -1370,10 +1370,14 @@ which is only correct for local client connections. See
   zip, the Windows portable zip, the NSIS setup and `SHA256SUMS`.
 - Downloaded the Windows portable zip from the release and checked it against
   `SHA256SUMS`: OK.
-- The release stays a draft until it is reviewed and published manually.
+- The release was published on 2026-11-14 11:50 UTC. The unauthenticated GitHub
+  API then returned `draft=false`, seven assets, and a `200` on a download
+  request, so the artifacts are publicly reachable.
 
 **Next**
 
-- Publish the draft after the real-machine QA pass.
+- Run the published portable builds on real machines (the QA checklist in
+  `docs/RELEASE.md`). Re-uploading assets later requires a new version or
+  `gh release upload`.
 - Decide whether `v0.1.0` should be marked as a prerelease while the product is
   still pre-1.0 in behaviour.
