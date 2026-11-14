@@ -984,6 +984,13 @@ mod integration {
 
     const PASSWORD: &str = "sftply-test";
 
+    /// Folder names must be unique across concurrently running tests. A
+    /// millisecond stamp collides when several protocols start together, and a
+    /// shared name makes one test delete another test's folder.
+    fn unique_token() -> String {
+        uuid::Uuid::new_v4().simple().to_string()
+    }
+
     fn assert_streaming_payload(received: &[u8], expected: &[u8]) {
         assert_eq!(
             received.len(),
@@ -1076,7 +1083,7 @@ mod integration {
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_millis();
-        let folder = format!("it-{stamp}");
+        let folder = format!("it-{stamp}-{}", unique_token());
         let path = format!("/{folder}");
 
         let created = remote.mkdir("/", &folder).await.expect("mkdir");
@@ -1115,7 +1122,7 @@ mod integration {
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_millis();
-        let folder = format!("stream-{stamp}");
+        let folder = format!("stream-{stamp}-{}", unique_token());
         let folder_path = format!("/{folder}");
         remote.mkdir("/", &folder).await.expect("mkdir");
 
@@ -1196,7 +1203,7 @@ mod integration {
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_millis();
-        let folder = format!("tree-{stamp}");
+        let folder = format!("tree-{stamp}-{}", unique_token());
         let nested = format!("/{folder}/photos/2024");
 
         crate::transfer::ensure_remote_dir(&mut remote, &nested)
@@ -1339,7 +1346,7 @@ mod integration {
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_millis();
-        let folder = format!("atomic-{stamp}");
+        let folder = format!("atomic-{stamp}-{}", unique_token());
         let folder_path = format!("/{folder}");
         client.mkdir("/", &folder).await.expect("mkdir");
 
