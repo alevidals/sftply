@@ -1,0 +1,51 @@
+---
+import { REPO_URL } from "../lib/releases"
+
+const notes = [
+  {
+    title: "macOS: first launch",
+    body: "The build is ad-hoc signed, not notarized. Right-click the app → Open → Open, or clear the quarantine flag:",
+    command: "xattr -dr com.apple.quarantine /Applications/sftply.app",
+  },
+  {
+    title: "Windows: WebView2",
+    body: "The portable .exe uses the WebView2 runtime that ships with Windows 10 (1803+) and 11. The setup installs it when missing.",
+    command: "winget install Microsoft.EdgeWebView2Runtime",
+  },
+  {
+    title: "Linux: FUSE",
+    body: "AppImages need FUSE 2, and WebKitGTK 4.1 comes from your distribution. Without FUSE, extract and run:",
+    command: "chmod +x sftply-*.AppImage && ./sftply-*.AppImage",
+  },
+]
+---
+
+<section class="section" id="notes">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Before you start</p>
+      <h2>Notes for the first launch</h2>
+      <p class="lead">
+        Nothing needs an account, a licence key or a network round trip. These are the platform
+        quirks worth knowing.
+      </p>
+    </div>
+
+    <div class="notes">
+      {
+        notes.map((note) => (
+          <article class="note">
+            <h3>{note.title}</h3>
+            <p>{note.body}</p>
+            <pre><code>{note.command}</code></pre>
+          </article>
+        ))
+      }
+    </div>
+
+    <p class="checksum-note">
+      <span>Full details and signing steps live in the repository.</span>
+      <a href={`${REPO_URL}/blob/main/docs/RELEASE.md`}>Release and packaging</a>
+    </p>
+  </div>
+</section>

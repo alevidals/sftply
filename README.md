@@ -2,6 +2,8 @@
 
 A modern, keyboard-first desktop client for FTP, FTPS and SFTP. Built with Tauri 2, React, TypeScript and Rust.
 
+Website: <https://alevidals.github.io/sftply/>
+
 > **Status: pre-1.0.** `v0.1.0` is published as portable builds and installers for macOS, Windows and Linux. The source is usable and tested, but the product is still under active development; expect breaking behaviour changes before 1.0.
 
 ## Download
@@ -56,6 +58,13 @@ Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies.
 bun install
 bun run tauri dev      # desktop app with hot reload
 bun run check          # typecheck, Biome, Vitest and production build
+```
+
+The landing page lives in `web/` and is its own Bun project:
+
+```bash
+bun run web:dev        # Astro dev server
+bun run web:build      # static output in web/dist
 ```
 
 Rust gates run from `src-tauri`:

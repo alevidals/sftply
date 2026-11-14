@@ -1,0 +1,115 @@
+---
+import "../styles/global.css"
+import mark from "../assets/mark.svg?url"
+import Brand from "../components/Brand.astro"
+import Icon from "../components/Icon.astro"
+import { RELEASES_URL, REPO_URL } from "../lib/releases"
+
+interface Props {
+  title: string
+  description: string
+}
+
+const { title, description } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://alevidals.github.io").href
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={mark} type="image/svg+xml" />
+    <meta name="theme-color" content="#16181f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="sftply" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="generator" content={Astro.generator} />
+    <script is:inline>
+      // Resolve the theme before first paint so the page never flashes.
+      (() => {
+        const root = document.documentElement;
+        let stored = null;
+        try {
+          stored = localStorage.getItem("sftply-site-theme");
+        } catch {
+          stored = null;
+        }
+        const system = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        root.dataset.theme = stored === "light" || stored === "dark" ? stored : system;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" id="site-header">
+      <div class="container">
+        <Brand />
+        <nav class="site-nav" aria-label="Main">
+          <a class="nav-link" href="#features">Features</a>
+          <a class="nav-link" href="#download">Download</a>
+          <a class="nav-link" href="#notes">Install notes</a>
+          <a class="nav-cta" href={REPO_URL}>
+            GitHub
+            <Icon name="arrow-up-right" size={14} />
+          </a>
+          <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle color theme">
+            <span class="icon-moon"><Icon name="moon" size={16} /></span>
+            <span class="icon-sun"><Icon name="sun" size={16} /></span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <Brand />
+        <ul class="footer-links">
+          <li><a href={REPO_URL}>Source</a></li>
+          <li><a href={RELEASES_URL}>All releases</a></li>
+          <li><a href={`${REPO_URL}/tree/main/docs`}>Docs</a></li>
+          <li><a href={`${REPO_URL}/blob/main/docs/RELEASE.md`}>Packaging</a></li>
+        </ul>
+        <p class="footer-note">
+          Built with Tauri 2, React and Rust · License not yet decided · © {new Date().getFullYear()} sftply
+        </p>
+      </div>
+    </footer>
+
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        const toggle = document.getElementById("theme-toggle");
+        const header = document.getElementById("site-header");
+
+        toggle?.addEventListener("click", () => {
+          const next = root.dataset.theme === "light" ? "dark" : "light";
+          root.dataset.theme = next;
+          try {
+            localStorage.setItem("sftply-site-theme", next);
+          } catch {
+            /* storage disabled: the toggle still works for this page view */
+          }
+        });
+
+        const onScroll = () => {
+          header?.toggleAttribute("data-scrolled", window.scrollY > 8);
+        };
+        onScroll();
+        addEventListener("scroll", onScroll, { passive: true });
+      })();
+    </script>
+  </body>
+</html>

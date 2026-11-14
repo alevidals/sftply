@@ -22,7 +22,10 @@
     "dev:ftp:down": "docker compose -f docker/dev-ftp/docker-compose.yml down",
     "dev:ftp:logs": "docker compose -f docker/dev-ftp/docker-compose.yml logs -f ftp",
     "check": "bun run typecheck && bun run lint && bun run test && bun run build",
-    "version:check": "bun scripts/check-versions.ts"
+    "version:check": "bun scripts/check-versions.ts",
+    "web:dev": "cd web && bun run dev",
+    "web:build": "cd web && bun run build",
+    "web:check": "cd web && bun run check"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

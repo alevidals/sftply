@@ -13,7 +13,8 @@
       "!**/coverage",
       "!**/src-tauri/target",
       "!**/src-tauri/gen",
-      "!**/src/lib/ipc/bindings.ts"
+      "!**/src/lib/ipc/bindings.ts",
+      "!web/**/*.astro"
     ]
   },
   "formatter": {
@@ -96,6 +97,16 @@
     },
     {
       "includes": ["src/styles/globals.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["web/src/styles/global.css"],
       "linter": {
         "rules": {
           "complexity": {

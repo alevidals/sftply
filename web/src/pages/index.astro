@@ -1,0 +1,29 @@
+---
+import Downloads from "../components/Downloads.astro"
+import Features from "../components/Features.astro"
+import Hero from "../components/Hero.astro"
+import Notes from "../components/Notes.astro"
+import Principles from "../components/Principles.astro"
+import Base from "../layouts/Base.astro"
+import { loadRelease } from "../lib/releases"
+
+const release = await loadRelease()
+
+console.info(
+  release.live
+    ? `[site] using release v${release.version} with ${release.assets.length} assets`
+    : `[site] offline build, linking to the latest release page for v${release.version}`,
+)
+
+const title = "sftply — FTP, FTPS and SFTP, without the friction"
+const description =
+  "A dual-pane FTP, FTPS and SFTP client for macOS, Windows and Linux. Native Rust networking, keychain credentials and a transfer queue that only promises what the protocol can deliver."
+---
+
+<Base title={title} description={description}>
+  <Hero version={release.version} />
+  <Features />
+  <Principles />
+  <Downloads release={release} />
+  <Notes />
+</Base>

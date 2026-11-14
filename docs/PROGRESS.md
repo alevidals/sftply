@@ -1381,3 +1381,43 @@ which is only correct for local client connections. See
   `gh release upload`.
 - Decide whether `v0.1.0` should be marked as a prerelease while the product is
   still pre-1.0 in behaviour.
+
+### 2026-11-14 — Session 47: landing page
+
+**Changed**
+
+- Added `web/`, a standalone Astro 7 site with its own `bun.lock`, outside the Bun
+  workspace so desktop installs, tests and `tauri build` never touch it. Plain
+  CSS with the app's OKLCH palette, Inter and JetBrains Mono bundled locally.
+- Content is limited to shipped behaviour: dual-pane browsing, FTP/FTPS/SFTP,
+  capability-aware transfers, keychain credentials, remote text editing and
+  themes. There are no screenshots or fabricated UI strings.
+- The newest published release is fetched from the GitHub API at build time and
+  every download link points at that exact version, with byte sizes.
+  `GITHUB_TOKEN` avoids the anonymous rate limit; without a token or network the
+  page falls back to `/releases/latest`.
+- The download card that matches the visitor's OS is highlighted; the page stays
+  fully usable without JavaScript and defaults to dark.
+- `.github/workflows/web.yml` builds on `web/**` changes and deploys to GitHub
+  Pages with `actions/deploy-pages`; the desktop workflows ignore `web/` and
+  vice versa.
+- `SITE_URL`/`SITE_BASE` keep the build portable to a custom domain, Vercel or
+  Cloudflare Pages. Documented in `docs/RELEASE.md`.
+- Biome excludes `.astro` files: it parses the frontmatter but not the template,
+  so every import and constant looks unused and the suggested "fix" deletes
+  working code.
+
+**Verified**
+
+- `astro check` reports 0 errors and the production build resolves v0.1.0 with
+  seven assets.
+- Headless screenshots of the full page in dark and light at 1440 px and in dark
+  at 390 px: single column on mobile, no overflow, both themes legible.
+- `bun run lint` and the root `bun run check` stay green.
+
+**Next**
+
+- Enable Pages (Settings → Pages → Source: GitHub Actions) and confirm the first
+  deploy.
+- Add a signed Developer ID before pointing a custom domain at the site, and
+  decide the license the footer currently calls out as undecided.

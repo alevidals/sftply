@@ -87,6 +87,42 @@ Install FUSE 2 (`libfuse2` on Debian/Ubuntu, `fuse2` on Fedora) or run the image
 with `--appimage-extract-and-run`. WebKitGTK 4.1 must be installed by the
 distribution; a missing `libwebkit2gtk-4.1.so.0` is the usual cause.
 
+## Landing page
+
+`web/` holds a static Astro site that links to the newest release. It is a
+separate Bun project (its own `bun.lock`), outside the workspace, so desktop
+builds never install it and `tauri build` never sees it.
+
+```sh
+bun run web:dev      # local dev server
+bun run web:check    # astro check
+bun run web:build    # static output in web/dist
+```
+
+The newest published release is resolved at build time. Set `GITHUB_TOKEN` to
+avoid the anonymous API rate limit; without it the page still builds and links to
+the `/releases/latest` redirect.
+
+`SITE_URL` and `SITE_BASE` make the same build deployable anywhere:
+
+| Host                                    | `SITE_URL`                    | `SITE_BASE` |
+| --------------------------------------- | ----------------------------- | ----------- |
+| GitHub Pages project site (default)     | `https://alevidals.github.io` | `/sftply`   |
+| Custom domain, Vercel, Cloudflare Pages | `https://sftply.app`          | `/`         |
+
+### GitHub Pages
+
+`.github/workflows/web.yml` builds on changes under `web/` and deploys with
+`actions/deploy-pages`. One-time setup: **Settings → Pages → Build and
+deployment → Source: GitHub Actions**. For a custom domain, add it there (or a
+`web/public/CNAME` file) and create a repository variable `SITE_BASE=/` plus
+`SITE_URL=https://your-domain`.
+
+### Vercel or Cloudflare Pages
+
+Point the project at the `web/` root directory and use `bun run build` with
+`web/dist` as the output. Set `SITE_BASE=/` and `SITE_URL` to the final domain.
+
 ## Licensing
 
 The repository and the published binaries currently have no license file. Public

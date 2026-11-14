@@ -1,0 +1,105 @@
+---
+import { findAsset, formatBytes, LATEST_RELEASE_URL, type ReleaseInfo } from "../lib/releases"
+import Icon from "./Icon.astro"
+
+interface Props {
+  release: ReleaseInfo
+}
+
+const { release } = Astro.props
+
+const platforms = [
+  {
+    id: "macos",
+    name: "macOS",
+    badge: "Universal",
+    blurb: "Apple Silicon and Intel in one bundle. Unzip and drag sftply.app to Applications.",
+    portable: { label: "Portable .app", suffix: "_macos-universal_portable.zip" },
+    installer: { label: "Disk image", suffix: ".dmg" },
+  },
+  {
+    id: "windows",
+    name: "Windows",
+    badge: "x64",
+    blurb: "Windows 10 and 11. Unzip and run the .exe, or use the setup wizard.",
+    portable: { label: "Portable .exe", suffix: "_windows-x64_portable.zip" },
+    installer: { label: "Setup", suffix: "-setup.exe" },
+  },
+  {
+    id: "linux",
+    name: "Linux",
+    badge: "x64",
+    blurb: "Make the AppImage executable and run it, or install the Debian package.",
+    portable: { label: "AppImage", suffix: ".AppImage" },
+    installer: { label: "Debian package", suffix: ".deb" },
+  },
+]
+
+function link(suffix: string) {
+  const asset = findAsset(release, suffix)
+  return {
+    href: asset?.url ?? LATEST_RELEASE_URL,
+    size: asset ? formatBytes(asset.bytes) : "",
+  }
+}
+
+const sums = findAsset(release, "SHA256SUMS")
+---
+
+<section class="section" id="download">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Download · v{release.version}</p>
+      <h2>Take the build that fits</h2>
+      <p class="lead">
+        Portable archives need no installer and leave nothing behind. Packages are signed and
+        checksummed the moment they are published.
+      </p>
+    </div>
+
+    <div class="download-grid">
+      {
+        platforms.map((platform) => {
+          const portable = link(platform.portable.suffix);
+          const installer = link(platform.installer.suffix);
+          return (
+            <article class="download" data-platform={platform.id}>
+              <div class="download-head">
+                <h3>{platform.name}</h3>
+                <span class="badge badge-default">{platform.badge}</span>
+                <span class="badge badge-you">Your system</span>
+              </div>
+              <p>{platform.blurb}</p>
+              <a class="download-primary" href={portable.href}>
+                <span>{platform.portable.label}</span>
+                <span class="size">{portable.size}</span>
+              </a>
+              <a class="download-secondary" href={installer.href}>
+                {platform.installer.label}
+                {installer.size ? ` · ${installer.size}` : ""}
+                <Icon name="arrow-up-right" size={13} />
+              </a>
+            </article>
+          );
+        })
+      }
+    </div>
+
+    <p class="checksum-note">
+      <span>Every release ships SHA256SUMS.</span>
+      <a href={sums?.url ?? release.url}>Download checksums</a>
+      <a href={release.url}>All files for v{release.version}</a>
+    </p>
+  </div>
+</section>
+
+<script is:inline>
+  // Highlight the card that matches the visitor's OS. Presentation only: every
+  // card stays a normal link if the detection is wrong or unavailable.
+  (() => {
+    const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
+    const id = /mac/i.test(ua) ? "macos" : /win/i.test(ua) ? "windows" : /linux/i.test(ua) ? "linux" : "";
+    if (!id) return;
+    document.querySelector(`[data-platform="${id}"]`)?.setAttribute("data-detected", "");
+  })();
+</script>

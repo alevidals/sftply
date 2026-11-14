@@ -1,0 +1,61 @@
+---
+import mark from "../assets/mark.svg?url"
+import Icon from "./Icon.astro"
+
+interface Props {
+  version: string
+}
+
+const { version } = Astro.props
+---
+
+<section class="hero">
+  <div class="container">
+    <img class="hero-mark" src={mark} alt="sftply icon" width="84" height="84" />
+
+    <p class="eyebrow">Desktop FTP, FTPS and SFTP client</p>
+
+    <h1>FTP, FTPS and SFTP, without the <em>friction</em>.</h1>
+
+    <p class="hero-sub">
+      A dual-pane client for macOS, Windows and Linux with native Rust networking, keychain
+      credentials, and a transfer queue that only promises what the protocol can actually deliver.
+    </p>
+
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#download">
+        <Icon name="download" size={17} />
+        Download for desktop
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/alevidals/sftply">
+        View on GitHub
+        <Icon name="arrow-up-right" size={15} />
+      </a>
+    </div>
+
+    <p class="hero-meta">
+      v{version} · macOS universal · Windows x64 · Linux x64 · portable builds included
+    </p>
+  </div>
+</section>
+
+<div class="facts">
+  <dl class="container">
+    <div>
+      <dt>Protocols</dt>
+      <dd>FTP · FTPS · SFTP</dd>
+    </div>
+    <div>
+      <dt>Networking</dt>
+      <dd>Native Rust</dd>
+    </div>
+    <div>
+      <dt>Credentials</dt>
+      <dd>OS keychain</dd>
+    </div>
+    <div>
+      <dt>Builds</dt>
+      <dd>Portable, no install</dd>
+    </div>
+  </dl>
+</div>
