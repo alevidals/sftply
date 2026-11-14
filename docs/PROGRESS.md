@@ -1338,13 +1338,17 @@ which is only correct for local client connections. See
 - `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`.
 - `bun run bindings` regenerates `src/lib/ipc/bindings.ts` byte for byte,
   `bun run version:check` and `bun run check` (227 tests in 34 files).
-- First expanded CI run: frontend, Linux Rust, Ubuntu and macOS checks, and the
-  Docker protocol suite passed. Windows failed on the unused import above.
-- First release dispatch: Linux built the AppImage and `.deb` in 11m33s. macOS and
-  Windows failed on the two issues above.
+- CI run `43588938081` is green on all six jobs: frontend, Linux Rust, the
+  Ubuntu/macOS/Windows check matrix and the Docker protocol suite.
+- Manual release dispatch `43588974864` is green: macOS universal 10m13s,
+  Linux 5m54s, Windows 6m34s. The artifacts were downloaded and inspected:
+  - `sftply_0.1.0_macos-universal_portable.zip` → `sftply.app` whose binary is a
+    `x86_64 arm64` fat Mach-O, ad-hoc signed with the hardened runtime.
+  - `sftply_0.1.0_windows-x64_portable.zip` → a single 12 MB `sftply.exe`.
+  - `sftply_0.1.0_linux-x64.AppImage` → static-pie x86-64 ELF.
+  - Plus `.dmg`, `.deb` and the NSIS `-setup.exe`.
 
 **Next**
 
-- Rerun CI and a manual release dispatch; both must be green before tagging.
-- Then tag `v0.1.0` to validate the draft release, the portable archives and
-  `SHA256SUMS`.
+- Tag `v0.1.0` to validate the draft release, `SHA256SUMS` and the download page.
+- Run the portable builds on real machines (the QA checklist in `docs/RELEASE.md`).
