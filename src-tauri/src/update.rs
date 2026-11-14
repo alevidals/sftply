@@ -184,4 +184,14 @@ mod tests {
         let garbage = parse_release("not json", "0.1.0");
         assert_eq!(garbage.unwrap_err().code, ErrorCode::Internal);
     }
+
+    /// Opt-in network check: `cargo test update::tests::live -- --ignored`.
+    /// Proves the TLS stack, the URL and the response shape still line up.
+    #[test]
+    #[ignore = "network: talks to api.github.com"]
+    fn live_check_reaches_github() {
+        let status = check(env!("CARGO_PKG_VERSION")).expect("update check should succeed");
+        assert!(!status.latest_version.is_empty());
+        assert!(status.release_url.starts_with("https://github.com/"));
+    }
 }

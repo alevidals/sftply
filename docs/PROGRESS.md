@@ -1499,8 +1499,9 @@ which is only correct for local client connections. See
 **Verified**
 
 - `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
-  (122 passed, 18 ignored) including bundle round-trip, secret-free assertions,
-  schema limits and version comparison.
+  (122 passed, 19 ignored) including bundle round-trip, secret-free assertions,
+  schema limits, version comparison and an opt-in live check
+  against the real GitHub API.
 - `bun run typecheck`, `bun run lint`, 235 frontend tests in 36 files, production
   build without size warnings.
 
