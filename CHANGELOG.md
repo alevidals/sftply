@@ -6,6 +6,10 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.4] - 2026-11-15
+
 ### Fixed
 
 - Cancelling an upload while the server was unreachable still took up to ten
@@ -13,6 +17,9 @@ All notable changes to sftply. The format follows
   and another 5 s for a graceful disconnect. A cancelled transfer now gets a
   1.5 s cleanup window and skips the disconnect handshake, so the row reports
   **Cancelled** immediately.
+- The automatic reconnect after a successful transfer waits for the transfer's
+  socket to close, retries once when the server is still settling, and logs a
+  warning at info level when it gives up instead of failing silently.
 
 ## [0.4.3] - 2026-11-14
 
@@ -206,7 +213,8 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.3...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/alevidals/sftply/releases/tag/v0.4.4
 [0.4.3]: https://github.com/alevidals/sftply/releases/tag/v0.4.3
 [0.4.2]: https://github.com/alevidals/sftply/releases/tag/v0.4.2
 [0.4.1]: https://github.com/alevidals/sftply/releases/tag/v0.4.1

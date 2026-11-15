@@ -234,8 +234,26 @@ pub(crate) async fn reconnect_lost_for_connection<R: tauri::Runtime>(
         if session.is_usable() {
             continue;
         }
-        if let Err(error) = reconnect_session(app, state, session).await {
-            tracing::debug!(%error, "automatic reconnect after a transfer failed");
+        // Give the transfer's own socket a moment to close, so the server does
+        // not see two connections from this machine at once.
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        match reconnect_session(app, state, session.clone()).await {
+            Ok(_) => {}
+            Err(error)
+                if matches!(
+                    error.code,
+                    crate::error::ErrorCode::Network | crate::error::ErrorCode::Timeout
+                ) =>
+            {
+                // A server that just came back may still be settling.
+                tokio::time::sleep(std::time::Duration::from_millis(1_500)).await;
+                if let Err(second) = reconnect_session(app, state, session).await {
+                    tracing::warn!(%second, "automatic reconnect after a transfer failed");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "automatic reconnect after a transfer failed")
+            }
         }
     }
 }
