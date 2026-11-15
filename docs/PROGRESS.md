@@ -1829,3 +1829,19 @@ which is only correct for local client connections. See
   the socket to close on drop. Real failures keep the 5 s window so cleanup has
   a chance to finish.
 - Unit test for `cleanup_grace` and `is_cancelled`.
+
+### 2026-11-15 — Session 62: reconnect at connect time and long names
+
+**Fixed**
+
+- The reconnect after a retry waited for the transfer to complete. A successful
+  authentication already proves the server is reachable, so `run_job` now calls
+  `reconnect_browsing_session` right after `connect_remote`, before the first
+  byte. The completion call stays as a fallback.
+- Long file names widened the delete confirmation and the text editor header:
+  the titles and the header rows now use `min-w-0` plus `truncate`, with the full
+  name in a tooltip.
+
+**Verified**
+
+- Rust 135 tests and clippy; frontend 245 tests; typecheck, lint and build.

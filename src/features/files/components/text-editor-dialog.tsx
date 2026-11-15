@@ -145,9 +145,14 @@ export function TextEditorDialog({
         <DialogHeader>
           <DialogTitle className="flex min-w-0 items-center gap-2">
             <FileTextIcon className="size-4 shrink-0 text-primary" />
-            <span className="truncate">{title}</span>
+            <span className="min-w-0 flex-1 truncate" title={title}>
+              {title}
+            </span>
           </DialogTitle>
-          <DialogDescription className="truncate font-mono text-2xs">
+          <DialogDescription
+            className="min-w-0 truncate font-mono text-2xs"
+            title={path ?? undefined}
+          >
             {path ?? "No file selected"}
           </DialogDescription>
         </DialogHeader>

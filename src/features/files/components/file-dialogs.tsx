@@ -176,10 +176,12 @@ export function DeleteDialog({ open, entries, scope, onOpenChange, onConfirm }: 
     <AlertDialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-4 text-destructive" />
-            {title}
-            <span className="rounded border border-border px-1.5 py-0.5 text-2xs font-normal text-muted-foreground">
+          <AlertDialogTitle className="flex min-w-0 items-center gap-2">
+            <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
+            <span className="min-w-0 flex-1 truncate" title={entries[0]?.name}>
+              {title}
+            </span>
+            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs font-normal text-muted-foreground">
               {scope}
             </span>
           </AlertDialogTitle>
@@ -190,9 +192,9 @@ export function DeleteDialog({ open, entries, scope, onOpenChange, onConfirm }: 
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="selectable max-h-32 space-y-0.5 overflow-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-2xs text-muted-foreground">
+        <div className="selectable min-w-0 max-h-32 space-y-0.5 overflow-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-2xs text-muted-foreground">
           {entries.slice(0, 12).map((entry) => (
-            <div key={entry.path} className="truncate">
+            <div key={entry.path} className="truncate" title={entry.name}>
               {entry.name}
               {entry.kind === "directory" ? "/" : ""}
             </div>

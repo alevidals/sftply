@@ -551,6 +551,7 @@ async fn run_job<R: Runtime>(
                 _ = token.cancelled() => return Err(cancelled()),
                 result = connect_remote(access) => result?,
             };
+            reconnect_browsing_session(app, &access.profile.id);
             let result = download(app, manager, item, &mut client, job.policy, token).await;
             if !is_cancelled(&result) {
                 let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
@@ -566,6 +567,7 @@ async fn run_job<R: Runtime>(
                 _ = token.cancelled() => return Err(cancelled()),
                 result = connect_remote(access) => result?,
             };
+            reconnect_browsing_session(app, &access.profile.id);
             let preserve_permissions = app
                 .state::<crate::app_state::AppState>()
                 .settings
@@ -587,6 +589,23 @@ async fn run_job<R: Runtime>(
             result
         }
     }
+}
+
+/// A transfer that just authenticated proves the server is reachable, so a
+/// browsing tab marked lost can reconnect right away instead of waiting for the
+/// whole file to finish.
+fn reconnect_browsing_session<R: Runtime>(app: &AppHandle<R>, connection_id: &str) {
+    let app = app.clone();
+    let connection_id = connection_id.to_string();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<crate::app_state::AppState>();
+        crate::commands::sessions::reconnect_lost_for_connection(
+            &app,
+            state.inner(),
+            &connection_id,
+        )
+        .await;
+    });
 }
 
 fn is_cancelled(result: &Result<(), AppError>) -> bool {

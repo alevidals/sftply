@@ -6,7 +6,13 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The automatic reconnect now happens as soon as a retried transfer
+  authenticates, not when the whole file finishes, so a long upload no longer
+  keeps the "Connection lost" banner for minutes.
+- Dialog titles and the file list truncate long names instead of widening the
+  delete and text editor dialogs.
 
 ## [0.4.4] - 2026-11-15
 
