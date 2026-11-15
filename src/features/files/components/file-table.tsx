@@ -43,6 +43,22 @@ import { formatBytes, formatMode, formatModified } from "@/lib/format"
 import type { FsEntry, FsScope } from "@/lib/ipc/bindings"
 import { shortcutLabel } from "@/lib/shortcuts"
 
+// Rows are virtualized and positioned with transforms, and the browser's
+// default drag image (the row) only comes out right for the first item. The
+// app draws its own badge, so hide the native ghost with an invisible element.
+let dragGhost: HTMLDivElement | null = null
+
+function hideNativeDragImage(transfer: DataTransfer) {
+  if (typeof transfer.setDragImage !== "function") return
+  if (!dragGhost) {
+    dragGhost = document.createElement("div")
+    dragGhost.style.cssText =
+      "position:fixed;top:-10px;left:-10px;width:1px;height:1px;pointer-events:none"
+    document.body.append(dragGhost)
+  }
+  transfer.setDragImage(dragGhost, 0, 0)
+}
+
 export type FileAction =
   | "open"
   | "edit"
@@ -352,6 +368,7 @@ export function FileTable({
                       return
                     }
                     writeTransferDrag(event.dataTransfer, { scope: dragScope, entries: supported })
+                    hideNativeDragImage(event.dataTransfer)
                   }}
                   onDragEnd={clearTransferDrag}
                   onDragOver={(event) => {

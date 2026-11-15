@@ -207,6 +207,7 @@ function dataTransfer(): DataTransfer {
     setData: (type: string, value: string) => {
       store.set(type, value)
     },
+    setDragImage: vi.fn(),
     getData: (type: string) => store.get(type) ?? "",
   } as unknown as DataTransfer
 }
@@ -303,6 +304,15 @@ describe("FileTable drag and drop", () => {
     const [payload, directory] = onDropPayload.mock.calls[0] as [TransferDragPayload, FsEntry]
     expect(payload.entries.map((entry) => entry.name)).toEqual(["alpha.txt"])
     expect(directory.name).toBe("beta")
+  })
+
+  it("replaces the browser drag image with the app's own badge", () => {
+    const transfer = dataTransfer()
+    renderTable({ selection: selection(0, ["/tmp/alpha.txt"]) })
+
+    fireEvent.dragStart(screen.getByTitle("/tmp/alpha.txt"), { dataTransfer: transfer })
+
+    expect(transfer.setDragImage).toHaveBeenCalledTimes(1)
   })
 
   it("keeps a multi-selection when pressing a selected row and drags all of it", () => {
