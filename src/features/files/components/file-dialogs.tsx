@@ -176,9 +176,9 @@ export function DeleteDialog({ open, entries, scope, onOpenChange, onConfirm }: 
     <AlertDialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex min-w-0 items-center gap-2">
-            <AlertTriangleIcon className="size-4 shrink-0 text-destructive" />
-            <span className="min-w-0 flex-1 truncate" title={entries[0]?.name}>
+          <AlertDialogTitle className="flex min-w-0 items-start gap-2">
+            <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <span className="min-w-0 flex-1 break-all" title={entries[0]?.name}>
               {title}
             </span>
             <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs font-normal text-muted-foreground">

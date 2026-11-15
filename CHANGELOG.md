@@ -6,13 +6,19 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.5] - 2026-11-15
+
 ### Fixed
 
 - The automatic reconnect now happens as soon as a retried transfer
   authenticates, not when the whole file finishes, so a long upload no longer
   keeps the "Connection lost" banner for minutes.
-- Dialog titles and the file list truncate long names instead of widening the
-  delete and text editor dialogs.
+- Long file names wrap inside the delete confirmation instead of spilling out of
+  the dialog, and the disk list truncates with the full name in a tooltip.
+- Dialog headers reserve space for the close button, so the text editor title and
+  path no longer touch it.
 
 ## [0.4.4] - 2026-11-15
 
@@ -219,7 +225,8 @@ First public build.
 - Portable builds for macOS (universal), Windows x64 and Linux x64, plus `.dmg`,
   NSIS and `.deb` installers and `SHA256SUMS`.
 
-[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.4...HEAD
+[unreleased]: https://github.com/alevidals/sftply/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/alevidals/sftply/releases/tag/v0.4.5
 [0.4.4]: https://github.com/alevidals/sftply/releases/tag/v0.4.4
 [0.4.3]: https://github.com/alevidals/sftply/releases/tag/v0.4.3
 [0.4.2]: https://github.com/alevidals/sftply/releases/tag/v0.4.2
