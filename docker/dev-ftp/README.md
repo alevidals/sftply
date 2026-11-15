@@ -26,8 +26,10 @@ connections.
 | Password | `sftply-dev` |
 | Start    | `/`          |
 
-The home folder contains `welcome.txt` and an `upload` folder. The whole home
-folder is writable, so uploads, folders, renames and deletes can be tested.
+The home folder is seeded from `seed/` on start (`tar -k`, so existing files are
+kept) with a small project, documents, backups and media. The whole home folder
+is writable, so uploads, folders, renames and deletes can be tested. Edit
+`seed/` and restart the container to add more content.
 
 Passive data connections use ports `30000-30009`, mapped 1:1 to the host. The
 server advertises `127.0.0.1` in `PASV` replies, which is correct for a client on

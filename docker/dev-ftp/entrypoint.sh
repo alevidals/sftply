@@ -25,6 +25,14 @@ fi
 echo "$FTP_USER:$FTP_PASSWORD" | chpasswd
 
 mkdir -p "$FTP_HOME" "$FTP_HOME/upload"
+
+# Seed a realistic tree for screenshots and manual checks. `tar -k` keeps files
+# the user uploaded, so restarting the container never overwrites their data.
+# (BusyBox `cp -n` silently copies nothing when the source ends in `/.`.)
+if [ -d /seed ]; then
+    tar -C /seed -cf - . | tar -C "$FTP_HOME" -xkf - || echo "seed copy failed" >&2
+fi
+
 chown -R "$FTP_USER":"$FTP_USER" "$FTP_HOME"
 chmod 755 "$FTP_HOME"
 

@@ -1,0 +1,6 @@
+New machine checklist
+
+1. Install the client from the releases page.
+2. Import connections from the JSON export.
+3. Enter the password once; it is stored in the OS keychain.
+4. Open Settings -> Transfers and set concurrency to 3.

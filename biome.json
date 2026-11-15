@@ -14,7 +14,8 @@
       "!**/src-tauri/target",
       "!**/src-tauri/gen",
       "!**/src/lib/ipc/bindings.ts",
-      "!web/**/*.astro"
+      "!web/**/*.astro",
+      "!docker/dev-ftp/seed"
     ]
   },
   "formatter": {

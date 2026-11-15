@@ -26,3 +26,6 @@ dist-ssr
 # Landing page build output
 web/dist
 web/.astro
+
+# Dev FTP server data (seed is committed, uploads are not)
+docker/dev-ftp/data

@@ -18,7 +18,9 @@ services:
       # device: PASV replies must point at the Mac, not at the client's loopback.
       FTP_PUBLIC_IP: ${FTP_PUBLIC_IP:-127.0.0.1}
     volumes:
-      - ftp-data:/home/ftpuser
-
-volumes:
-  ftp-data:
+      # A plain folder instead of a named volume: easy to inspect and reset.
+      - ./data:/home/ftpuser
+      # Read-only seed copied into the home on start when missing.
+      - ./seed:/seed:ro
+      # Bind the entrypoint so seed changes apply on restart without a rebuild.
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
