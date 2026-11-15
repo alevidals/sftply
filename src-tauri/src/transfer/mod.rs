@@ -37,6 +37,10 @@ const TRANSFER_IO_TIMEOUT: Duration = Duration::from_secs(30);
 /// Closing a connection is best effort; a dead control channel must not delay
 /// the final status.
 const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// Cleanup after a cancel must not keep the row "running" while a dead server
+/// is given time to answer. The partial file is still removed when the server
+/// replies within this window; otherwise the socket is simply closed.
+const CANCEL_CLEANUP_TIMEOUT: Duration = Duration::from_millis(1_500);
 /// Most servers and filesystems cap a single name at 255 bytes. Partial and
 /// backup names are kept below that limit even when the target name is at it.
 const PARTIAL_NAME_MAX_BYTES: usize = 255;
@@ -548,7 +552,9 @@ async fn run_job<R: Runtime>(
                 result = connect_remote(access) => result?,
             };
             let result = download(app, manager, item, &mut client, job.policy, token).await;
-            let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
+            if !is_cancelled(&result) {
+                let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
+            }
             result
         }
         TransferDirection::Upload => {
@@ -575,10 +581,16 @@ async fn run_job<R: Runtime>(
                 preserve_permissions,
             )
             .await;
-            let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
+            if !is_cancelled(&result) {
+                let _ = tokio::time::timeout(DISCONNECT_TIMEOUT, client.disconnect()).await;
+            }
             result
         }
     }
+}
+
+fn is_cancelled(result: &Result<(), AppError>) -> bool {
+    matches!(result, Err(error) if error.code == ErrorCode::Cancelled)
 }
 
 async fn connect_remote(access: &RemoteAccess) -> Result<Box<dyn RemoteFs>, AppError> {
@@ -714,16 +726,16 @@ async fn upload<R: Runtime>(
 
     if let Err(error) = copy_stream(app, manager, item, &mut *reader, &mut *writer, token).await {
         let _ = writer.abort().await;
-        cleanup_remote_upload(client, &upload_path).await;
+        cleanup_remote_upload(client, &upload_path, cleanup_grace(&error)).await;
         return Err(error);
     }
     if let Err(error) = finish_reader(reader).await {
         let _ = writer.abort().await;
-        cleanup_remote_upload(client, &upload_path).await;
+        cleanup_remote_upload(client, &upload_path, cleanup_grace(&error)).await;
         return Err(error);
     }
     if let Err(error) = finish_writer(writer).await {
-        cleanup_remote_upload(client, &upload_path).await;
+        cleanup_remote_upload(client, &upload_path, cleanup_grace(&error)).await;
         return Err(error);
     }
 
@@ -736,11 +748,11 @@ async fn upload<R: Runtime>(
         {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
-                cleanup_remote_upload(client, &upload_path).await;
+                cleanup_remote_upload(client, &upload_path, cleanup_grace(&error)).await;
                 return Err(error);
             }
             Err(_) => {
-                cleanup_remote_upload(client, &upload_path).await;
+                cleanup_remote_upload(client, &upload_path, Duration::from_secs(5)).await;
                 return Err(crate::session::timeout_error());
             }
         }
@@ -779,8 +791,17 @@ async fn apply_local_mode(_client: &mut Box<dyn RemoteFs>, _source: &str, _targe
 
 /// Best-effort removal of a partial or backup upload. A failure here must not
 /// replace the original transfer error.
-async fn cleanup_remote_upload(client: &mut Box<dyn RemoteFs>, path: &str) {
-    let _ = tokio::time::timeout(Duration::from_secs(5), client.delete(path, false)).await;
+async fn cleanup_remote_upload(client: &mut Box<dyn RemoteFs>, path: &str, grace: Duration) {
+    let _ = tokio::time::timeout(grace, client.delete(path, false)).await;
+}
+
+/// Cancels report immediately; real failures get the full cleanup window.
+fn cleanup_grace(error: &AppError) -> Duration {
+    if error.code == ErrorCode::Cancelled {
+        CANCEL_CLEANUP_TIMEOUT
+    } else {
+        Duration::from_secs(5)
+    }
 }
 
 /// Put a finished upload in place. Servers that refuse to rename over an
@@ -1547,6 +1568,18 @@ mod tests {
         apply_local_mode(&mut client, source.to_str().unwrap(), "/dir/public.txt").await;
 
         assert!(calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn cancelled_transfers_use_a_short_cleanup_window() {
+        let cancelled = AppError::new(ErrorCode::Cancelled, "cancelled");
+        let failed = AppError::new(ErrorCode::Network, "network");
+
+        assert_eq!(cleanup_grace(&cancelled), CANCEL_CLEANUP_TIMEOUT);
+        assert_eq!(cleanup_grace(&failed), Duration::from_secs(5));
+        assert!(is_cancelled(&Err(cancelled)));
+        assert!(!is_cancelled(&Err(failed)));
+        assert!(!is_cancelled(&Ok(())));
     }
 
     /// The retry command used to run on a thread without a Tokio runtime and

@@ -6,7 +6,13 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- Cancelling an upload while the server was unreachable still took up to ten
+  seconds: the cancel was observed, but cleanup waited 5 s for the partial file
+  and another 5 s for a graceful disconnect. A cancelled transfer now gets a
+  1.5 s cleanup window and skips the disconnect handshake, so the row reports
+  **Cancelled** immediately.
 
 ## [0.4.3] - 2026-11-14
 

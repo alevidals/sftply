@@ -1816,3 +1816,16 @@ which is only correct for local client connections. See
 
 - Rust 134 tests and clippy; FileTable 19 tests; full frontend suite 245;
   typecheck, lint and build.
+
+### 2026-11-15 — Session 61: cancel while the server is down
+
+**Fixed**
+
+- Cancelling an upload with the server offline looked like it did nothing. The
+  transfer task did receive the cancellation, but it then waited up to 5 s for
+  the partial-file cleanup and another 5 s for a graceful `QUIT`, and both hang
+  on a dead control connection. A cancelled transfer now uses a 1.5 s cleanup
+  window (`CANCEL_CLEANUP_TIMEOUT`) and skips the graceful disconnect, leaving
+  the socket to close on drop. Real failures keep the 5 s window so cleanup has
+  a chance to finish.
+- Unit test for `cleanup_grace` and `is_cancelled`.
