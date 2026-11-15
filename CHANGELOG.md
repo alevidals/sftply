@@ -8,6 +8,14 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [0.4.6] - 2026-11-15
+
+### Fixed
+
+- Dragging the first row of a pane no longer shows a second, full-row ghost
+  next to the app's badge. The browser's default drag image is replaced by an
+  invisible one, which also avoids the broken snapshot on virtualized rows.
+
 ## [0.4.5] - 2026-11-15
 
 ### Fixed
