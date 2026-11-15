@@ -4,7 +4,6 @@ import Downloads from "../components/Downloads.astro";
 import Features from "../components/Features.astro";
 import Hero from "../components/Hero.astro";
 import Notes from "../components/Notes.astro";
-import heroDark from "../assets/screens/hero-dark.webp";
 import { loadRelease } from "../lib/releases";
 
 const release = await loadRelease();
@@ -15,12 +14,22 @@ console.info(
     : `[site] offline build, linking to the latest release page for v${release.version}`,
 );
 
-const title = "sftply — FTP, FTPS and SFTP, without the friction";
+const title = "sftply — FTP, FTPS and SFTP client";
 const description =
-  "A dual-pane FTP, FTPS and SFTP client for macOS, Windows and Linux. Native Rust networking, keychain credentials and a transfer queue that only promises what the protocol can deliver.";
+  "A free, open-source FTP, FTPS and SFTP client for macOS, Windows and Linux. Dual panes, keychain credentials and an honest transfer queue.";
+const basePath = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const image = `${basePath}og-image.jpg`;
 ---
 
-<Base title={title} description={description} image={heroDark.src}>
+<Base
+  title={title}
+  description={description}
+  image={image}
+  version={release.version}
+  downloadUrl={release.url}
+>
   <Hero version={release.version} />
   <Features />
   <Downloads release={release} />

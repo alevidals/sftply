@@ -9,12 +9,32 @@ interface Props {
   title: string;
   description: string;
   image?: string;
+  version?: string;
+  downloadUrl?: string;
 }
 
-const { title, description, image } = Astro.props;
+const { title, description, image, version, downloadUrl } = Astro.props;
 const origin = Astro.site ?? "https://alevidals.github.io";
 const canonical = new URL(Astro.url.pathname, origin).href;
 const imageUrl = image ? new URL(image, origin).href : undefined;
+
+const software = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "sftply",
+  description:
+    "A free, open-source FTP, FTPS and SFTP client for macOS, Windows and Linux.",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "macOS, Windows, Linux",
+  url: canonical,
+  downloadUrl: downloadUrl ?? canonical,
+  softwareVersion: version,
+  license: "https://opensource.org/license/mit",
+  sameAs: [REPO_URL],
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  screenshot: imageUrl,
+  inLanguage: "en",
+};
 ---
 
 <!doctype html>
@@ -32,9 +52,19 @@ const imageUrl = image ? new URL(image, origin).href : undefined;
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="en_US" />
+    <meta name="application-name" content="sftply" />
     {imageUrl && <meta property="og:image" content={imageUrl} />}
+    {imageUrl && <meta property="og:image:type" content="image/jpeg" />}
+    {imageUrl && <meta property="og:image:width" content="1200" />}
+    {imageUrl && <meta property="og:image:height" content="630" />}
+    {imageUrl && <meta property="og:image:alt" content="sftply, an FTP, FTPS and SFTP client for the desktop" />}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     {imageUrl && <meta name="twitter:image" content={imageUrl} />}
+    {imageUrl && <meta name="twitter:image:alt" content="sftply, an FTP, FTPS and SFTP client for the desktop" />}
+    <script type="application/ld+json" set:html={JSON.stringify(software)} />
     <meta name="generator" content={Astro.generator} />
     <Font cssVariable="--font-work-sans" preload />
     <Font cssVariable="--font-jetbrains-mono" />
