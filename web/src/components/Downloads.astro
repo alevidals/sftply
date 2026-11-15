@@ -1,16 +1,20 @@
 ---
-import { findAsset, formatBytes, LATEST_RELEASE_URL, type ReleaseInfo } from "../lib/releases"
-import Icon from "./Icon.astro"
+import Icon from "./Icon.astro";
+import {
+  findAsset,
+  formatBytes,
+  LATEST_RELEASE_URL,
+  type ReleaseInfo,
+} from "../lib/releases";
 
 interface Props {
-  release: ReleaseInfo
+  release: ReleaseInfo;
 }
 
-const { release } = Astro.props
+const { release } = Astro.props;
 
 const platforms = [
   {
-    id: "macos",
     name: "macOS",
     badge: "Universal",
     blurb: "Apple Silicon and Intel in one bundle. Unzip and drag sftply.app to Applications.",
@@ -18,7 +22,6 @@ const platforms = [
     installer: { label: "Disk image", suffix: ".dmg" },
   },
   {
-    id: "windows",
     name: "Windows",
     badge: "x64",
     blurb: "Windows 10 and 11. Unzip and run the .exe, or use the setup wizard.",
@@ -26,24 +29,23 @@ const platforms = [
     installer: { label: "Setup", suffix: "-setup.exe" },
   },
   {
-    id: "linux",
     name: "Linux",
     badge: "x64",
     blurb: "Make the AppImage executable and run it, or install the Debian package.",
     portable: { label: "AppImage", suffix: ".AppImage" },
     installer: { label: "Debian package", suffix: ".deb" },
   },
-]
+];
 
 function link(suffix: string) {
-  const asset = findAsset(release, suffix)
+  const asset = findAsset(release, suffix);
   return {
     href: asset?.url ?? LATEST_RELEASE_URL,
     size: asset ? formatBytes(asset.bytes) : "",
-  }
+  };
 }
 
-const sums = findAsset(release, "SHA256SUMS")
+const sums = findAsset(release, "SHA256SUMS");
 ---
 
 <section class="section" id="download">
@@ -52,8 +54,8 @@ const sums = findAsset(release, "SHA256SUMS")
       <p class="eyebrow">Download · v{release.version}</p>
       <h2>Take the build that fits</h2>
       <p class="lead">
-        Portable archives need no installer and leave nothing behind. Every package ships with
-        a checksum the moment it is published.
+        Portable archives need no installer and leave nothing behind. Every package
+        ships with a checksum the moment it is published.
       </p>
     </div>
 
@@ -63,11 +65,10 @@ const sums = findAsset(release, "SHA256SUMS")
           const portable = link(platform.portable.suffix);
           const installer = link(platform.installer.suffix);
           return (
-            <article class="download" data-platform={platform.id}>
+            <article class="download">
               <div class="download-head">
                 <h3>{platform.name}</h3>
-                <span class="badge badge-default">{platform.badge}</span>
-                <span class="badge badge-you">Your system</span>
+                <span class="badge">{platform.badge}</span>
               </div>
               <p>{platform.blurb}</p>
               <a class="download-primary" href={portable.href}>
@@ -92,14 +93,3 @@ const sums = findAsset(release, "SHA256SUMS")
     </p>
   </div>
 </section>
-
-<script is:inline>
-  // Highlight the card that matches the visitor's OS. Presentation only: every
-  // card stays a normal link if the detection is wrong or unavailable.
-  (() => {
-    const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
-    const id = /mac/i.test(ua) ? "macos" : /win/i.test(ua) ? "windows" : /linux/i.test(ua) ? "linux" : "";
-    if (!id) return;
-    document.querySelector(`[data-platform="${id}"]`)?.setAttribute("data-detected", "");
-  })();
-</script>

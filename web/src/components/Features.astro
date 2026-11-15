@@ -1,91 +1,187 @@
 ---
-import type { IconName } from "../lib/icons"
-import Icon from "./Icon.astro"
-
-interface Feature {
-  icon: IconName
-  title: string
-  body: string
-}
-
-const features: Feature[] = [
-  {
-    icon: "arrow-right-left",
-    title: "Two panes, one flow",
-    body: "Local and remote folders side by side. Multi-select, drag across panes, and the destination refreshes as soon as the transfer completes.",
-  },
-  {
-    icon: "network",
-    title: "FTP, explicit and implicit FTPS, SFTP",
-    body: "One client for the protocols you actually meet. TLS for FTPS, SSH host keys for SFTP, and no shelling out to system binaries.",
-  },
-  {
-    icon: "list-checks",
-    title: "A queue that tells the truth",
-    body: "Per-file progress, speed and errors in one panel. Pause and resume appear only when the server can honour them.",
-  },
-  {
-    icon: "key-round",
-    title: "Secrets stay in the keychain",
-    body: "Passwords and passphrases live in the OS keychain. Saved connections, exports and logs never contain them.",
-  },
-  {
-    icon: "file-pen",
-    title: "Edit remote text files",
-    body: "Open a UTF-8 file in place, edit it, save atomically. Stale writes are detected instead of silently overwriting someone else's changes.",
-  },
-  {
-    icon: "palette",
-    title: "Dark, light and named palettes",
-    body: "Dark by default, light as a first-class mode, plus curated palettes. Every theme is contrast-tested, including focus rings.",
-  },
-]
-
-const shortcuts = [
-  { keys: "⌘K", label: "Command palette" },
-  { keys: "⌘1", label: "Local pane" },
-  { keys: "⌘2", label: "Remote pane" },
-  { keys: "⌘J", label: "Transfers" },
-  { keys: "⌘L", label: "Edit path" },
-]
+import editorShot from "../assets/screens/editor.webp";
+import lightShot from "../assets/screens/hero-light.webp";
+import paletteShot from "../assets/screens/palette.webp";
+import permissionsShot from "../assets/screens/permissions.webp";
+import connectionShot from "../assets/screens/new-connection.webp";
+import { REPO_URL } from "../lib/releases";
 ---
 
 <section class="section" id="features">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">What's inside</p>
-      <h2>Built for moving files, not for fighting the client</h2>
+      <p class="eyebrow">What’s inside</p>
+      <h2>Everything for moving files. Nothing to fight.</h2>
       <p class="lead">
         Every pane, dialog and shortcut serves one loop: pick files, move them, see
         exactly what happened.
       </p>
     </div>
 
-    <div class="card-grid">
-      {
-        features.map((feature) => (
-          <article class="card">
-            <div class="card-icon">
-              <Icon name={feature.icon} size={18} />
-            </div>
-            <h3>{feature.title}</h3>
-            <p>{feature.body}</p>
-          </article>
-        ))
-      }
-    </div>
+    <div class="bento">
+      <article class="tile tile-wide tile-white">
+        <div class="tile-copy">
+          <p class="eyebrow">Protocols</p>
+          <h3>FTP, FTPS and SFTP, without extra moving parts</h3>
+          <p>
+            Native Rust networking for all of them. TLS with certificate pins, strict
+            SSH host keys and passive, extended passive or active data channels.
+          </p>
+          <p class="tile-facts">
+            <span>Keychain credentials</span>
+            <span>Host key verification</span>
+          </p>
+        </div>
+        <div class="tile-media" style={`--media-ratio: ${connectionShot.width} / ${connectionShot.height}`}>
+          <img
+            src={connectionShot.src}
+            width={connectionShot.width}
+            height={connectionShot.height}
+            alt="New connection dialog with name, protocol, host, authentication and data channel fields"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </article>
 
-    <ul class="shortcut-strip" aria-label="Keyboard shortcuts">
-      <li class="shortcut-strip-label">Keyboard first</li>
-      {
-        shortcuts.map((shortcut) => (
-          <li class="shortcut">
-            <kbd>{shortcut.keys}</kbd>
-            <span>{shortcut.label}</span>
+      <article class="tile tile-narrow tile-peach">
+        <div class="tile-copy">
+          <p class="eyebrow">Editor</p>
+          <h3>Edit remote files in place</h3>
+          <p>
+            Open a UTF-8 file up to 2&nbsp;MiB, edit it and save atomically. If it changed
+            on the server since you opened it, sftply asks instead of overwriting
+            someone else’s work.
+          </p>
+          <p class="tile-facts">
+            <span>No autosave</span>
+            <span>Stale-write detection</span>
+          </p>
+        </div>
+        <div class="tile-media" style={`--media-ratio: ${editorShot.width} / ${editorShot.height}`}>
+          <img
+            src={editorShot.src}
+            width={editorShot.width}
+            height={editorShot.height}
+            alt="Editor with design-notes.md open on the remote server"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </article>
+
+      <article class="tile tile-narrow tile-lavender">
+        <div class="tile-copy">
+          <p class="eyebrow">Keyboard</p>
+          <h3>Built to be driven without the mouse</h3>
+          <p>
+            <code translate="no">⌘K</code> opens the command palette, <code translate="no">⌘1</code> and{" "}
+            <code translate="no">⌘2</code> jump between panes and <code translate="no">⌘J</code> toggles the queue.
+            Every action has a shortcut, and the hints follow your platform.
+          </p>
+          <p class="tile-facts">
+            <span>Command palette</span>
+            <span>Type-ahead</span>
+          </p>
+        </div>
+        <div class="tile-media" style={`--media-ratio: ${paletteShot.width} / ${paletteShot.height}`}>
+          <img
+            src={paletteShot.src}
+            width={paletteShot.width}
+            height={paletteShot.height}
+            alt="Command palette searching for connections and actions"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </article>
+
+      <article class="tile tile-wide tile-mint">
+        <div class="tile-copy">
+          <p class="eyebrow">Themes</p>
+          <h3>Dark by default. Light as a first-class mode.</h3>
+          <p>
+            Named palettes, contrast-tested text and visible focus rings in every
+            theme. The interface stays quiet so the files are the loudest thing on
+            screen.
+          </p>
+          <p class="tile-facts">
+            <span>System theme</span>
+            <span>Contrast checked</span>
+          </p>
+        </div>
+        <div class="tile-media" style={`--media-ratio: ${lightShot.width} / ${lightShot.height}`}>
+          <img
+            src={lightShot.src}
+            width={lightShot.width}
+            height={lightShot.height}
+            alt="Both panes and the transfer queue in the light theme"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </article>
+
+      <article class="tile tile-wide tile-pink">
+        <div class="tile-copy">
+          <p class="eyebrow">Permissions</p>
+          <h3>Unix modes, visible and editable</h3>
+          <p>
+            Octal and symbolic editing for a selection, with per-entry errors. When a
+            server or platform cannot change modes, the action says so instead of
+            failing halfway.
+          </p>
+          <p class="tile-facts">
+            <span>Octal and symbolic</span>
+            <span>Capability gated</span>
+          </p>
+        </div>
+        <div class="tile-media" style={`--media-ratio: ${permissionsShot.width} / ${permissionsShot.height}`}>
+          <img
+            src={permissionsShot.src}
+            width={permissionsShot.width}
+            height={permissionsShot.height}
+            alt="Permissions dialog with an octal mode and read, write and execute checkboxes"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </article>
+
+      <article class="tile tile-narrow tile-navy">
+        <div class="tile-copy">
+          <p class="eyebrow">Honest by construction</p>
+          <h3>A queue that tells the truth</h3>
+          <p>
+            Most clients guess, then draw a progress bar and hope. sftply reports what
+            the protocol actually did, including when the answer is “not supported”.
+          </p>
+        </div>
+
+        <blockquote class="navy-quote">
+          A transfer queue is a promise. If the server cannot resume a download, the
+          interface should not offer a resume button.
+        </blockquote>
+
+        <ul class="navy-points">
+          <li>
+            <strong>Pause and resume only where the server allows it</strong>
+            <span>If a transfer has to restart, the queue says so.</span>
           </li>
-        ))
-      }
-      <li class="shortcut-strip-note">Ctrl on Windows and Linux</li>
-    </ul>
+          <li>
+            <strong>Cancelled is cancelled</strong>
+            <span>A cancelled transfer never turns into a green row.</span>
+          </li>
+          <li>
+            <strong>Failures are reported as failures</strong>
+            <span>Errors carry a code, a safe message and a recovery action.</span>
+          </li>
+        </ul>
+
+        <a class="tile-link" href={`${REPO_URL}/blob/main/docs/ARCHITECTURE.md`}>
+          Read the architecture notes
+        </a>
+      </article>
+    </div>
   </div>
 </section>

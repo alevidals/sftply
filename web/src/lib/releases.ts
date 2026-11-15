@@ -85,9 +85,11 @@ export function findAsset(release: ReleaseInfo, suffix: string): ReleaseAsset | 
   return release.assets.find((asset) => asset.name.toLowerCase().endsWith(suffix.toLowerCase()))
 }
 
+const fileSize = new Intl.NumberFormat("en", { maximumFractionDigits: 1 })
+
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) return ""
   const mb = bytes / (1024 * 1024)
-  if (mb >= 1) return `${mb.toFixed(1)} MB`
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  if (mb >= 1) return `${fileSize.format(mb)}\u00a0MB`
+  return `${Math.max(1, Math.round(bytes / 1024))}\u00a0KB`
 }
