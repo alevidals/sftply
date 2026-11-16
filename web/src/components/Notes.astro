@@ -4,38 +4,33 @@ import { REPO_URL } from "../lib/releases";
 const questions = [
   {
     title: "Is it really free?",
-    body: "Yes. sftply is MIT licensed: use it, modify it and redistribute it, including commercially. The source is on GitHub.",
+    body: "MIT licensed. Use, modify and redistribute.",
   },
   {
-    title: "Why does macOS warn me on first launch?",
-    body: "Builds are ad-hoc signed but not notarized. Right-click the app and choose Open, or allow it under System Settings → Privacy & Security.",
+    title: "macOS warning on first launch?",
+    body: "Ad-hoc signed. Right-click and Open.",
   },
   {
     title: "What about Windows and Linux?",
-    body: "The portable .exe needs the WebView2 runtime that ships with Windows 10 and 11. On Linux, the AppImage may need FUSE 2 and WebKitGTK from your distribution.",
+    body: "Windows needs WebView2. Linux may need FUSE 2 and WebKitGTK.",
   },
   {
-    title: "Is there sync or a directory diff?",
-    body: "Not yet. 1.0 focuses on hardening the client. Comparison and one-way sync with a mandatory dry-run are planned for 1.1.",
+    title: "Sync or directory diff?",
+    body: "Not in 1.0. A dry-run sync is planned for 1.1.",
   },
 ];
 ---
 
-<section class="section" id="questions">
+<section class="section section--tight faq-section" id="questions">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">Questions</p>
-      <h2>Before you install</h2>
-      <p class="lead">
-        Short answers to what people ask before the first connection. Everything
-        else is in the user guide.
-      </p>
+      <h2>Before you install.</h2>
     </div>
 
     <div class="faq-grid">
       {
         questions.map((question) => (
-          <article class="faq-card">
+          <article class="faq-item">
             <h3>{question.title}</h3>
             <p>{question.body}</p>
           </article>
@@ -43,8 +38,8 @@ const questions = [
       }
     </div>
 
-    <p class="checksum-note">
-      <span>Source, issues and release notes live on GitHub.</span>
+    <p class="download-meta">
+      <span>Source and release notes on GitHub.</span>
       <a href={REPO_URL}>github.com/alevidals/sftply</a>
       <a href={`${REPO_URL}/blob/main/docs/USER_GUIDE.md`}>User guide</a>
     </p>

@@ -47,7 +47,7 @@ const software = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" href={mark} type="image/svg+xml" />
-    <meta name="theme-color" id="theme-color" content="#f5f6f8" />
+    <meta name="theme-color" id="theme-color" content="#f4f5f7" />
     <script is:inline>
       (() => {
         let stored = null;
@@ -64,7 +64,7 @@ const software = {
               : "light";
         document.documentElement.dataset.theme = theme;
         const meta = document.getElementById("theme-color");
-        if (meta) meta.content = theme === "dark" ? "#101218" : "#f5f6f8";
+        if (meta) meta.content = theme === "dark" ? "#101218" : "#f4f5f7";
       })();
     </script>
     <meta property="og:type" content="website" />
@@ -96,9 +96,8 @@ const software = {
       <div class="container">
         <Brand />
         <nav class="site-nav" aria-label="Main">
-          <a class="nav-link" href="#features">Features</a>
           <a class="nav-link" href="#interface">Interface</a>
-          <a class="nav-link" href={`${REPO_URL}/tree/main/docs`}>Docs</a>
+          <a class="nav-link" href="#features">Capabilities</a>
           <a class="nav-link" href="#questions">FAQ</a>
           <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark theme">
             <span class="theme-icon theme-icon-moon"><Icon name="moon" size={16} /></span>
@@ -114,19 +113,18 @@ const software = {
     </main>
 
     <footer class="site-footer">
-      <div class="container">
-        <Brand />
+      <div class="container footer-mast">
+        <div class="footer-brand">
+          <Brand />
+          <p>Free and open source under MIT.</p>
+        </div>
         <ul class="footer-links">
           <li><a href={REPO_URL}>Source</a></li>
-          <li><a href={RELEASES_URL}>All releases</a></li>
+          <li><a href={RELEASES_URL}>Releases</a></li>
           <li><a href={`${REPO_URL}/tree/main/docs`}>Docs</a></li>
-          <li><a href={`${REPO_URL}/blob/main/LICENSE`}>MIT license</a></li>
+          <li><a href={`${REPO_URL}/blob/main/LICENSE`}>License</a></li>
         </ul>
-        <p class="footer-note">
-          Built with Tauri 2, React and Rust · unsigned builds, verify SHA256SUMS · © {
-            new Date().getFullYear()
-          } sftply
-        </p>
+        <p class="footer-note">Built with Tauri 2, React and Rust. Verify SHA256SUMS.</p>
       </div>
     </footer>
 

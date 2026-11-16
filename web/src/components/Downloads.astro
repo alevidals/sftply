@@ -1,11 +1,5 @@
 ---
-import Icon from "./Icon.astro";
-import {
-  findAsset,
-  formatBytes,
-  LATEST_RELEASE_URL,
-  type ReleaseInfo,
-} from "../lib/releases";
+import { findAsset, formatBytes, LATEST_RELEASE_URL, type ReleaseInfo } from "../lib/releases";
 
 interface Props {
   release: ReleaseInfo;
@@ -16,33 +10,25 @@ const { release } = Astro.props;
 const platforms = [
   {
     id: "macos",
-    name: "macOS",
-    badge: "Universal",
-    blurb: "Apple Silicon and Intel in one bundle. Unzip and drag sftply.app to Applications.",
+    name: "macOS universal",
     portable: { label: "Portable .app", suffix: "_macos-universal_portable.zip" },
     installer: { label: "Disk image", suffix: ".dmg" },
   },
   {
     id: "windows",
-    name: "Windows",
-    badge: "x64",
-    blurb: "Windows 10 and 11. Unzip and run the .exe, or use the setup wizard.",
+    name: "Windows x64",
     portable: { label: "Portable .exe", suffix: "_windows-x64_portable.zip" },
     installer: { label: "Setup", suffix: "-setup.exe" },
   },
   {
     id: "linux",
-    name: "Linux",
-    badge: "x64",
-    blurb: "Make the AppImage executable and run it, or install the Debian package.",
+    name: "Linux x64",
     portable: { label: "AppImage", suffix: "_linux-x64.AppImage" },
     installer: { label: "Debian package", suffix: "_linux-x64.deb" },
   },
   {
     id: "linux-arm",
     name: "Linux ARM64",
-    badge: "arm64",
-    blurb: "For ARM64 desktops, Raspberry Pi 4/5 and ARM servers. AppImage or Debian package.",
     portable: { label: "AppImage", suffix: "_linux-arm64.AppImage" },
     installer: { label: "Debian package", suffix: "_linux-arm64.deb" },
   },
@@ -59,48 +45,41 @@ function link(suffix: string) {
 const sums = findAsset(release, "SHA256SUMS");
 ---
 
-<section class="section" id="download">
+<section class="section downloads" id="download">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">Download · v{release.version}</p>
-      <h2>Take the build that fits</h2>
-      <p class="lead">
-        Portable archives need no installer and leave nothing behind. Every package
-        ships with a checksum the moment it is published.
-      </p>
+      <h2>Download.</h2>
+      <p class="lead">Version {release.version}. Portable builds; every release ships SHA256SUMS.</p>
     </div>
 
-    <div class="download-grid">
+    <ul class="download-list">
       {
         platforms.map((platform) => {
           const portable = link(platform.portable.suffix);
           const installer = link(platform.installer.suffix);
           return (
-            <article class="download" data-platform={platform.id}>
-              <div class="download-head">
-                <h3>{platform.name}</h3>
-                <span class="badge">{platform.badge}</span>
-                <span class="badge badge-you">Your system</span>
+            <li class="download-row" data-platform={platform.id}>
+              <div class="download-platform">
+                <span class="download-name">{platform.name}</span>
+                <span class="download-system">Your system</span>
               </div>
-              <p>{platform.blurb}</p>
-              <div class="download-actions">
-                <a class="download-primary" href={portable.href}>
-                  <span>{platform.portable.label}</span>
-                  <span class="size">{portable.size}</span>
+              <div class="download-links">
+                <a class="download-link" href={portable.href}>
+                  {platform.portable.label}
+                  {portable.size ? <span class="download-size">{portable.size}</span> : null}
                 </a>
-                <a class="download-secondary" href={installer.href}>
+                <a class="download-link" href={installer.href}>
                   {platform.installer.label}
-                  {installer.size ? ` · ${installer.size}` : ""}
-                  <Icon name="arrow-up-right" size={13} />
+                  {installer.size ? <span class="download-size">{installer.size}</span> : null}
                 </a>
               </div>
-            </article>
+            </li>
           );
         })
       }
-    </div>
+    </ul>
 
-    <p class="checksum-note">
+    <p class="download-meta">
       <span>Every release ships SHA256SUMS.</span>
       <a href={sums?.url ?? release.url}>Download checksums</a>
       <a href={release.url}>All files for v{release.version}</a>
@@ -109,8 +88,8 @@ const sums = findAsset(release, "SHA256SUMS");
 </section>
 
 <script is:inline>
-  // Highlight the card that matches the visitor's OS. Presentation only: every
-  // card stays a normal link if the detection is wrong or unavailable.
+  // Mark the row that matches the visitor's OS. Presentation only: every row
+  // stays a normal link if the detection is wrong or unavailable.
   (() => {
     const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
     const armLinux = /linux/i.test(ua) && /aarch64|arm64|armv8/i.test(navigator.userAgent);

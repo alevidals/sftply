@@ -1,45 +1,32 @@
 ---
-import mark from "../assets/mark.svg?url";
 import heroDark from "../assets/screens/hero-dark.webp";
+import heroDetail from "../assets/screens/hero-detail.webp";
 import { REPO_URL } from "../lib/releases";
-
-interface Props {
-  version: string;
-}
-
-const { version } = Astro.props;
 ---
 
 <section class="hero container">
   <div class="hero-copy">
-    <img class="hero-icon" src={mark} alt="sftply icon" width="76" height="76" />
     <h1>FTP, FTPS and SFTP, without the friction.</h1>
-  </div>
-
-  <div class="hero-side">
-    <p>
-      A free, open-source dual-pane client for macOS, Windows and Linux with native
-      Rust networking, keychain credentials and a transfer queue that only promises
-      what the protocol can actually deliver.
+    <p class="hero-sentence">
+      Free and open source, with native Rust networking and an honest queue.
     </p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="#download">Download for desktop</a>
-      <a class="btn btn-ghost" href={REPO_URL}>View on GitHub</a>
+      <a class="btn btn-ghost" href={REPO_URL}>View source</a>
     </div>
-    <p class="hero-meta">v{version} · macOS · Windows · Linux · MIT</p>
+    <p class="hero-platform">macOS, Windows and Linux. MIT licensed.</p>
   </div>
-</section>
 
-<div class="hero-shot container">
-  <div class="shot-card">
-    <div class="shot-frame">
+  <figure class="hero-visual">
+    <picture>
+      <source media="(max-width: 700px)" srcset={heroDetail.src} />
       <img
         src={heroDark.src}
         width={heroDark.width}
         height={heroDark.height}
-        alt="sftply showing a local folder on the left, a remote FTP folder on the right and a running upload in the transfer queue"
+        alt="sftply with a local folder on the left, a remote FTP folder on the right and an upload in the transfer queue"
         fetchpriority="high"
       />
-    </div>
-  </div>
-</div>
+    </picture>
+  </figure>
+</section>

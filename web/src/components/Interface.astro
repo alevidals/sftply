@@ -1,21 +1,20 @@
 ---
 import editorShot from "../assets/screens/editor.webp";
 import paletteShot from "../assets/screens/palette.webp";
+import permissionsShot from "../assets/screens/permissions.webp";
 ---
 
-<section class="section" id="interface">
+<section class="section section--roomy interface" id="interface">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">A familiar interface</p>
-      <h2>Two panes, native controls, no surprises</h2>
+      <h2>Two panes, no surprises.</h2>
       <p class="lead">
-        The same patterns as your file manager: select, drag and drop. The queue
-        reports what the protocol is actually doing instead of drawing a guess.
+        The patterns of your file manager, with the protocol’s state on screen.
       </p>
     </div>
 
-    <div class="shot-grid">
-      <figure class="shot shot-square">
+    <div class="shots">
+      <figure class="shot shot-large">
         <div class="shot-media">
           <img
             src={editorShot.src}
@@ -27,27 +26,46 @@ import paletteShot from "../assets/screens/palette.webp";
           />
         </div>
         <figcaption>
-          <strong>Edit remote files in place</strong>
-          <span>Atomic saves and stale-write detection.</span>
+          <strong>Edit remote files in place.</strong> UTF-8 up to 2&nbsp;MiB, atomic saves and
+          stale-write detection.
         </figcaption>
       </figure>
 
-      <figure class="shot shot-square">
-        <div class="shot-media">
-          <img
-            src={paletteShot.src}
-            width={paletteShot.width}
-            height={paletteShot.height}
-            alt="Command palette searching for connections and actions"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-        <figcaption>
-          <strong>Every action one keystroke away</strong>
-          <span>⌘K opens the command palette.</span>
-        </figcaption>
-      </figure>
+      <div class="shot-pair">
+        <figure class="shot">
+          <div class="shot-media">
+            <img
+              src={paletteShot.src}
+              width={paletteShot.width}
+              height={paletteShot.height}
+              alt="Command palette searching for connections and actions"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <figcaption>
+            <strong><kbd>⌘K</kbd> opens the command palette.</strong>{" "}
+            <kbd>⌘1</kbd> and <kbd>⌘2</kbd> switch panes; <kbd>⌘J</kbd> opens the queue.
+          </figcaption>
+        </figure>
+
+        <figure class="shot">
+          <div class="shot-media">
+            <img
+              src={permissionsShot.src}
+              width={permissionsShot.width}
+              height={permissionsShot.height}
+              alt="Permissions dialog with an octal mode and read, write and execute checkboxes"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <figcaption>
+            <strong>Octal and symbolic modes.</strong> Per-entry errors, right where the change
+            happens.
+          </figcaption>
+        </figure>
+      </div>
     </div>
   </div>
 </section>

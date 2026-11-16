@@ -1,7 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
 import Downloads from "../components/Downloads.astro";
-import Facts from "../components/Facts.astro";
 import Features from "../components/Features.astro";
 import Hero from "../components/Hero.astro";
 import Interface from "../components/Interface.astro";
@@ -33,10 +32,9 @@ const image = `${basePath}og-image.jpg`;
   version={release.version}
   downloadUrl={release.url}
 >
-  <Hero version={release.version} />
-  <Facts />
-  <Features />
+  <Hero />
   <Interface />
+  <Features />
   <Principles />
   <Downloads release={release} />
   <Notes />

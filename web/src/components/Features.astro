@@ -1,98 +1,51 @@
 ---
-import type { IconName } from "../lib/icons";
-import Icon from "./Icon.astro";
-
-interface Feature {
-  icon: IconName;
-  tone: "lavender" | "peach" | "mint" | "sky" | "pink";
-  title: string;
-  body: string;
-}
-
-const features: Feature[] = [
+const capabilities = [
   {
-    icon: "arrow-right-left",
-    tone: "lavender",
-    title: "Two panes, one flow",
-    body: "Local and remote folders side by side. Multi-select, drag across panes, and the destination refreshes as soon as the transfer completes.",
+    label: "Protocols",
+    detail: "FTP, FTPS and SFTP. Passive, extended passive and active channels.",
   },
   {
-    icon: "network",
-    tone: "sky",
-    title: "FTP, explicit and implicit FTPS, SFTP",
-    body: "One client for the protocols you actually meet. TLS for FTPS, SSH host keys for SFTP, and no shelling out to system binaries.",
+    label: "Networking",
+    detail: "Native Rust. TLS pins, strict SSH host keys, no system binaries.",
   },
   {
-    icon: "list-checks",
-    tone: "mint",
-    title: "A queue that tells the truth",
-    body: "Per-file progress, speed and errors in one panel. Pause and resume appear only when the server can honour them.",
+    label: "Queue",
+    detail: "Progress, speed and errors per file. Resume only when supported.",
   },
   {
-    icon: "key-round",
-    tone: "peach",
-    title: "Secrets stay in the keychain",
-    body: "Passwords and passphrases live in the OS keychain. Saved connections, exports and logs never contain them.",
+    label: "Secrets",
+    detail: "Passwords stay in the OS keychain, never in config or logs.",
   },
   {
-    icon: "file-pen",
-    tone: "pink",
-    title: "Edit remote text files",
-    body: "Open a UTF-8 file in place, edit it, save atomically. Stale writes are detected instead of silently overwriting someone else’s changes.",
+    label: "Editor",
+    detail: "UTF-8 up to 2 MiB. Atomic saves and stale-write detection.",
   },
   {
-    icon: "palette",
-    tone: "lavender",
-    title: "Dark, light and named palettes",
-    body: "Dark by default, light as a first-class mode, plus curated palettes. Every theme is contrast-tested, including focus rings.",
+    label: "Permissions",
+    detail: "Octal and symbolic modes, with per-entry errors.",
   },
-];
-
-const shortcuts = [
-  { keys: "⌘K", label: "Command palette" },
-  { keys: "⌘1", label: "Local pane" },
-  { keys: "⌘2", label: "Remote pane" },
-  { keys: "⌘J", label: "Transfers" },
-  { keys: "⌘L", label: "Edit path" },
+  {
+    label: "Themes",
+    detail: "Dark, light and named palettes, contrast-tested.",
+  },
 ];
 ---
 
-<section class="section" id="features">
+<section class="section features" id="features">
   <div class="container">
     <div class="section-head">
-      <p class="eyebrow">What’s inside</p>
-      <h2>Built for moving files, not for fighting the client</h2>
-      <p class="lead">
-        Every pane, dialog and shortcut serves one loop: pick files, move them, see
-        exactly what happened.
-      </p>
+      <h2>Built for moving files, not for fighting the client.</h2>
     </div>
 
-    <div class="feature-grid">
+    <dl class="spec-list">
       {
-        features.map((feature) => (
-          <article class="feature-card">
-            <div class={`feature-icon tone-${feature.tone}`}>
-              <Icon name={feature.icon} size={18} />
-            </div>
-            <h3>{feature.title}</h3>
-            <p>{feature.body}</p>
-          </article>
+        capabilities.map((capability) => (
+          <div class="spec-row">
+            <dt>{capability.label}</dt>
+            <dd set:html={capability.detail} />
+          </div>
         ))
       }
-    </div>
-
-    <ul class="shortcut-strip" aria-label="Keyboard shortcuts">
-      <li class="shortcut-strip-label">Keyboard first</li>
-      {
-        shortcuts.map((shortcut) => (
-          <li class="shortcut">
-            <kbd>{shortcut.keys}</kbd>
-            <span>{shortcut.label}</span>
-          </li>
-        ))
-      }
-      <li class="shortcut-strip-note">Ctrl on Windows and Linux</li>
-    </ul>
+    </dl>
   </div>
 </section>
