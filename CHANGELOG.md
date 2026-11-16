@@ -8,6 +8,20 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [1.0.0] - 2026-11-16
+
+First stable release. The 0.5 line is promoted to 1.0 without protocol or
+file-operation changes; this release marks the documented behavior as stable.
+
+### Added
+
+- Redesigned landing page built around real captures, with per-platform
+  downloads, light and dark themes, and a new social card.
+
+### Changed
+
+- Version 1.0.0 across the app, installers and release artifacts.
+
 ## [0.5.0] - 2026-11-16
 
 ### Added
