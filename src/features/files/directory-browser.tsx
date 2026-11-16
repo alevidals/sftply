@@ -329,6 +329,15 @@ export function DirectoryBrowser({
         case "reveal":
           if (activeEntry && allowReveal) revealEntry(activeEntry)
           break
+        case "reveal-folder": {
+          if (!allowReveal) break
+          const folder = listing?.path ?? path
+          if (!folder) break
+          localFiles.reveal(folder).catch((error) => {
+            reportError("Could not reveal the folder", error)
+          })
+          break
+        }
         case "permissions":
           if (selectedEntries.length > 0 && canChmod) {
             setPermissionsTargets(selectedEntries)
@@ -366,6 +375,7 @@ export function DirectoryBrowser({
       listing,
       openEditor,
       openEntry,
+      path,
       reportError,
       revealEntry,
       selectedEntries,

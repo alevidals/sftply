@@ -65,6 +65,7 @@ export type FileAction =
   | "rename"
   | "delete"
   | "reveal"
+  | "reveal-folder"
   | "permissions"
   | "new-folder"
   | "copy-path"
@@ -193,6 +194,8 @@ export function FileTable({
       case "permissions":
         return !hasSelection || !canChmod
       case "new-folder":
+        return false
+      case "reveal-folder":
         return false
       case "copy-path":
         return false
@@ -488,6 +491,12 @@ export function FileTable({
               <CopyIcon />
               Copy folder path
             </ContextMenuItem>
+            {allowReveal ? (
+              <ContextMenuItem onSelect={() => onAction("reveal-folder")}>
+                <FolderSearchIcon />
+                Reveal folder in file manager
+              </ContextMenuItem>
+            ) : null}
           </>
         ) : (
           <>

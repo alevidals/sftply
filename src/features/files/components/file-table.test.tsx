@@ -60,6 +60,7 @@ function renderTable(
     renamingPath?: string | null
     dragScope?: FsScope
     canEdit?: boolean
+    allowReveal?: boolean
     onDropPayload?: (payload: TransferDragPayload, directory: FsEntry) => void
   } = {},
 ) {
@@ -86,7 +87,7 @@ function renderTable(
       canChmod
       canEdit={overrides.canEdit ?? true}
       allowOpen
-      allowReveal
+      allowReveal={overrides.allowReveal ?? true}
       canTransfer
       transferLabel="Download to local"
       transferDirection="download"
@@ -106,7 +107,30 @@ describe("FileTable background menu", () => {
     expect(await screen.findByRole("menuitem", { name: /New folder/ })).toBeInTheDocument()
     expect(screen.getByRole("menuitem", { name: /Select all/ })).toBeInTheDocument()
     expect(screen.getByRole("menuitem", { name: /Copy folder path/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole("menuitem", { name: /Reveal folder in file manager/ }),
+    ).toBeInTheDocument()
     expect(screen.queryByRole("menuitem", { name: /Rename/ })).not.toBeInTheDocument()
+  })
+
+  it("reveals the current folder in the file manager", async () => {
+    const { handlers, grid } = renderTable({ selection: selection(null, []) })
+
+    fireEvent.contextMenu(grid)
+
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Reveal folder in file manager/ }))
+    expect(handlers.onAction).toHaveBeenCalledWith("reveal-folder")
+  })
+
+  it("hides the reveal action on panes without a local file manager", async () => {
+    const { grid } = renderTable({ selection: selection(null, []), allowReveal: false })
+
+    fireEvent.contextMenu(grid)
+
+    expect(await screen.findByRole("menuitem", { name: /New folder/ })).toBeInTheDocument()
+    expect(
+      screen.queryByRole("menuitem", { name: /Reveal folder in file manager/ }),
+    ).not.toBeInTheDocument()
   })
 
   it("clears the selection when the empty background is clicked", () => {
