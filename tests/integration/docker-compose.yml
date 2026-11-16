@@ -11,12 +11,12 @@ services:
     <<: *pure-ftpd
     ports:
       - "2121:21"
-      - "30000-30009:30000-30009"
+      - "30000-30099:30000-30099"
     environment:
       FTP_USER: sftply
       FTP_PASSWORD: sftply-test
       FTP_HOME: /home/ftpuser
-      FTP_PASSIVE: 30000:30009
+      FTP_PASSIVE: 30000:30099
       FTP_TLS: "0"
     volumes:
       - ftp-data:/home/ftpuser
@@ -25,12 +25,12 @@ services:
     <<: *pure-ftpd
     ports:
       - "2122:21"
-      - "30010-30019:30010-30019"
+      - "30100-30199:30100-30199"
     environment:
       FTP_USER: sftply
       FTP_PASSWORD: sftply-test
       FTP_HOME: /home/ftpuser
-      FTP_PASSIVE: 30010:30019
+      FTP_PASSIVE: 30100:30199
       FTP_TLS: "1"
     volumes:
       - ftps-explicit-data:/home/ftpuser
@@ -43,12 +43,12 @@ services:
     restart: "no"
     ports:
       - "2990:990"
-      - "30020-30029:30020-30029"
+      - "30200-30299:30200-30299"
     environment:
       FTP_USER: sftply
       FTP_PASSWORD: sftply-test
       FTP_HOME: /home/ftpuser
-      FTP_PASSIVE: 30020:30029
+      FTP_PASSIVE: 30200:30299
       FTP_PORT: "990"
     volumes:
       - ftps-implicit-data:/home/ftpuser

@@ -15,9 +15,9 @@ no Rosetta/amd64 emulation is required.
 
 | Service         | Port(s) | Image                            | Notes                               |
 | --------------- | ------- | -------------------------------- | ----------------------------------- |
-| `ftp`           | `2121`  | `sftply/pure-ftpd-test`          | Plain FTP, passive `30000-30009`    |
-| `ftps-explicit` | `2122`  | `sftply/pure-ftpd-test`          | `AUTH TLS`, passive `30010-30019`   |
-| `ftps-implicit` | `2990`  | `sftply/pure-ftpd-implicit-test` | TLS from byte zero, `30020-30029`   |
+| `ftp`           | `2121`  | `sftply/pure-ftpd-test`          | Plain FTP, passive `30000-30099`    |
+| `ftps-explicit` | `2122`  | `sftply/pure-ftpd-test`          | `AUTH TLS`, passive `30100-30199`   |
+| `ftps-implicit` | `2990`  | `sftply/pure-ftpd-implicit-test` | TLS from byte zero, `30200-30299`   |
 | `sftp`          | `2222`  | `atmoz/sftp:alpine`              | OpenSSH, chrooted to `/home/sftply` |
 
 Credentials for every service: `sftply` / `sftply-test`.
