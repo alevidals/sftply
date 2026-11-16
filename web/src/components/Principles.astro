@@ -1,0 +1,54 @@
+---
+import { REPO_URL } from "../lib/releases";
+
+const principles = [
+  {
+    title: "Pause and resume only where the protocol allows it",
+    body: "The queue checks what the server supports before showing a control. If a transfer has to restart, it says so.",
+  },
+  {
+    title: "Host keys are verified, never trusted silently",
+    body: "SFTP connections fail closed on an unknown or changed fingerprint. You see the key before it is remembered.",
+  },
+  {
+    title: "Credentials never leave the keychain",
+    body: "Configuration files, diagnostics exports and logs contain connection details, never passwords or passphrases.",
+  },
+];
+---
+
+<section class="section" id="principles">
+  <div class="container principles">
+    <div>
+      <div class="section-head">
+        <p class="eyebrow">Honest by construction</p>
+        <h2>No invented states</h2>
+        <p class="lead">
+          Most clients guess, then draw a progress bar and hope. sftply reports what
+          the protocol actually did, including when the answer is “not supported”.
+        </p>
+      </div>
+
+      <blockquote class="pull-quote">
+        A transfer queue is a promise. If the server cannot resume a download, the
+        interface should not offer a resume button.
+        <span>
+          Design principle · <a href={`${REPO_URL}/blob/main/docs/ARCHITECTURE.md`}>
+            architecture notes
+          </a>
+        </span>
+      </blockquote>
+    </div>
+
+    <ol class="principle-list">
+      {
+        principles.map((principle) => (
+          <li class="principle">
+            <h3>{principle.title}</h3>
+            <p>{principle.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>

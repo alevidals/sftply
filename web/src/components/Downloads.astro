@@ -15,6 +15,7 @@ const { release } = Astro.props;
 
 const platforms = [
   {
+    id: "macos",
     name: "macOS",
     badge: "Universal",
     blurb: "Apple Silicon and Intel in one bundle. Unzip and drag sftply.app to Applications.",
@@ -22,6 +23,7 @@ const platforms = [
     installer: { label: "Disk image", suffix: ".dmg" },
   },
   {
+    id: "windows",
     name: "Windows",
     badge: "x64",
     blurb: "Windows 10 and 11. Unzip and run the .exe, or use the setup wizard.",
@@ -29,6 +31,7 @@ const platforms = [
     installer: { label: "Setup", suffix: "-setup.exe" },
   },
   {
+    id: "linux",
     name: "Linux",
     badge: "x64",
     blurb: "Make the AppImage executable and run it, or install the Debian package.",
@@ -65,10 +68,11 @@ const sums = findAsset(release, "SHA256SUMS");
           const portable = link(platform.portable.suffix);
           const installer = link(platform.installer.suffix);
           return (
-            <article class="download">
+            <article class="download" data-platform={platform.id}>
               <div class="download-head">
                 <h3>{platform.name}</h3>
                 <span class="badge">{platform.badge}</span>
+                <span class="badge badge-you">Your system</span>
               </div>
               <p>{platform.blurb}</p>
               <a class="download-primary" href={portable.href}>
@@ -93,3 +97,21 @@ const sums = findAsset(release, "SHA256SUMS");
     </p>
   </div>
 </section>
+
+<script is:inline>
+  // Highlight the card that matches the visitor's OS. Presentation only: every
+  // card stays a normal link if the detection is wrong or unavailable.
+  (() => {
+    const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
+    const armLinux = /linux/i.test(ua) && /aarch64|arm64|armv8/i.test(navigator.userAgent);
+    const id = /mac/i.test(ua)
+      ? "macos"
+      : /win/i.test(ua)
+        ? "windows"
+        : /linux/i.test(ua) && !armLinux
+          ? "linux"
+          : "";
+    if (!id) return;
+    document.querySelector(`[data-platform="${id}"]`)?.setAttribute("data-detected", "");
+  })();
+</script>

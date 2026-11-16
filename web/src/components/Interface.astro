@@ -1,0 +1,53 @@
+---
+import editorShot from "../assets/screens/editor.webp";
+import paletteShot from "../assets/screens/palette.webp";
+---
+
+<section class="section" id="interface">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">A familiar interface</p>
+      <h2>Two panes, native controls, no surprises</h2>
+      <p class="lead">
+        The same patterns as your file manager: select, drag and drop. The queue
+        reports what the protocol is actually doing instead of drawing a guess.
+      </p>
+    </div>
+
+    <div class="shot-grid">
+      <figure class="shot shot-square">
+        <div class="shot-media">
+          <img
+            src={editorShot.src}
+            width={editorShot.width}
+            height={editorShot.height}
+            alt="Editor with design-notes.md open on the remote server"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <figcaption>
+          <strong>Edit remote files in place</strong>
+          <span>Atomic saves and stale-write detection.</span>
+        </figcaption>
+      </figure>
+
+      <figure class="shot shot-square">
+        <div class="shot-media">
+          <img
+            src={paletteShot.src}
+            width={paletteShot.width}
+            height={paletteShot.height}
+            alt="Command palette searching for connections and actions"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <figcaption>
+          <strong>Every action one keystroke away</strong>
+          <span>⌘K opens the command palette.</span>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
