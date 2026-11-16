@@ -28,6 +28,10 @@ jobs:
             platform: macos-latest
           - name: linux-x64
             platform: ubuntu-22.04
+            arch: x64
+          - name: linux-arm64
+            platform: ubuntu-22.04-arm
+            arch: arm64
           - name: windows-x64
             platform: windows-latest
     steps:
@@ -102,10 +106,10 @@ jobs:
           VERSION="$(bun -p "require('./package.json').version")"
           mkdir -p artifacts
           cp src-tauri/target/release/bundle/appimage/*.AppImage \
-            "artifacts/sftply_${VERSION}_linux-x64.AppImage"
+            "artifacts/sftply_${VERSION}_linux-${{ matrix.arch }}.AppImage"
           cp src-tauri/target/release/bundle/deb/*.deb \
-            "artifacts/sftply_${VERSION}_linux-x64.deb"
-          chmod +x "artifacts/sftply_${VERSION}_linux-x64.AppImage"
+            "artifacts/sftply_${VERSION}_linux-${{ matrix.arch }}.deb"
+          chmod +x "artifacts/sftply_${VERSION}_linux-${{ matrix.arch }}.AppImage"
 
       - name: Package Windows artifacts
         if: runner.os == 'Windows'

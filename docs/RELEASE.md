@@ -48,6 +48,7 @@ in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
 | macOS universal | `*_macos-universal_portable.zip` (zipped `.app`) | `.dmg`            |
 | Windows x64     | `*_windows-x64_portable.zip` (raw `.exe`)        | NSIS `-setup.exe` |
 | Linux x64       | `.AppImage`                                      | `.deb`            |
+| Linux ARM64     | `.AppImage`                                      | `.deb`            |
 
 A final job writes `SHA256SUMS` and creates a **draft** GitHub release with all
 artifacts. Review it and publish manually.
@@ -63,7 +64,9 @@ Portable caveats:
   below.
 - **Linux**: the AppImage is a single executable, but it may need FUSE 2 (or
   `--appimage-extract-and-run`) and the WebKitGTK libraries provided by the
-  distribution. It is built on Ubuntu 22.04 to keep the glibc baseline low.
+  distribution. Both architectures are built on Ubuntu 22.04 to keep the glibc
+  baseline low; the ARM64 bundles run on aarch64 desktops, Raspberry Pi 4/5 and
+  ARM servers.
 
 ## Troubleshooting first launch
 
