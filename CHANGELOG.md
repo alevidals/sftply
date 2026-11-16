@@ -8,6 +8,20 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [0.5.0] - 2026-11-16
+
+### Added
+
+- Create empty files from local panes. The empty folder state now has a New
+  menu, and New file is also available in the context menus. A created file
+  opens in the in-app editor or in the system text editor.
+- The empty folder state has the same folder actions as the pane background.
+
+### Fixed
+
+- Reveal in file manager from the file actions menu now reveals the current
+  folder when no row is selected.
+
 ## [0.4.7] - 2026-11-16
 
 ### Added
