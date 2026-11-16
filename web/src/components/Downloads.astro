@@ -35,8 +35,16 @@ const platforms = [
     name: "Linux",
     badge: "x64",
     blurb: "Make the AppImage executable and run it, or install the Debian package.",
-    portable: { label: "AppImage", suffix: ".AppImage" },
-    installer: { label: "Debian package", suffix: ".deb" },
+    portable: { label: "AppImage", suffix: "_linux-x64.AppImage" },
+    installer: { label: "Debian package", suffix: "_linux-x64.deb" },
+  },
+  {
+    id: "linux-arm",
+    name: "Linux ARM64",
+    badge: "arm64",
+    blurb: "For ARM64 desktops, Raspberry Pi 4/5 and ARM servers. AppImage or Debian package.",
+    portable: { label: "AppImage", suffix: "_linux-arm64.AppImage" },
+    installer: { label: "Debian package", suffix: "_linux-arm64.deb" },
   },
 ];
 
@@ -75,15 +83,17 @@ const sums = findAsset(release, "SHA256SUMS");
                 <span class="badge badge-you">Your system</span>
               </div>
               <p>{platform.blurb}</p>
-              <a class="download-primary" href={portable.href}>
-                <span>{platform.portable.label}</span>
-                <span class="size">{portable.size}</span>
-              </a>
-              <a class="download-secondary" href={installer.href}>
-                {platform.installer.label}
-                {installer.size ? ` · ${installer.size}` : ""}
-                <Icon name="arrow-up-right" size={13} />
-              </a>
+              <div class="download-actions">
+                <a class="download-primary" href={portable.href}>
+                  <span>{platform.portable.label}</span>
+                  <span class="size">{portable.size}</span>
+                </a>
+                <a class="download-secondary" href={installer.href}>
+                  {platform.installer.label}
+                  {installer.size ? ` · ${installer.size}` : ""}
+                  <Icon name="arrow-up-right" size={13} />
+                </a>
+              </div>
             </article>
           );
         })
@@ -108,8 +118,10 @@ const sums = findAsset(release, "SHA256SUMS");
       ? "macos"
       : /win/i.test(ua)
         ? "windows"
-        : /linux/i.test(ua) && !armLinux
-          ? "linux"
+        : /linux/i.test(ua)
+          ? armLinux
+            ? "linux-arm"
+            : "linux"
           : "";
     if (!id) return;
     document.querySelector(`[data-platform="${id}"]`)?.setAttribute("data-detected", "");
