@@ -16,6 +16,27 @@ describe("PaneEmpty", () => {
     expect(onNewFolder).toHaveBeenCalledOnce()
   })
 
+  it("offers folders and files together when the pane can create both", async () => {
+    const user = userEvent.setup()
+    const onNewFolder = vi.fn()
+    const onNewFile = vi.fn()
+    render(
+      <PaneEmpty
+        filtered={false}
+        canCreate
+        canCreateFile
+        onNewFolder={onNewFolder}
+        onNewFile={onNewFile}
+        onClearFilter={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole("button", { name: "New" }))
+    expect(screen.getByRole("menuitem", { name: /New folder/ })).toBeInTheDocument()
+    await user.click(screen.getByRole("menuitem", { name: /New file in sftply/ }))
+    expect(onNewFile).toHaveBeenCalledWith("editor")
+  })
+
   it("hides the new folder action when the server cannot create folders", () => {
     render(
       <PaneEmpty

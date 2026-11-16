@@ -113,6 +113,14 @@ describe("FileTable background menu", () => {
     expect(screen.queryByRole("menuitem", { name: /Rename/ })).not.toBeInTheDocument()
   })
 
+  it("offers new file actions on local panes", async () => {
+    const { grid } = renderTable({ selection: selection(null, []) })
+
+    fireEvent.contextMenu(grid)
+
+    expect(await screen.findByRole("menuitem", { name: /New file/ })).toBeInTheDocument()
+  })
+
   it("reveals the current folder in the file manager", async () => {
     const { handlers, grid } = renderTable({ selection: selection(null, []) })
 

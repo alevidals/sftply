@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import {
   DeleteDialog,
+  NewFileDialog,
   NewFolderDialog,
   PermissionsDialog,
 } from "@/features/files/components/file-dialogs"
@@ -35,6 +36,21 @@ const folder: FsEntry = {
 function failure(message: string) {
   return new IpcError({ code: "PERMISSION_DENIED", message, detail: null, retryable: false })
 }
+
+describe("NewFileDialog", () => {
+  it("creates a file with the typed name", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const onOpenChange = vi.fn()
+    render(<NewFileDialog open parentPath="/tmp" onCreate={onCreate} onOpenChange={onOpenChange} />)
+
+    await user.type(screen.getByLabelText("Name"), "notes.txt")
+    await user.click(screen.getByRole("button", { name: "Create file" }))
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith("notes.txt"))
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+})
 
 describe("NewFolderDialog", () => {
   it("creates a folder and closes on success", async () => {

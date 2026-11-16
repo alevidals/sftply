@@ -107,6 +107,16 @@ export const ipc = {
     )
   },
 
+  localCreateFile(parent: string, name: string): Promise<FsEntry> {
+    return invoke(commands.localCreateFile(parent, name)).then((result) => unwrap(result))
+  },
+
+  localOpenEditor(path: string): Promise<void> {
+    return invoke(commands.localOpenEditor(path)).then((result) => {
+      unwrap(result)
+    })
+  },
+
   localOpen(path: string): Promise<void> {
     return invoke(commands.localOpen(path)).then((result) => {
       unwrap(result)

@@ -4,6 +4,7 @@ import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
   CopyIcon,
+  FilePlusIcon,
   FileTextIcon,
   FolderPlusIcon,
   FolderSearchIcon,
@@ -20,6 +21,9 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { Input } from "@/components/ui/input"
@@ -66,6 +70,8 @@ export type FileAction =
   | "delete"
   | "reveal"
   | "reveal-folder"
+  | "new-file-editor"
+  | "new-file-system"
   | "permissions"
   | "new-folder"
   | "copy-path"
@@ -196,6 +202,9 @@ export function FileTable({
       case "new-folder":
         return false
       case "reveal-folder":
+        return false
+      case "new-file-editor":
+      case "new-file-system":
         return false
       case "copy-path":
         return false
@@ -482,6 +491,22 @@ export function FileTable({
               New folder
               <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
             </ContextMenuItem>
+            {allowReveal ? (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <FilePlusIcon />
+                  New file
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuItem onSelect={() => onAction("new-file-editor")}>
+                    Edit in sftply
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => onAction("new-file-system")}>
+                    Open in system editor
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            ) : null}
             <ContextMenuItem onSelect={onSelectAll}>
               <MousePointerSquareDashedIcon />
               Select all

@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, FolderPlusIcon, LockIcon } from "lucide-react"
+import { AlertTriangleIcon, FilePlusIcon, FolderPlusIcon, LockIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import {
   AlertDialog,
@@ -34,19 +34,32 @@ import { errorMessage } from "@/lib/errors"
 import { formatMode, formatModeSymbolic } from "@/lib/format"
 import type { FsEntry } from "@/lib/ipc/bindings"
 
-interface NewFolderDialogProps {
+interface NameDialogProps {
   open: boolean
   parentPath: string
   onOpenChange: (open: boolean) => void
   onCreate: (name: string) => Promise<void>
 }
 
-export function NewFolderDialog({
+interface NameDialogFields extends NameDialogProps {
+  icon: React.ReactNode
+  title: string
+  inputId: string
+  placeholder: string
+  submitLabel: string
+}
+
+function NameDialog({
   open,
   parentPath,
   onOpenChange,
   onCreate,
-}: NewFolderDialogProps) {
+  icon,
+  title,
+  inputId,
+  placeholder,
+  submitLabel,
+}: NameDialogFields) {
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -85,8 +98,8 @@ export function NewFolderDialog({
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FolderPlusIcon className="size-4 text-primary" />
-              New folder
+              {icon}
+              {title}
             </DialogTitle>
             <DialogDescription className="selectable truncate font-mono text-2xs">
               {parentPath}
@@ -94,9 +107,9 @@ export function NewFolderDialog({
           </DialogHeader>
 
           <div className="space-y-1.5 py-4">
-            <Label htmlFor="new-folder-name">Name</Label>
+            <Label htmlFor={inputId}>Name</Label>
             <Input
-              id="new-folder-name"
+              id={inputId}
               ref={inputRef}
               value={name}
               onChange={(event) => {
@@ -106,7 +119,7 @@ export function NewFolderDialog({
               aria-invalid={Boolean(error)}
               autoComplete="off"
               spellCheck={false}
-              placeholder="untitled folder"
+              placeholder={placeholder}
             />
             {error ? (
               <p className="text-xs text-destructive" role="alert">
@@ -125,12 +138,38 @@ export function NewFolderDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={busy || name.trim().length === 0}>
-              {busy ? "Creating…" : "Create folder"}
+              {busy ? "Creating…" : submitLabel}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+export function NewFolderDialog(props: NameDialogProps) {
+  return (
+    <NameDialog
+      {...props}
+      icon={<FolderPlusIcon className="size-4 text-primary" />}
+      title="New folder"
+      inputId="new-folder-name"
+      placeholder="untitled folder"
+      submitLabel="Create folder"
+    />
+  )
+}
+
+export function NewFileDialog(props: NameDialogProps) {
+  return (
+    <NameDialog
+      {...props}
+      icon={<FilePlusIcon className="size-4 text-primary" />}
+      title="New file"
+      inputId="new-file-name"
+      placeholder="untitled.txt"
+      submitLabel="Create file"
+    />
   )
 }
 

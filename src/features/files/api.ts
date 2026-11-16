@@ -58,8 +58,16 @@ export function filesApi(scope: FsScope) {
 export const localFiles = {
   ...filesApi(LOCAL_SCOPE),
 
+  createFile(parent: string, name: string): Promise<FsEntry> {
+    return ipc.localCreateFile(parent, name)
+  },
+
   open(path: string): Promise<void> {
     return ipc.localOpen(path)
+  },
+
+  openEditor(path: string): Promise<void> {
+    return ipc.localOpenEditor(path)
   },
 
   reveal(path: string): Promise<void> {

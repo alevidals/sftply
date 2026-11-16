@@ -374,6 +374,89 @@ async fn cleanup_remote_text(client: &mut Box<dyn RemoteFs>, path: &str) {
 
 #[tauri::command]
 #[specta::specta]
+pub async fn local_create_file(parent: String, name: String) -> Result<FsEntry, AppError> {
+    local::create_file(&parent, &name).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn local_open_editor(path: String) -> Result<(), AppError> {
+    let path = normalize_absolute(&path)?;
+    tauri::async_runtime::spawn_blocking(move || open_system_editor(&path))
+        .await
+        .map_err(|error| {
+            AppError::internal(
+                "Could not open the text editor.",
+                format!("task failed: {error}"),
+            )
+        })?
+}
+
+fn open_system_editor(path: &std::path::Path) -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("open")
+            .arg("-t")
+            .arg(path)
+            .status()
+            .map_err(|error| {
+                AppError::internal("Could not open the text editor.", error.to_string())
+            })?;
+        if !status.success() {
+            return Err(AppError::internal(
+                "Could not open the text editor.",
+                format!("open exited with {status}"),
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("notepad")
+            .arg(path)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| {
+                AppError::internal("Could not open the text editor.", error.to_string())
+            })
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Ask the desktop for the text/plain handler so an HTML file opens in
+        // an editor rather than the browser, then fall back to xdg-open.
+        let desktop = std::process::Command::new("xdg-mime")
+            .args(["query", "default", "text/plain"])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty());
+        if let Some(desktop) = desktop {
+            let launched = std::process::Command::new("gtk-launch")
+                .arg(&desktop)
+                .arg(path)
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
+            if launched {
+                return Ok(());
+            }
+        }
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| {
+                AppError::internal("Could not open the text editor.", error.to_string())
+            })
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn local_open(path: String) -> Result<(), AppError> {
     let path = normalize_absolute(&path)?;
     tauri::async_runtime::spawn_blocking(move || open_path(&path, None::<&str>))

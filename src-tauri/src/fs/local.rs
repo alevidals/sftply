@@ -143,6 +143,23 @@ pub async fn mkdir(parent: &str, name: &str) -> Result<FsEntry, AppError> {
     stat_path(&target).await
 }
 
+pub async fn create_file(parent: &str, name: &str) -> Result<FsEntry, AppError> {
+    let parent = normalize_absolute(parent)?;
+    let target = join_child(&parent, name)?;
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&target)
+        .await
+    {
+        Ok(_) => stat_path(&target).await,
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => Err(AppError::invalid_input(
+            "A file or folder with that name already exists.",
+        )),
+        Err(error) => Err(io_error(error, "create", &target)),
+    }
+}
+
 pub async fn rename(input: &str, new_name: &str) -> Result<FsEntry, AppError> {
     let source = normalize_absolute(input)?;
     let parent = source
@@ -588,6 +605,27 @@ mod tests {
             .await
             .unwrap();
         assert!(!root.join("archive").exists());
+    }
+
+    #[tokio::test]
+    async fn creates_empty_files_and_rejects_existing_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+
+        let created = create_file(root.to_str().unwrap(), "notes.txt")
+            .await
+            .unwrap();
+        assert_eq!(created.kind, EntryKind::File);
+        assert_eq!(created.size, 0.0);
+        assert!(root.join("notes.txt").is_file());
+
+        assert!(
+            create_file(root.to_str().unwrap(), "notes.txt")
+                .await
+                .is_err()
+        );
+        fs::create_dir(root.join("folder")).unwrap();
+        assert!(create_file(root.to_str().unwrap(), "folder").await.is_err());
     }
 
     #[tokio::test]

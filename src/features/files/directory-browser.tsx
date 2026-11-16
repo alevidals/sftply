@@ -8,6 +8,7 @@ import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
+  FilePlusIcon,
   FileTextIcon,
   FolderPlusIcon,
   FolderSearchIcon,
@@ -28,6 +29,18 @@ import { tinykeys } from "tinykeys"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -35,6 +48,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -45,6 +61,7 @@ import { BookmarksDialog } from "@/features/files/components/bookmarks-dialog"
 import { ColumnHeader } from "@/features/files/components/column-header"
 import {
   DeleteDialog,
+  NewFileDialog,
   NewFolderDialog,
   PermissionsDialog,
 } from "@/features/files/components/file-dialogs"
@@ -155,6 +172,8 @@ export function DirectoryBrowser({
   const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [newFolderOpen, setNewFolderOpen] = useState(false)
+  const [newFileOpen, setNewFileOpen] = useState(false)
+  const [newFileTarget, setNewFileTarget] = useState<"editor" | "system">("editor")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [permissionsOpen, setPermissionsOpen] = useState(false)
   const [permissionsTargets, setPermissionsTargets] = useState<FsEntry[]>([])
@@ -311,6 +330,15 @@ export function DirectoryBrowser({
     [allowReveal, reportError],
   )
 
+  const revealFolder = useCallback(() => {
+    if (!allowReveal) return
+    const folder = listing?.path ?? path
+    if (!folder) return
+    localFiles.reveal(folder).catch((error) => {
+      reportError("Could not reveal the folder", error)
+    })
+  }, [allowReveal, listing, path, reportError])
+
   const handleAction = useCallback(
     (action: FileAction) => {
       switch (action) {
@@ -327,17 +355,21 @@ export function DirectoryBrowser({
           if (selectedEntries.length > 0) setDeleteOpen(true)
           break
         case "reveal":
-          if (activeEntry && allowReveal) revealEntry(activeEntry)
-          break
-        case "reveal-folder": {
           if (!allowReveal) break
-          const folder = listing?.path ?? path
-          if (!folder) break
-          localFiles.reveal(folder).catch((error) => {
-            reportError("Could not reveal the folder", error)
-          })
+          if (activeEntry) revealEntry(activeEntry)
+          else revealFolder()
           break
-        }
+        case "reveal-folder":
+          revealFolder()
+          break
+        case "new-file-editor":
+          setNewFileTarget("editor")
+          setNewFileOpen(true)
+          break
+        case "new-file-system":
+          setNewFileTarget("system")
+          setNewFileOpen(true)
+          break
         case "permissions":
           if (selectedEntries.length > 0 && canChmod) {
             setPermissionsTargets(selectedEntries)
@@ -375,13 +407,26 @@ export function DirectoryBrowser({
       listing,
       openEditor,
       openEntry,
-      path,
       reportError,
       revealEntry,
+      revealFolder,
       selectedEntries,
       transfer,
     ],
   )
+
+  const createFile = async (name: string) => {
+    if (!listing) throw new Error("No folder is loaded.")
+    const entry = await localFiles.createFile(listing.path, name)
+    await invalidate()
+    if (newFileTarget === "editor") {
+      openEditor(entry)
+      return
+    }
+    localFiles.openEditor(entry.path).catch((error) => {
+      reportError(`Could not open “${name}” in the system editor`, error)
+    })
+  }
 
   const createFolder = async (name: string) => {
     if (!listing) throw new Error("No folder is loaded.")
@@ -875,16 +920,72 @@ export function DirectoryBrowser({
       ) : listingQuery.isPending ? (
         <TableSkeleton columns={columns} rowHeight={rowHeight} />
       ) : entries.length === 0 ? (
-        <PaneEmpty
-          filtered={filter.trim().length > 0 && (listing?.entries.length ?? 0) > 0}
-          description={emptyDescription}
-          canCreate={canMkdir}
-          onNewFolder={() => setNewFolderOpen(true)}
-          onClearFilter={() => {
-            setFilter("")
-            setFilterOpen(false)
-          }}
-        />
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="flex min-h-0 flex-1">
+              <PaneEmpty
+                filtered={filter.trim().length > 0 && (listing?.entries.length ?? 0) > 0}
+                description={emptyDescription}
+                canCreate={canMkdir}
+                canCreateFile={allowReveal}
+                onNewFolder={() => setNewFolderOpen(true)}
+                onNewFile={(target) => {
+                  setNewFileTarget(target)
+                  setNewFileOpen(true)
+                }}
+                onClearFilter={() => {
+                  setFilter("")
+                  setFilterOpen(false)
+                }}
+              />
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuLabel className="font-normal">Folder</ContextMenuLabel>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => setNewFolderOpen(true)}>
+              <FolderPlusIcon />
+              New folder
+              <ContextMenuShortcut>{shortcutLabel("new-folder")}</ContextMenuShortcut>
+            </ContextMenuItem>
+            {allowReveal ? (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <FilePlusIcon />
+                  New file
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuItem
+                    onSelect={() => {
+                      setNewFileTarget("editor")
+                      setNewFileOpen(true)
+                    }}
+                  >
+                    Edit in sftply
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onSelect={() => {
+                      setNewFileTarget("system")
+                      setNewFileOpen(true)
+                    }}
+                  >
+                    Open in system editor
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            ) : null}
+            <ContextMenuItem onSelect={() => handleAction("copy-path")}>
+              <CopyIcon />
+              Copy folder path
+            </ContextMenuItem>
+            {allowReveal ? (
+              <ContextMenuItem onSelect={revealFolder}>
+                <FolderSearchIcon />
+                Reveal folder in file manager
+              </ContextMenuItem>
+            ) : null}
+          </ContextMenuContent>
+        </ContextMenu>
       ) : (
         <FileTable
           entries={entries}
@@ -948,6 +1049,12 @@ export function DirectoryBrowser({
         parentPath={listing?.path ?? path ?? ""}
         onOpenChange={setNewFolderOpen}
         onCreate={createFolder}
+      />
+      <NewFileDialog
+        open={newFileOpen}
+        parentPath={listing?.path ?? path ?? ""}
+        onOpenChange={setNewFileOpen}
+        onCreate={createFile}
       />
       <DeleteDialog
         open={deleteOpen}
@@ -1109,6 +1216,22 @@ function ActionsMenu({
           New folder
           <DropdownMenuShortcut>{shortcutLabel("new-folder")}</DropdownMenuShortcut>
         </DropdownMenuItem>
+        {canReveal ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <FilePlusIcon />
+              New file
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onSelect={() => onAction("new-file-editor")}>
+                Edit in sftply
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onAction("new-file-system")}>
+                Open in system editor
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : null}
         <DropdownMenuItem disabled={!canDelete} onSelect={() => onAction("delete")}>
           <Trash2Icon />
           Delete
