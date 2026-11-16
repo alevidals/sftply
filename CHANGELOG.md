@@ -8,6 +8,18 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [0.4.7] - 2026-11-16
+
+### Added
+
+- Linux ARM64 builds: AppImage and Debian package for aarch64 desktops,
+  Raspberry Pi 4/5 and ARM servers.
+
+### Fixed
+
+- Right-clicking the empty area of a local pane now offers “Reveal folder in
+  file manager” for the current folder. Remote panes keep the reduced menu.
+
 ## [0.4.6] - 2026-11-15
 
 ### Fixed

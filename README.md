@@ -32,6 +32,7 @@
 | macOS (Intel + Apple Silicon) | `*_macos-universal_portable.zip`: unzip and drag `sftply.app` to Applications | `.dmg`              |
 | Windows 10/11 x64             | `*_windows-x64_portable.zip`: unzip and run `sftply.exe`                      | `-setup.exe` (NSIS) |
 | Linux x64                     | `.AppImage`: `chmod +x` and run                                               | `.deb`              |
+| Linux ARM64                   | `.AppImage`: `chmod +x` and run                                               | `.deb`              |
 
 Every release ships `SHA256SUMS`.
 
