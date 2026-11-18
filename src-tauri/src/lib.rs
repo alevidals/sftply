@@ -82,6 +82,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::transfer::transfer_history,
             commands::transfer::transfer_clear_history,
             commands::sync::sync_compare,
+            commands::sync::sync_cancel,
         ])
         .events(tauri_specta::collect_events![
             ActivityEntry,

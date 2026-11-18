@@ -67,36 +67,64 @@ export function SyncCompareDialog() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState("")
   const [showEqual, setShowEqual] = useState(false)
+  const [includeGlobs, setIncludeGlobs] = useState("")
+  const [excludeGlobs, setExcludeGlobs] = useState("")
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const requestIdRef = useRef(0)
 
   const sessionName = activeSessionId ? sessions[activeSessionId]?.name : null
 
-  const load = useCallback(async () => {
-    if (!localPath || !remotePath || !activeSessionId) return
-    setLoading(true)
-    setError(null)
-    setPlan(null)
-    setSelected(new Set())
-    try {
-      const next = await syncApi.compare(localPath, remoteScope(activeSessionId), remotePath)
-      setPlan(next)
-      setSelected(defaultSelection(next))
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      setLoading(false)
-    }
-  }, [activeSessionId, localPath, remotePath])
+  const runCompare = useCallback(
+    async (include: string[], exclude: string[]) => {
+      if (!localPath || !remotePath || !activeSessionId) return
+      const requestId = ++requestIdRef.current
+      setLoading(true)
+      setError(null)
+      setPlan(null)
+      setSelected(new Set())
+      try {
+        const next = await syncApi.compare(
+          localPath,
+          remoteScope(activeSessionId),
+          remotePath,
+          include,
+          exclude,
+        )
+        if (requestId !== requestIdRef.current) return
+        setPlan(next)
+        setSelected(defaultSelection(next))
+      } catch (cause) {
+        if (requestId === requestIdRef.current) setError(errorMessage(cause))
+      } finally {
+        if (requestId === requestIdRef.current) setLoading(false)
+      }
+    },
+    [activeSessionId, localPath, remotePath],
+  )
 
   useEffect(() => {
     if (!open) return
     setFilter("")
     setShowEqual(false)
-    void load()
-  }, [open, load])
+    setIncludeGlobs("")
+    setExcludeGlobs("")
+    void runCompare([], [])
+  }, [open, runCompare])
+
+  const applyFilters = () => {
+    if (loading) return
+    void runCompare(globList(includeGlobs), globList(excludeGlobs))
+  }
+
+  const close = () => {
+    if (busy) return
+    requestIdRef.current += 1
+    if (loading) void syncApi.cancel().catch(() => {})
+    setOpen(false)
+  }
 
   const allEntries = useMemo(() => {
     if (!plan) return []
@@ -202,7 +230,12 @@ export function SyncCompareDialog() {
   const missingPaths = !localPath || !remotePath || !activeSessionId
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) close()
+      }}
+    >
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -231,7 +264,11 @@ export function SyncCompareDialog() {
             <p className="max-w-md text-xs text-destructive" role="alert">
               {error}
             </p>
-            <Button variant="outline" size="sm" onClick={() => void load()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void runCompare(globList(includeGlobs), globList(excludeGlobs))}
+            >
               <RefreshCwIcon className="size-3.5" />
               Try again
             </Button>
@@ -254,14 +291,47 @@ export function SyncCompareDialog() {
 
             <p className="text-2xs text-muted-foreground">
               Compare uses size and date. Small files with a different date are checked by content;
-              larger files stay as “Date differs” for review.
+              larger files stay as “Date differs” for review. Globs are relative to the compared
+              folders.
             </p>
+
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <Input
+                value={includeGlobs}
+                onChange={(event) => setIncludeGlobs(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !loading) applyFilters()
+                }}
+                placeholder="Include: src/**, **/*.md"
+                aria-label="Include globs"
+                className="h-8 text-xs"
+              />
+              <Input
+                value={excludeGlobs}
+                onChange={(event) => setExcludeGlobs(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !loading) applyFilters()
+                }}
+                placeholder="Exclude: node_modules/**, .git/**"
+                aria-label="Exclude globs"
+                className="h-8 text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                onClick={applyFilters}
+              >
+                Apply filters
+              </Button>
+            </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <Input
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
-                placeholder="Filter by path…"
+                placeholder="Filter results…"
                 className="h-8 flex-1 text-xs"
               />
               <span className="flex items-center gap-2 text-2xs text-muted-foreground">
@@ -437,6 +507,13 @@ function statusClass(status: SyncEntryStatus): string {
     default:
       return "text-muted-foreground"
   }
+}
+
+function globList(value: string): string[] {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {

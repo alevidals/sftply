@@ -248,10 +248,20 @@ export const ipc = {
     return invoke(commands.sessionCancel(sessionId)).then((result) => unwrap(result))
   },
 
-  syncCompare(localPath: string, remote: FsScope, remotePath: string): Promise<SyncPlan_Serialize> {
-    return invoke(commands.syncCompare(localPath, remote, remotePath)).then((result) =>
-      unwrap(result),
+  syncCompare(
+    localPath: string,
+    remote: FsScope,
+    remotePath: string,
+    include: string[],
+    exclude: string[],
+  ): Promise<SyncPlan_Serialize> {
+    return invoke(commands.syncCompare(localPath, remote, remotePath, include, exclude)).then(
+      (result) => unwrap(result),
     )
+  },
+
+  syncCancel(): Promise<boolean> {
+    return invoke(commands.syncCancel())
   },
 
   transferPlan(

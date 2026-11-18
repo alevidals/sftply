@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, State};
+use tokio_util::sync::CancellationToken;
 
 use crate::app_state::AppState;
 use crate::domain::fs::{EntryKind, FsEntry, FsScope};
@@ -166,12 +167,17 @@ pub(crate) async fn scope_hash(
     scope: &FsScope,
     path: &str,
     max_bytes: u64,
+    token: &CancellationToken,
 ) -> Result<Vec<u8>, AppError> {
+    if token.is_cancelled() {
+        return Err(cancelled());
+    }
     match scope {
         FsScope::Local => hash_local(path, max_bytes).await,
         FsScope::Remote { session_id } => {
             let session = remote_session(state, session_id)?;
             let path = normalize_remote(path)?;
+            let cancellation = token.clone();
             let result = run_operation(&session, operation_timeout(state), |client| {
                 Box::pin(async move {
                     let mut reader = client.open_read(&path, 0).await?;
@@ -179,7 +185,10 @@ pub(crate) async fn scope_hash(
                     let mut buffer = vec![0u8; 64 * 1024];
                     let mut total = 0u64;
                     loop {
-                        let read = reader.read(&mut buffer).await?;
+                        let read = tokio::select! {
+                            _ = cancellation.cancelled() => return Err(cancelled()),
+                            result = reader.read(&mut buffer) => result?,
+                        };
                         if read == 0 {
                             break;
                         }
@@ -200,12 +209,17 @@ pub(crate) async fn scope_hash(
             if let Err(error) = &result
                 && error.code != ErrorCode::Unsupported
                 && error.code != ErrorCode::NotFound
+                && error.code != ErrorCode::Cancelled
             {
                 report_operation_failure(app, &session, error);
             }
             result
         }
     }
+}
+
+fn cancelled() -> AppError {
+    AppError::new(ErrorCode::Cancelled, "The comparison was cancelled.")
 }
 
 async fn hash_local(path: &str, max_bytes: u64) -> Result<Vec<u8>, AppError> {

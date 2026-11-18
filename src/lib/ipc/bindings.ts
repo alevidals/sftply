@@ -82,7 +82,8 @@ export const commands = {
 	 *  Compare a local folder with a remote folder. This is the dry-run for the
 	 *  one-way local -> remote sync; it never writes to either side.
 	 */
-	syncCompare: (localPath: string, remote: FsScope, remotePath: string) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath })),
+	syncCompare: (localPath: string, remote: FsScope, remotePath: string, include: string[], exclude: string[]) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath, include, exclude })),
+	syncCancel: () => __TAURI_INVOKE<boolean>("sync_cancel"),
 };
 
 /** Events */

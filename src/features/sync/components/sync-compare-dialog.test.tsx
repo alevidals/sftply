@@ -8,13 +8,14 @@ import { useUiStore } from "@/stores/ui-store"
 
 const state = vi.hoisted(() => ({
   compare: vi.fn(),
+  cancel: vi.fn(),
   enqueueTree: vi.fn(),
   invalidateQueries: vi.fn(),
   updateSettings: vi.fn(),
 }))
 
 vi.mock("@/features/sync/api", () => ({
-  syncApi: { compare: state.compare },
+  syncApi: { compare: state.compare, cancel: state.cancel },
 }))
 
 vi.mock("@/features/transfers/api", () => ({
@@ -104,6 +105,7 @@ const plan: SyncPlan_Serialize = {
 
 beforeEach(() => {
   state.compare.mockReset().mockResolvedValue(plan)
+  state.cancel.mockReset().mockResolvedValue(true)
   state.enqueueTree.mockReset().mockResolvedValue([{ id: "transfer-1" }])
   state.invalidateQueries.mockReset()
   state.updateSettings.mockReset().mockResolvedValue(undefined)
@@ -132,6 +134,8 @@ describe("SyncCompareDialog", () => {
         "/local",
         { kind: "remote", sessionId: "session-1" },
         "/remote",
+        [],
+        [],
       ),
     )
     expect(await screen.findByText("a.txt")).toBeInTheDocument()
@@ -156,4 +160,24 @@ describe("SyncCompareDialog", () => {
     )
     expect(useUiStore.getState().syncCompareOpen).toBe(false)
   })
+})
+
+it("reloads the plan with include and exclude globs", async () => {
+  const user = userEvent.setup({ pointerEventsCheck: 0 })
+  render(<SyncCompareDialog />)
+
+  await waitFor(() => expect(state.compare).toHaveBeenCalled())
+  await user.type(screen.getByLabelText("Include globs"), "src/**, **/*.md")
+  await user.type(screen.getByLabelText("Exclude globs"), "node_modules/**")
+  await user.click(screen.getByRole("button", { name: "Apply filters" }))
+
+  await waitFor(() =>
+    expect(state.compare).toHaveBeenLastCalledWith(
+      "/local",
+      { kind: "remote", sessionId: "session-1" },
+      "/remote",
+      ["src/**", "**/*.md"],
+      ["node_modules/**"],
+    ),
+  )
 })
