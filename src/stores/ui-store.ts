@@ -21,6 +21,7 @@ interface UiState {
   settingsOpen: boolean
   settingsTab: SettingsTab
   quickConnectOpen: boolean
+  syncCompareOpen: boolean
   activePane: PaneId
   bottomTab: BottomTab
   localSummary: PaneSummary
@@ -30,6 +31,7 @@ interface UiState {
   setSettingsOpen: (open: boolean) => void
   setSettingsTab: (tab: SettingsTab) => void
   setQuickConnectOpen: (open: boolean) => void
+  setSyncCompareOpen: (open: boolean) => void
   setActivePane: (pane: PaneId) => void
   setBottomTab: (tab: BottomTab) => void
   setLocalSummary: (summary: PaneSummary) => void
@@ -43,6 +45,7 @@ export const useUiStore = create<UiState>((set) => ({
   settingsOpen: false,
   settingsTab: "appearance",
   quickConnectOpen: false,
+  syncCompareOpen: false,
   activePane: "local",
   bottomTab: "activity",
   localSummary: EMPTY_SUMMARY,
@@ -52,6 +55,7 @@ export const useUiStore = create<UiState>((set) => ({
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setSettingsTab: (settingsTab) => set({ settingsTab }),
   setQuickConnectOpen: (quickConnectOpen) => set({ quickConnectOpen }),
+  setSyncCompareOpen: (syncCompareOpen) => set({ syncCompareOpen }),
   setActivePane: (activePane) => set({ activePane }),
   setBottomTab: (bottomTab) => set({ bottomTab }),
   setLocalSummary: (localSummary) => set({ localSummary }),

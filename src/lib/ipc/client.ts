@@ -17,6 +17,7 @@ import {
   type SecretStatus,
   type SessionInfo,
   type StartupReport,
+  type SyncPlan_Serialize,
   type TextFile,
   type TransferConflict,
   type TransferHistoryEntry_Serialize,
@@ -245,6 +246,12 @@ export const ipc = {
 
   sessionCancel(sessionId: string): Promise<boolean> {
     return invoke(commands.sessionCancel(sessionId)).then((result) => unwrap(result))
+  },
+
+  syncCompare(localPath: string, remote: FsScope, remotePath: string): Promise<SyncPlan_Serialize> {
+    return invoke(commands.syncCompare(localPath, remote, remotePath)).then((result) =>
+      unwrap(result),
+    )
   },
 
   transferPlan(

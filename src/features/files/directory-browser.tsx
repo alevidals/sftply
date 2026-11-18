@@ -3,6 +3,7 @@ import { cn } from "cn"
 import {
   AlertTriangleIcon,
   ArrowDownToLineIcon,
+  ArrowLeftRightIcon,
   ArrowUpFromLineIcon,
   Columns3Icon,
   CopyIcon,
@@ -105,6 +106,7 @@ import { formatCount, formatMode } from "@/lib/format"
 import type { FsEntry, FsScope, TextFile } from "@/lib/ipc/bindings"
 import { shortcutLabel } from "@/lib/shortcuts"
 import { recordActivity } from "@/stores/activity-store"
+import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
 
 interface DirectoryBrowserProps {
@@ -154,6 +156,9 @@ export function DirectoryBrowser({
   const setActivePane = useUiStore((state) => state.setActivePane)
   const setLocalSummary = useUiStore((state) => state.setLocalSummary)
   const setRemoteSummary = useUiStore((state) => state.setRemoteSummary)
+  const remotePath = useUiStore((state) => state.remoteSummary.path)
+  const setSyncCompareOpen = useUiStore((state) => state.setSyncCompareOpen)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
 
   const navigation = usePathNavigation(initialPath)
   const { path, navigate, back, forward, canBack, canForward } = navigation
@@ -817,6 +822,15 @@ export function DirectoryBrowser({
               onClick={() => setBookmarksOpen(true)}
             >
               <StarIcon className={cn(isBookmarked && "fill-current")} />
+            </ToolbarButton>
+          ) : null}
+          {pane === "local" ? (
+            <ToolbarButton
+              label="Compare with remote folder"
+              disabled={!activeSessionId || !remotePath}
+              onClick={() => setSyncCompareOpen(true)}
+            >
+              <ArrowLeftRightIcon />
             </ToolbarButton>
           ) : null}
           {filterOpen ? (

@@ -110,6 +110,7 @@ beforeEach(() => {
 
   useUiStore.setState({
     paletteOpen: true,
+    syncCompareOpen: false,
     localSummary: { path: "/tmp/local", items: 2, selected: 0 },
     remoteSummary: { path: "/home/ada", items: 3, selected: 0 },
   })
@@ -160,5 +161,15 @@ describe("CommandPalette", () => {
       "aria-disabled",
       "true",
     )
+  })
+
+  it("opens the folder comparison", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<CommandPalette />)
+
+    await user.click(screen.getByText("Compare folders…"))
+
+    expect(useUiStore.getState().syncCompareOpen).toBe(true)
+    expect(useUiStore.getState().paletteOpen).toBe(false)
   })
 })

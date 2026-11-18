@@ -68,7 +68,7 @@ fn local_leaf(path: &str) -> Result<String, AppError> {
         .ok_or_else(|| AppError::invalid_input("The file name is not valid UTF-8."))
 }
 
-fn normalize_scope_path(scope: &FsScope, path: &str) -> Result<String, AppError> {
+pub(crate) fn normalize_scope_path(scope: &FsScope, path: &str) -> Result<String, AppError> {
     match scope {
         FsScope::Local => local_path(path),
         FsScope::Remote { .. } => normalize_remote(path),
@@ -82,7 +82,11 @@ fn scope_leaf(scope: &FsScope, path: &str) -> Result<String, AppError> {
     }
 }
 
-fn join_scope_path(scope: &FsScope, parent: &str, name: &str) -> Result<String, AppError> {
+pub(crate) fn join_scope_path(
+    scope: &FsScope,
+    parent: &str,
+    name: &str,
+) -> Result<String, AppError> {
     match scope {
         FsScope::Local => {
             let parent = crate::fs::path::normalize_absolute(parent)?;
@@ -107,7 +111,7 @@ fn transfer_direction(source: &FsScope, target: &FsScope) -> Result<TransferDire
     }
 }
 
-async fn scope_stat(
+pub(crate) async fn scope_stat(
     app: &AppHandle,
     state: &AppState,
     scope: &FsScope,
@@ -130,7 +134,7 @@ async fn scope_stat(
     }
 }
 
-async fn scope_list(
+pub(crate) async fn scope_list(
     app: &AppHandle,
     state: &AppState,
     scope: &FsScope,

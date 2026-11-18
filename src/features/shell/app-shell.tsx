@@ -32,6 +32,11 @@ const SettingsDialog = lazy(() =>
     default: module.SettingsDialog,
   })),
 )
+const SyncCompareDialog = lazy(() =>
+  import("@/features/sync/components/sync-compare-dialog").then((module) => ({
+    default: module.SyncCompareDialog,
+  })),
+)
 
 /** Keep the sidebar wide enough for a connection card's actions. */
 const SIDEBAR_MIN_WIDTH = 240
@@ -41,6 +46,7 @@ export function AppShell() {
   const { settings } = useSettings()
   const paletteOpen = useUiStore((state) => state.paletteOpen)
   const settingsOpen = useUiStore((state) => state.settingsOpen)
+  const syncCompareOpen = useUiStore((state) => state.syncCompareOpen)
   const persistLayout = useDebouncedSettingsPatch()
   const appInfo = useAppInfo()
   const startupReport = useStartupReport()
@@ -154,6 +160,11 @@ export function AppShell() {
       {settingsOpen ? (
         <Suspense fallback={null}>
           <SettingsDialog />
+        </Suspense>
+      ) : null}
+      {syncCompareOpen ? (
+        <Suspense fallback={null}>
+          <SyncCompareDialog />
         </Suspense>
       ) : null}
       <QuickConnectDialog />

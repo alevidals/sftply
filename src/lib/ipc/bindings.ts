@@ -78,6 +78,11 @@ export const commands = {
 	transferQueuePaused: () => __TAURI_INVOKE<boolean>("transfer_queue_paused"),
 	transferHistory: () => __TAURI_INVOKE<TransferHistoryEntry_Serialize[]>("transfer_history"),
 	transferClearHistory: () => __TAURI_INVOKE<number>("transfer_clear_history"),
+	/**
+	 *  Compare a local folder with a remote folder. This is the dry-run for the
+	 *  one-way local -> remote sync; it never writes to either side.
+	 */
+	syncCompare: (localPath: string, remote: FsScope, remotePath: string) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath })),
 };
 
 /** Events */
@@ -556,6 +561,124 @@ export type SizeFormat = "binary" | "decimal";
  *  after the webview is ready so warnings are not lost as early events.
  */
 export type StartupReport = {
+	warnings: string[],
+};
+
+/**
+ *  What the plan proposes for an entry. `Review` and `Skip` are never applied
+ *  without an explicit user decision.
+ */
+export type SyncAction = "upload" | "createDirectory" | "skip" | "review";
+
+/**
+ *  One entry in a comparison plan. Paths are absolute on each side; the
+ *  relative path is what the UI shows and what the planner uses to match.
+ */
+export type SyncEntry = SyncEntry_Serialize | SyncEntry_Deserialize;
+
+/**  Result of comparing one local entry with its remote counterpart. */
+export type SyncEntryStatus = 
+/**  Present locally, missing remotely. Directories are created; files are uploaded. */
+"localOnly" | 
+/**  Present remotely, missing locally. Kept as-is: 1.1 does not delete. */
+"remoteOnly" | 
+/**  Both sides exist and the metadata differs. */
+"different" | 
+/**  Both sides exist with the same size and modification time. */
+"equal" | 
+/**  Both sides exist, but one side could not provide reliable metadata. */
+"unknown" | 
+/**  One side is a file and the other is a directory. */
+"typeMismatch" | 
+/**  Symlinks and special files are not synchronized. */
+"unsupported";
+
+/**
+ *  One entry in a comparison plan. Paths are absolute on each side; the
+ *  relative path is what the UI shows and what the planner uses to match.
+ */
+export type SyncEntry_Deserialize = {
+	/**  Path relative to the compared roots, using `/` on every platform. */
+	relativePath: string,
+	name: string,
+	localPath?: string | null,
+	remotePath?: string | null,
+	/**
+	 *  Where this entry would be written on the remote side. Present even for
+	 *  local-only entries, so the UI does not have to join remote paths.
+	 */
+	remoteTargetPath?: string | null,
+	localKind?: EntryKind | null,
+	remoteKind?: EntryKind | null,
+	localSize?: number | null,
+	remoteSize?: number | null,
+	localModifiedAt?: number | null,
+	remoteModifiedAt?: number | null,
+	status: SyncEntryStatus,
+	action: SyncAction,
+};
+
+/**
+ *  One entry in a comparison plan. Paths are absolute on each side; the
+ *  relative path is what the UI shows and what the planner uses to match.
+ */
+export type SyncEntry_Serialize = {
+	/**  Path relative to the compared roots, using `/` on every platform. */
+	relativePath: string,
+	name: string,
+	localPath: string | null,
+	remotePath: string | null,
+	/**
+	 *  Where this entry would be written on the remote side. Present even for
+	 *  local-only entries, so the UI does not have to join remote paths.
+	 */
+	remoteTargetPath: string | null,
+	localKind: EntryKind | null,
+	remoteKind: EntryKind | null,
+	localSize: number | null,
+	remoteSize: number | null,
+	localModifiedAt: number | null,
+	remoteModifiedAt: number | null,
+	status: SyncEntryStatus,
+	action: SyncAction,
+};
+
+/**  The complete dry-run. Applying it is a separate, explicit step. */
+export type SyncPlan = SyncPlan_Serialize | SyncPlan_Deserialize;
+
+/**  The complete dry-run. Applying it is a separate, explicit step. */
+export type SyncPlan_Deserialize = {
+	localRoot: string,
+	remoteRoot: string,
+	entries: SyncEntry_Deserialize[],
+	uploadFiles: number,
+	uploadBytes: number,
+	createDirectories: number,
+	equal: number,
+	remoteOnly: number,
+	unknown: number,
+	conflicts: number,
+	skipped: number,
+	/**  True when the walk hit the entry limit before finishing. */
+	truncated: boolean,
+	warnings: string[],
+};
+
+/**  The complete dry-run. Applying it is a separate, explicit step. */
+export type SyncPlan_Serialize = {
+	localRoot: string,
+	remoteRoot: string,
+	entries: SyncEntry_Serialize[],
+	uploadFiles: number,
+	uploadBytes: number,
+	createDirectories: number,
+	equal: number,
+	remoteOnly: number,
+	unknown: number,
+	conflicts: number,
+	skipped: number,
+	/**  True when the walk hit the entry limit before finishing. */
+	truncated: boolean,
 	warnings: string[],
 };
 

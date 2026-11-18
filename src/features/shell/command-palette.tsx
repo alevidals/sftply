@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   ArrowDownUpIcon,
+  ArrowLeftRightIcon,
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
@@ -48,6 +49,7 @@ export function CommandPalette() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
   const setSettingsTab = useUiStore((state) => state.setSettingsTab)
   const setQuickConnectOpen = useUiStore((state) => state.setQuickConnectOpen)
+  const setSyncCompareOpen = useUiStore((state) => state.setSyncCompareOpen)
   const setBottomTab = useUiStore((state) => state.setBottomTab)
   const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const localPath = useUiStore((state) => state.localSummary.path)
@@ -309,6 +311,19 @@ export function CommandPalette() {
               <EyeIcon className="text-muted-foreground" />
             )}
             {settings.showHiddenFiles ? "Hide hidden files" : "Show hidden files"}
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+
+        <CommandGroup heading="Sync">
+          <CommandItem
+            value="compare local and remote folders"
+            disabled={!localPath || !remotePath || !activeSessionId}
+            onSelect={() => run(() => setSyncCompareOpen(true))}
+          >
+            <ArrowLeftRightIcon className="text-muted-foreground" />
+            Compare folders…
           </CommandItem>
         </CommandGroup>
 
