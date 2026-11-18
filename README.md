@@ -62,20 +62,17 @@ roadmap covers what comes next:
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md): connections, host keys, transfers, troubleshooting
-- [Release and packaging](docs/RELEASE.md): CI, artifacts, branch policy, unsigned builds
-- [Contributing](CONTRIBUTING.md): setup, tests and pull request workflow
+- [User guide](docs/USER_GUIDE.md): install, connections, transfers and troubleshooting
+- [Contributing](CONTRIBUTING.md): setup, branches and checks
+- [Architecture](docs/ARCHITECTURE.md): layers, IPC contract and security model
+- [Release and packaging](docs/RELEASE.md): CI, artifacts and branch policy
 - [Changelog](CHANGELOG.md): what changed in each release
-- [Architecture](docs/ARCHITECTURE.md): layers, IPC contract, security model
-- [Roadmap](docs/ROADMAP.md): milestones and exit criteria
-- [Dependency evaluation](docs/DEPENDENCIES.md): protocol libraries and rejected alternatives
-- [Progress log](docs/PROGRESS.md): what is built, verified and next
-- [ADRs](docs/adr/README.md): architectural decision records
+
+[Full documentation index](docs/README.md)
 
 ## Development
 
-Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the branch and test workflow.
+Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies.
 
 ```bash
 bun install
@@ -83,20 +80,8 @@ bun run tauri dev      # desktop app with hot reload
 bun run check          # typecheck, Biome, Vitest and production build
 ```
 
-Rust gates run from `src-tauri`:
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-```
-
-The landing page lives in `web/` and is its own Bun project:
-
-```bash
-bun run web:dev        # Astro dev server
-bun run web:build      # static output in web/dist
-```
+The Rust gates, the `web/` project and the integration stack are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 

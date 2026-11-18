@@ -8,8 +8,9 @@
 
 This section originally recorded the repository on 2026-11-05: an unmodified Tauri 2
 starter template with a single `greet` command, no tests and no CI. That baseline is
-gone. `docs/PROGRESS.md` tracks what exists today, and `docs/ROADMAP.md` tracks what
-comes next. The decisions below remain the reference for the architecture.
+gone. `docs/PROGRESS.md` is a historical log through 1.0.0, and `docs/ROADMAP.md`
+tracks what comes next. The decisions below remain the reference for the
+architecture.
 
 ## 2. Product principles and non-goals
 

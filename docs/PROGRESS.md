@@ -1,25 +1,13 @@
 # sftply — Progress Log & Continuation Notes
 
-**Purpose:** This is the single source of truth for what is built, what is verified, and what to do next. Update it at the end of every work session so work can resume on another day without re-discovery.
+> **Historical record.** This log covers development through 1.0.0 and is no
+> longer updated. See [ROADMAP.md](ROADMAP.md) for current plans.
 
-**Last updated:** 2026-11-11  
-**Current phase:** Phase 4 in progress — Phase 4a (single-file) and Phase 4b (recursive jobs, queue control, retry, in-app drag-and-drop, bandwidth limiter) are implemented, and the transfer panel is virtualized for large queues. Phase 4c hardening (large files, broken connections, server matrix) and external OS file drops remain.
-**Overall status:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a/4b transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD, binary streaming round trips and nested-folder creation. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table (including drag/drop), dialogs and the transfer list; real-window visual QA remains pending. A minimal Docker FTP server for manual connection testing lives in `docker/dev-ftp/` and is documented below.
+**Purpose:** This was the working log for development through 1.0.0. It records what was built, verified and planned during that period.
 
----
-
-## How to resume
-
-1. Read **Current status** and **Next actions** below.
-2. Run the verification commands in **Verification**.
-3. Continue the first unchecked item in the current phase.
-4. At the end of the session, update this file:
-   - Current status / phase
-   - Completed checklist items
-   - New session-log entry at the bottom (date, done, verified, next)
-   - Any new decisions, known issues, or blockers in the appropriate section.
-
-Do not mark a feature complete unless its verification command passes and its acceptance criteria are met.
+- **Last updated:** 2026-11-15
+- **Last phase in this log:** Phase 4 in progress — Phase 4a (single-file) and Phase 4b (recursive jobs, queue control, retry, in-app drag-and-drop, bandwidth limiter) are implemented, and the transfer panel is virtualized for large queues. Phase 4c hardening (large files, broken connections, server matrix) and external OS file drops remain.
+- **Status at the last entry:** Phase 1 shell, Phase 2 local browser, the Phase 3 connection/remote-browsing slice and Phase 4a/4b transfers are implemented with automated gates green. Protocol integration is verified against real FTP, explicit FTPS, implicit FTPS and SFTP servers, including custom CA, certificate pinning, CRUD, binary streaming round trips and nested-folder creation. Rendered tests cover the connection row, remote tabs, host-key dialog, Quick Connect, the lost-session pane, the file table (including drag/drop), dialogs and the transfer list; real-window visual QA remains pending. A minimal Docker FTP server for manual connection testing lives in `docker/dev-ftp/` and is documented below.
 
 ---
 
