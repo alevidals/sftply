@@ -9,6 +9,7 @@ Short, immutable records of significant technical decisions. If a decision chang
 | [0003](0003-credential-storage.md)         | Credential storage                                        | Proposed               |
 | [0004](0004-transfer-engine.md)            | Transfer engine and resumability                          | Proposed               |
 | [0005](0005-state-and-ipc.md)              | State ownership and typed IPC                             | Proposed               |
+| [0006](0006-compare-and-one-way-sync.md)   | Folder comparison and one-way sync                        | Accepted               |
 
 Related documents:
 

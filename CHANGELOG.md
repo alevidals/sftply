@@ -6,7 +6,29 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Compare the current local and remote folders with a dry-run plan. Entries are
+  marked as only local, only remote, size differs, date differs, content
+  differs, equal, unknown, type mismatch or unsupported.
+- One-way local → remote sync: selected files are uploaded through the existing
+  queue and missing folders are created. Remote-only entries are never deleted.
+- Include and exclude globs for comparisons, relative to the compared roots.
+- Bounded content verification for files up to 4 MiB when the size matches but
+  the date differs. Up to 32 MiB and 200 files are checked per comparison.
+- Cancel a running comparison from the dialog.
+- Revalidate remote targets immediately before applying a plan. A target that
+  changed after the dry-run refreshes the plan instead of being overwritten.
+
+### Changed
+
+- Downloads preserve the remote modification time. Uploads preserve the local
+  modification time through SFTP setstat or FTP MFMT when the server supports
+  it.
+- The development FTP server now runs a full pure-ftpd build with FEAT, MLSD
+  and MFMT, so timestamp behavior can be tested locally.
+
+## [1.0.0] - 2026-11-16
 
 ## [1.0.0] - 2026-11-16
 

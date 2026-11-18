@@ -107,6 +107,36 @@ to copy the local Unix mode after the upload, when the server supports `chmod`.
 The option is off by default: a permissive local mode can widen access on a
 server that would otherwise create stricter files.
 
+## Compare and sync
+
+The compare action compares the current local folder with the current remote
+folder. It does not write anything: it gives you a plan first.
+
+| Status | Meaning |
+| --- | --- |
+| **Only local** | Missing remotely. Uploaded when selected. |
+| **Only remote** | Missing locally. Kept; 1.1 does not delete. |
+| **Size differs** | Same name, different size. Uploaded when selected. |
+| **Date differs** | Same size, different date. Not selected by default. |
+| **Content differs** | Content verification found different bytes. Uploaded when selected. |
+| **Equal / Equal (content)** | Same metadata, or verified identical content. Skipped. |
+| **Unknown** | Missing or unreliable metadata. Review it before applying. |
+| **Type mismatch** | One side is a file and the other is a folder. Never applied automatically. |
+
+For files up to 4 MiB, a different date is resolved by hashing both sides. The
+plan verifies at most 32 MiB and 200 files per comparison; larger date-only
+differences stay in review. This matters on FTP servers that cannot preserve
+modification times.
+
+Use **Include** and **Exclude** globs to limit the plan, for example
+`src/**, **/*.md` and `node_modules/**, .git/**`. Patterns are relative to the
+compared folders.
+
+**Sync** uploads the selected files and creates the folders they need. Remote
+files that are not in the local folder are never deleted. Before queueing, the
+app checks the remote targets again; if one changed after the plan was built,
+the plan refreshes instead of overwriting it.
+
 ## Editing remote text files
 
 Open a remote text file with **Edit text…** or by double-clicking it. Limits and
