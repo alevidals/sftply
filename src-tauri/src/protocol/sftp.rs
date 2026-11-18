@@ -423,6 +423,19 @@ impl RemoteFs for SftpRemote {
             .map_err(map_sftp_error)
     }
 
+    async fn set_mtime(&mut self, path: &str, modified_at: f64) -> Result<(), AppError> {
+        let path = normalize_remote(path)?;
+        let seconds = (modified_at.max(0.0) / 1000.0).round() as u32;
+        let attributes = FileAttributes {
+            mtime: Some(seconds),
+            ..Default::default()
+        };
+        self.sftp
+            .set_metadata(&path, attributes)
+            .await
+            .map_err(map_sftp_error)
+    }
+
     async fn open_read(
         &mut self,
         path: &str,

@@ -4,6 +4,7 @@ use std::time::{Duration, UNIX_EPOCH};
 use async_trait::async_trait;
 use suppaftp::FtpError;
 use suppaftp::Mode as FtpMode;
+use suppaftp::Status;
 use suppaftp::list::{File as FtpFile, ListParser, PosixPexQuery};
 use suppaftp::tokio::{
     AsyncFtpStream, AsyncNoTlsStream, AsyncRustlsConnector, AsyncRustlsFtpStream,
@@ -128,6 +129,8 @@ pub struct FtpRemote {
     capabilities: FsCapabilities,
     /// Whether the server advertises MLSD. We fall back to LIST otherwise.
     mlsd: bool,
+    /// Whether the server accepts MFMT for setting modification times.
+    mfmt: bool,
 }
 
 impl FtpRemote {
@@ -244,11 +247,13 @@ impl FtpRemote {
 
         let mlsd = feature_present(&features, "MLSD");
         let chmod = feature_present(&features, "SITE CHMOD");
+        let mfmt = feature_present(&features, "MFMT");
         tracing::debug!(
             host = %profile.host,
             port = profile.port,
             mlsd,
             chmod,
+            mfmt,
             "FTP connect: handshake complete"
         );
         let capabilities = FsCapabilities {
@@ -273,6 +278,7 @@ impl FtpRemote {
             client,
             capabilities,
             mlsd,
+            mfmt,
         })
     }
 
@@ -396,6 +402,37 @@ impl RemoteFs for FtpRemote {
         Ok(())
     }
 
+    async fn set_mtime(&mut self, path: &str, modified_at: f64) -> Result<(), AppError> {
+        if !self.mfmt {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "This server does not support setting modification times.",
+            ));
+        }
+        let path = normalize_remote(path)?;
+        let stamp = format_mfmt_time(modified_at)?;
+        let response = on_client!(
+            &mut self.client,
+            custom_command(
+                format!("MFMT {stamp} {path}"),
+                &[
+                    Status::CommandOk,
+                    Status::File,
+                    Status::RequestedFileActionOk,
+                ]
+            )
+        )
+        .map_err(map_ftp_error)?;
+        if response.status.code() / 100 != 2 {
+            return Err(protocol_error(
+                ErrorCode::Unsupported,
+                "The server rejected the file timestamp.",
+                sanitize_detail(&String::from_utf8_lossy(&response.body)),
+            ));
+        }
+        Ok(())
+    }
+
     async fn open_read(
         &mut self,
         path: &str,
@@ -466,6 +503,19 @@ impl RemoteFs for FtpRemote {
 
 fn feature_present(features: &HashMap<String, Option<String>>, name: &str) -> bool {
     features.keys().any(|key| key.eq_ignore_ascii_case(name))
+}
+
+/// MFMT expects a UTC timestamp in `YYYYMMDDHHMMSS` form.
+fn format_mfmt_time(modified_at: f64) -> Result<String, AppError> {
+    if !modified_at.is_finite() || modified_at < 0.0 {
+        return Err(AppError::invalid_input(
+            "The file timestamp is out of range.",
+        ));
+    }
+    let millis = modified_at.round() as i64;
+    let stamp = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(millis)
+        .ok_or_else(|| AppError::invalid_input("The file timestamp is out of range."))?;
+    Ok(stamp.format("%Y%m%d%H%M%S").to_string())
 }
 
 /// Turn raw `MLSD`/`LIST` lines into entries. Kept free of I/O so hostile
@@ -720,6 +770,15 @@ fn map_status(status: suppaftp::Status, body: &[u8]) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formats_mfmt_timestamps() {
+        assert_eq!(
+            format_mfmt_time(1_700_000_000_000.0).expect("timestamp"),
+            "20231114221320"
+        );
+        assert!(format_mfmt_time(f64::NAN).is_err());
+    }
 
     #[test]
     fn detects_features_case_insensitively() {

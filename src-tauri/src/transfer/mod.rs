@@ -750,6 +750,14 @@ async fn upload<R: Runtime>(
         target.clone()
     };
 
+    let source_modified = tokio::fs::metadata(&item.source_path)
+        .await
+        .ok()
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as f64)
+        .filter(|value| *value > 0.0);
+
     let mut reader: Box<dyn FileReader> = Box::new(LocalReader::open(&item.source_path, 0).await?);
     let mut writer = remote_call(client.open_write(&upload_path, 0)).await?;
 
@@ -766,6 +774,9 @@ async fn upload<R: Runtime>(
     if let Err(error) = finish_writer(writer).await {
         cleanup_remote_upload(client, &upload_path, cleanup_grace(&error)).await;
         return Err(error);
+    }
+    if let Some(modified_at) = source_modified {
+        preserve_remote_mtime(client, &upload_path, modified_at).await;
     }
 
     if atomic {
@@ -791,6 +802,21 @@ async fn upload<R: Runtime>(
         apply_local_mode(client, &item.source_path, &target).await;
     }
     Ok(())
+}
+
+/// Copy the local modification time to the uploaded file. Best effort: the
+/// content is already in place, and not every server accepts a timestamp.
+async fn preserve_remote_mtime(client: &mut Box<dyn RemoteFs>, path: &str, modified_at: f64) {
+    match tokio::time::timeout(Duration::from_secs(5), client.set_mtime(path, modified_at)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) if error.code == ErrorCode::Unsupported => {
+            tracing::debug!(%path, "the server does not support preserving timestamps");
+        }
+        Ok(Err(error)) => {
+            tracing::warn!(%error, %path, "could not preserve the local file timestamp")
+        }
+        Err(_) => tracing::warn!(%path, "preserving the file timestamp timed out"),
+    }
 }
 
 /// Copy the Unix permission bits of the local source to the uploaded file.

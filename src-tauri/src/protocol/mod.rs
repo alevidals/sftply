@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::domain::fs::{FsCapabilities, FsEntry, Listing};
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 use crate::fs::{FileReader, FileWriter};
 
 pub mod ftp;
@@ -18,6 +18,14 @@ pub trait RemoteFs: Send + Sync {
     async fn rename(&mut self, path: &str, new_name: &str) -> Result<FsEntry, AppError>;
     async fn delete(&mut self, path: &str, recursive: bool) -> Result<(), AppError>;
     async fn chmod(&mut self, path: &str, mode: u32) -> Result<(), AppError>;
+    /// Set a file's modification time. Protocols that cannot do this return
+    /// `Unsupported`; callers treat it as best effort.
+    async fn set_mtime(&mut self, _path: &str, _modified_at: f64) -> Result<(), AppError> {
+        Err(AppError::new(
+            ErrorCode::Unsupported,
+            "This server cannot set file modification times.",
+        ))
+    }
     /// Open a streaming reader. `offset` resumes a partial download.
     async fn open_read(&mut self, path: &str, offset: u64)
     -> Result<Box<dyn FileReader>, AppError>;
