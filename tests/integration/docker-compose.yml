@@ -5,6 +5,10 @@ x-pure-ftpd: &pure-ftpd
     context: ./pure-ftpd
   image: sftply/pure-ftpd-test:latest
   restart: "no"
+  # Debian's pure-ftpd keeps these capabilities; Docker drops them by default.
+  cap_add:
+    - SYS_NICE
+    - DAC_READ_SEARCH
 
 services:
   ftp:

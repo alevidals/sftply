@@ -1174,6 +1174,72 @@ mod integration {
         remote.disconnect().await.expect("disconnect");
     }
 
+    async fn exercise_sync_metadata(protocol: ConnectionProtocol, port: u16, secure: bool) {
+        use crate::domain::sync::{SyncAction, SyncEntryStatus, classify};
+        use std::time::{Duration, UNIX_EPOCH};
+
+        let profile = profile(protocol, port);
+        let connector = secure.then(test_connector);
+        let mut remote = FtpRemote::connect_with(&profile, PASSWORD, connector)
+            .await
+            .unwrap_or_else(|error| panic!("connect to {protocol:?} on {port}: {error}"));
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_millis();
+        let folder = format!("sync-{stamp}-{}", unique_token());
+        let folder_path = format!("/{folder}");
+        remote.mkdir("/", &folder).await.expect("mkdir");
+
+        let path = format!("{folder_path}/report.txt");
+        let payload = b"report";
+        let mut writer = remote.open_write(&path, 0).await.expect("open write");
+        assert_eq!(writer.write(payload).await.expect("write"), payload.len());
+        writer.finish().await.expect("finish");
+
+        let remote_time = 1_700_000_000_000.0;
+        remote
+            .set_mtime(&path, remote_time)
+            .await
+            .expect("set remote mtime");
+        let remote_entry = remote.stat(&path).await.expect("stat remote");
+
+        let local_dir = tempfile::tempdir().expect("temp dir");
+        let local_path = local_dir.path().join("report.txt");
+        std::fs::write(&local_path, payload).expect("write local");
+        let local_file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&local_path)
+            .expect("open local");
+        local_file
+            .set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(UNIX_EPOCH + Duration::from_millis(remote_time as u64)),
+            )
+            .expect("set local mtime");
+        let local_entry = crate::fs::local::stat(local_path.to_str().expect("utf-8 path"))
+            .await
+            .expect("stat local");
+
+        assert_eq!(
+            classify(Some(&local_entry), Some(&remote_entry)),
+            (SyncEntryStatus::Equal, SyncAction::Skip)
+        );
+
+        std::fs::write(&local_path, b"repprt").expect("rewrite local");
+        let changed_local = crate::fs::local::stat(local_path.to_str().expect("utf-8 path"))
+            .await
+            .expect("stat changed local");
+        assert_eq!(
+            classify(Some(&changed_local), Some(&remote_entry)),
+            (SyncEntryStatus::DateDiffers, SyncAction::Review)
+        );
+
+        remote.delete(&folder_path, true).await.expect("delete");
+        remote.disconnect().await.expect("disconnect");
+    }
+
     async fn exercise_streaming(protocol: ConnectionProtocol, port: u16, secure: bool) {
         let profile = profile(protocol, port);
         let connector = secure.then(test_connector);
@@ -1232,6 +1298,24 @@ mod integration {
             .await
             .unwrap_or_else(|error| panic!("delete {folder_path}: {error}"));
         remote.disconnect().await.expect("disconnect");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn plain_ftp_sync_metadata_round_trip() {
+        exercise_sync_metadata(ConnectionProtocol::Ftp, 2121, false).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn explicit_ftps_sync_metadata_round_trip() {
+        exercise_sync_metadata(ConnectionProtocol::FtpsExplicit, 2122, true).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires tests/integration/docker-compose.yml"]
+    async fn implicit_ftps_sync_metadata_round_trip() {
+        exercise_sync_metadata(ConnectionProtocol::FtpsImplicit, 2990, true).await;
     }
 
     #[tokio::test]

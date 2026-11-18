@@ -20,7 +20,11 @@ FTP_PORT="${FTP_PORT:-21}"
 FTP_CERT="${FTP_CERT:-/etc/ssl/private/pure-ftpd.pem}"
 
 if ! id "$FTP_USER" >/dev/null 2>&1; then
-    adduser -D -h "$FTP_HOME" -s /bin/sh "$FTP_USER"
+    if command -v useradd >/dev/null 2>&1; then
+        useradd --create-home --home-dir "$FTP_HOME" --shell /bin/sh "$FTP_USER"
+    else
+        adduser -D -h "$FTP_HOME" -s /bin/sh "$FTP_USER"
+    fi
 fi
 
 echo "$FTP_USER:$FTP_PASSWORD" | chpasswd

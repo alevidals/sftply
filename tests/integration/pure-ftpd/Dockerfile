@@ -1,6 +1,10 @@
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache pure-ftpd \
+# Debian's pure-ftpd includes FEAT, MLSD and MFMT, which the sync integration
+# tests exercise. Alpine's minimal package omits them.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pure-ftpd passwd \
+    && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /etc/ssl/private /var/ftp
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
