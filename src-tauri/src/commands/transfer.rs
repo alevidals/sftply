@@ -3,6 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use sha2::{Digest, Sha256};
 use tauri::{AppHandle, State};
 
 use crate::app_state::AppState;
@@ -155,6 +156,75 @@ pub(crate) async fn scope_list(
             result
         }
     }
+}
+
+/// Hash a file through the same scope abstraction as listings. The comparison
+/// only calls this for small files, so reading the whole local file is bounded.
+pub(crate) async fn scope_hash(
+    app: &AppHandle,
+    state: &AppState,
+    scope: &FsScope,
+    path: &str,
+    max_bytes: u64,
+) -> Result<Vec<u8>, AppError> {
+    match scope {
+        FsScope::Local => hash_local(path, max_bytes).await,
+        FsScope::Remote { session_id } => {
+            let session = remote_session(state, session_id)?;
+            let path = normalize_remote(path)?;
+            let result = run_operation(&session, operation_timeout(state), |client| {
+                Box::pin(async move {
+                    let mut reader = client.open_read(&path, 0).await?;
+                    let mut hasher = Sha256::new();
+                    let mut buffer = vec![0u8; 64 * 1024];
+                    let mut total = 0u64;
+                    loop {
+                        let read = reader.read(&mut buffer).await?;
+                        if read == 0 {
+                            break;
+                        }
+                        total += read as u64;
+                        if total > max_bytes {
+                            return Err(AppError::new(
+                                ErrorCode::Unsupported,
+                                "The file is too large to verify by content.",
+                            ));
+                        }
+                        hasher.update(&buffer[..read]);
+                    }
+                    reader.finish().await?;
+                    Ok(hasher.finalize().to_vec())
+                })
+            })
+            .await;
+            if let Err(error) = &result
+                && error.code != ErrorCode::Unsupported
+                && error.code != ErrorCode::NotFound
+            {
+                report_operation_failure(app, &session, error);
+            }
+            result
+        }
+    }
+}
+
+async fn hash_local(path: &str, max_bytes: u64) -> Result<Vec<u8>, AppError> {
+    let path = local_path(path)?;
+    let metadata = tokio::fs::metadata(&path).await.map_err(AppError::from)?;
+    if metadata.len() > max_bytes {
+        return Err(AppError::new(
+            ErrorCode::Unsupported,
+            "The file is too large to verify by content.",
+        ));
+    }
+    let bytes = tokio::fs::read(&path).await.map_err(AppError::from)?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(AppError::new(
+            ErrorCode::Unsupported,
+            "The file is too large to verify by content.",
+        ));
+    }
+    Ok(Sha256::digest(&bytes).to_vec())
 }
 
 async fn probe_conflict(
@@ -640,6 +710,20 @@ mod tests {
             .unwrap(),
             "/report.pdf"
         );
+    }
+
+    #[tokio::test]
+    async fn hashes_local_files_for_content_comparison() {
+        let directory = tempfile::tempdir().expect("temp dir");
+        let path = directory.path().join("report.txt");
+        tokio::fs::write(&path, b"report")
+            .await
+            .expect("write local file");
+
+        let hash = hash_local(path.to_str().expect("utf-8 path"), 1024)
+            .await
+            .expect("hash");
+        assert_eq!(hash, Sha256::digest(b"report").to_vec());
     }
 
     #[test]

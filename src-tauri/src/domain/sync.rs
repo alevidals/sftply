@@ -11,10 +11,17 @@ pub enum SyncEntryStatus {
     LocalOnly,
     /// Present remotely, missing locally. Kept as-is: 1.1 does not delete.
     RemoteOnly,
-    /// Both sides exist and the metadata differs.
-    Different,
+    /// Both sides exist as files and the sizes differ.
+    SizeDiffers,
+    /// Both sides have the same size but different modification times. Content
+    /// verification can turn this into `EqualContent` or `ContentDiffers`.
+    DateDiffers,
+    /// Content verification found different bytes.
+    ContentDiffers,
     /// Both sides exist with the same size and modification time.
     Equal,
+    /// Content verification found the same bytes despite different timestamps.
+    EqualContent,
     /// Both sides exist, but one side could not provide reliable metadata.
     Unknown,
     /// One side is a file and the other is a directory.
@@ -102,7 +109,13 @@ pub struct SyncPlan {
     #[specta(type = specta_typescript::Number)]
     pub upload_bytes: f64,
     pub create_directories: u32,
+    /// Size or content differences that would replace a remote file.
+    pub changed: u32,
+    /// Same size, different date, content not verified (or verification skipped).
+    pub date_differs: u32,
     pub equal: u32,
+    /// Equal after a bounded content check.
+    pub equal_content: u32,
     pub remote_only: u32,
     pub unknown: u32,
     pub conflicts: u32,
@@ -121,7 +134,10 @@ impl SyncPlan {
             upload_files: 0,
             upload_bytes: 0.0,
             create_directories: 0,
+            changed: 0,
+            date_differs: 0,
             equal: 0,
+            equal_content: 0,
             remote_only: 0,
             unknown: 0,
             conflicts: 0,
@@ -132,25 +148,60 @@ impl SyncPlan {
     }
 
     pub fn record(&mut self, entry: SyncEntry) {
-        match entry.action {
+        self.count(entry.action, entry.status, entry.local_size);
+        self.entries.push(entry);
+    }
+
+    /// Recalculate the summary after content verification changed statuses.
+    pub fn recount(&mut self) {
+        self.upload_files = 0;
+        self.upload_bytes = 0.0;
+        self.create_directories = 0;
+        self.changed = 0;
+        self.date_differs = 0;
+        self.equal = 0;
+        self.equal_content = 0;
+        self.remote_only = 0;
+        self.unknown = 0;
+        self.conflicts = 0;
+        self.skipped = 0;
+        for index in 0..self.entries.len() {
+            let entry = &self.entries[index];
+            self.count(entry.action, entry.status, entry.local_size);
+        }
+    }
+
+    fn count(&mut self, action: SyncAction, status: SyncEntryStatus, local_size: Option<f64>) {
+        match action {
             SyncAction::Upload => {
                 self.upload_files += 1;
-                self.upload_bytes += entry.local_size.unwrap_or(0.0);
+                self.upload_bytes += local_size.unwrap_or(0.0);
+                if matches!(
+                    status,
+                    SyncEntryStatus::SizeDiffers | SyncEntryStatus::ContentDiffers
+                ) {
+                    self.changed += 1;
+                }
             }
             SyncAction::CreateDirectory => self.create_directories += 1,
-            SyncAction::Skip => match entry.status {
-                SyncEntryStatus::Equal => self.equal += 1,
+            SyncAction::Skip => match status {
+                SyncEntryStatus::Equal | SyncEntryStatus::EqualContent => {
+                    self.equal += 1;
+                    if status == SyncEntryStatus::EqualContent {
+                        self.equal_content += 1;
+                    }
+                }
                 SyncEntryStatus::RemoteOnly => self.remote_only += 1,
                 SyncEntryStatus::Unsupported => self.skipped += 1,
                 _ => {}
             },
-            SyncAction::Review => match entry.status {
+            SyncAction::Review => match status {
+                SyncEntryStatus::DateDiffers => self.date_differs += 1,
                 SyncEntryStatus::Unknown => self.unknown += 1,
                 SyncEntryStatus::TypeMismatch => self.conflicts += 1,
                 _ => {}
             },
         }
-        self.entries.push(entry);
     }
 }
 
@@ -195,13 +246,13 @@ fn compare_files(local: &FsEntry, remote: &FsEntry) -> (SyncEntryStatus, SyncAct
         return (SyncEntryStatus::Unknown, SyncAction::Review);
     }
     if local.size != remote.size {
-        return (SyncEntryStatus::Different, SyncAction::Upload);
+        return (SyncEntryStatus::SizeDiffers, SyncAction::Upload);
     }
     match (local.modified_at, remote.modified_at) {
         (Some(left), Some(right)) if (left - right).abs() <= MTIME_TOLERANCE_MS => {
             (SyncEntryStatus::Equal, SyncAction::Skip)
         }
-        (Some(_), Some(_)) => (SyncEntryStatus::Different, SyncAction::Upload),
+        (Some(_), Some(_)) => (SyncEntryStatus::DateDiffers, SyncAction::Review),
         _ => (SyncEntryStatus::Unknown, SyncAction::Review),
     }
 }
@@ -237,18 +288,18 @@ mod tests {
     }
 
     #[test]
-    fn different_size_or_mtime_is_uploaded() {
+    fn size_difference_is_uploaded_and_date_difference_needs_review() {
         let local = entry(EntryKind::File, 10.0, Some(1_000.0));
         let remote = entry(EntryKind::File, 11.0, Some(1_000.0));
         assert_eq!(
             classify(Some(&local), Some(&remote)),
-            (SyncEntryStatus::Different, SyncAction::Upload)
+            (SyncEntryStatus::SizeDiffers, SyncAction::Upload)
         );
 
         let remote = entry(EntryKind::File, 10.0, Some(5_000.0));
         assert_eq!(
             classify(Some(&local), Some(&remote)),
-            (SyncEntryStatus::Different, SyncAction::Upload)
+            (SyncEntryStatus::DateDiffers, SyncAction::Review)
         );
     }
 
@@ -264,7 +315,7 @@ mod tests {
         let remote = entry(EntryKind::File, 10.0, Some(4_000.0));
         assert_eq!(
             classify(Some(&local), Some(&remote)),
-            (SyncEntryStatus::Different, SyncAction::Upload)
+            (SyncEntryStatus::DateDiffers, SyncAction::Review)
         );
     }
 
@@ -343,10 +394,24 @@ mod tests {
             Some(&file),
         ));
         plan.record(SyncEntry::new("c.txt".to_string(), None, Some(&file)));
+        let newer = entry(EntryKind::File, 10.0, Some(5_000.0));
+        plan.record(SyncEntry::new(
+            "d.txt".to_string(),
+            Some(&file),
+            Some(&newer),
+        ));
 
         assert_eq!(plan.upload_files, 1);
         assert_eq!(plan.upload_bytes, 10.0);
         assert_eq!(plan.equal, 1);
         assert_eq!(plan.remote_only, 1);
+        assert_eq!(plan.date_differs, 1);
+
+        plan.entries[3].status = SyncEntryStatus::EqualContent;
+        plan.entries[3].action = SyncAction::Skip;
+        plan.recount();
+        assert_eq!(plan.date_differs, 0);
+        assert_eq!(plan.equal, 2);
+        assert_eq!(plan.equal_content, 1);
     }
 }

@@ -3,15 +3,22 @@ use std::collections::{BTreeMap, HashSet};
 use tauri::{AppHandle, State};
 
 use crate::app_state::AppState;
-use crate::commands::transfer::{join_scope_path, normalize_scope_path, scope_list, scope_stat};
+use crate::commands::transfer::{
+    join_scope_path, normalize_scope_path, scope_hash, scope_list, scope_stat,
+};
 use crate::domain::fs::{EntryKind, FsEntry, FsScope};
-use crate::domain::sync::{SyncEntry, SyncPlan};
+use crate::domain::sync::{SyncAction, SyncEntry, SyncEntryStatus, SyncPlan};
 use crate::error::AppError;
 
 /// Keep a comparison bounded so a large tree cannot exhaust memory or leave
 /// the UI waiting forever. The user can compare a smaller folder.
 const MAX_SYNC_ENTRIES: usize = 50_000;
 const MAX_SYNC_DEPTH: usize = 64;
+/// Content verification is limited to small files. Larger date-only
+/// differences stay in manual review instead of being read over the network.
+const MAX_HASH_FILE_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_HASH_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_HASH_FILES: usize = 200;
 
 /// Compare a local folder with a remote folder. This is the dry-run for the
 /// one-way local -> remote sync; it never writes to either side.
@@ -55,7 +62,76 @@ pub async fn sync_compare(
         &mut plan,
     ))
     .await?;
+    verify_contents(&app, &state, &local_scope, &remote_scope, &mut plan).await;
+    plan.recount();
     Ok(plan)
+}
+
+/// Compare bytes for small files whose size matches but whose timestamps do
+/// not. This is what keeps servers without MFMT/SITE UTIME from re-uploading
+/// identical files forever, and it also catches same-size edits.
+async fn verify_contents(
+    app: &AppHandle,
+    state: &AppState,
+    local: &FsScope,
+    remote: &FsScope,
+    plan: &mut SyncPlan,
+) {
+    let mut checked = 0usize;
+    let mut checked_bytes = 0u64;
+    let mut skipped = 0usize;
+    let mut warnings = Vec::new();
+
+    for entry in &mut plan.entries {
+        if entry.status != SyncEntryStatus::DateDiffers {
+            continue;
+        }
+        let (Some(local_path), Some(remote_path)) =
+            (entry.local_path.as_deref(), entry.remote_path.as_deref())
+        else {
+            continue;
+        };
+        let size = entry.local_size.unwrap_or(0.0);
+        if !size.is_finite()
+            || size < 0.0
+            || size as u64 > MAX_HASH_FILE_BYTES
+            || checked >= MAX_HASH_FILES
+            || checked_bytes.saturating_add(size as u64) > MAX_HASH_TOTAL_BYTES
+        {
+            skipped += 1;
+            continue;
+        }
+
+        let (local_hash, remote_hash) = tokio::join!(
+            scope_hash(app, state, local, local_path, MAX_HASH_FILE_BYTES),
+            scope_hash(app, state, remote, remote_path, MAX_HASH_FILE_BYTES),
+        );
+        match (local_hash, remote_hash) {
+            (Ok(left), Ok(right)) if left == right => {
+                entry.status = SyncEntryStatus::EqualContent;
+                entry.action = SyncAction::Skip;
+            }
+            (Ok(_), Ok(_)) => {
+                entry.status = SyncEntryStatus::ContentDiffers;
+                entry.action = SyncAction::Upload;
+            }
+            (Err(error), _) | (_, Err(error)) => {
+                warnings.push(format!(
+                    "Could not verify {} by content: {}",
+                    entry.relative_path, error.message
+                ));
+            }
+        }
+        checked += 1;
+        checked_bytes = checked_bytes.saturating_add(size as u64);
+    }
+
+    if skipped > 0 {
+        warnings.push(format!(
+            "Content check skipped for {skipped} date-only difference(s) above the {MAX_HASH_FILE_BYTES} byte per-file or {MAX_HASH_TOTAL_BYTES} byte total limit."
+        ));
+    }
+    plan.warnings.extend(warnings);
 }
 
 async fn require_directory(

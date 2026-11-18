@@ -80,11 +80,20 @@ const plan: SyncPlan_Serialize = {
     entry("a.txt", "upload"),
     entry("photos", "createDirectory", { localKind: "directory", localSize: 0 }),
     entry("same.txt", "skip", { status: "equal" }),
+    entry("draft.txt", "review", {
+      status: "dateDiffers",
+      remotePath: "/remote/draft.txt",
+      remoteSize: 10,
+      remoteModifiedAt: 2_000,
+    }),
   ],
   uploadFiles: 1,
   uploadBytes: 10,
   createDirectories: 1,
+  changed: 0,
+  dateDiffers: 1,
   equal: 1,
+  equalContent: 0,
   remoteOnly: 0,
   unknown: 0,
   conflicts: 0,
@@ -127,7 +136,11 @@ describe("SyncCompareDialog", () => {
     )
     expect(await screen.findByText("a.txt")).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Sync 1 file" }))
+    const dateOnly = screen.getByLabelText("Select draft.txt")
+    expect(dateOnly).toHaveAttribute("aria-checked", "false")
+    await user.click(dateOnly)
+
+    await user.click(screen.getByRole("button", { name: "Sync 2 files" }))
 
     await waitFor(() => expect(state.enqueueTree).toHaveBeenCalled())
     expect(state.enqueueTree).toHaveBeenCalledWith(
@@ -137,6 +150,7 @@ describe("SyncCompareDialog", () => {
       [
         expect.objectContaining({ relativePath: "a.txt" }),
         expect.objectContaining({ relativePath: "photos", kind: "directory" }),
+        expect.objectContaining({ relativePath: "draft.txt" }),
       ],
       [],
     )

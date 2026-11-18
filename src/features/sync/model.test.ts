@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   defaultSelection,
+  isSelectable,
   selectedBytes,
   selectedCount,
   selectionToTransferEntries,
@@ -40,7 +41,10 @@ function plan(entries: SyncEntry_Serialize[]): SyncPlan_Serialize {
     uploadFiles: entries.filter((entry) => entry.action === "upload").length,
     uploadBytes: entries.reduce((total, entry) => total + (entry.localSize ?? 0), 0),
     createDirectories: entries.filter((entry) => entry.action === "createDirectory").length,
+    changed: 0,
+    dateDiffers: 0,
     equal: 0,
+    equalContent: 0,
     remoteOnly: 0,
     unknown: 0,
     conflicts: 0,
@@ -105,8 +109,29 @@ describe("sync model", () => {
     expect(selectedCount(value, selected)).toEqual({ files: 1, directories: 1 })
   })
 
+  it("keeps date-only differences out of the default selection", () => {
+    const value = plan([
+      entry("changed-date.txt", "review", {
+        status: "dateDiffers",
+        remotePath: "/remote/changed-date.txt",
+        remoteSize: 10,
+        remoteModifiedAt: 2_000,
+      }),
+    ])
+
+    expect(defaultSelection(value).size).toBe(0)
+    expect(value.entries[0] ? isSelectable(value.entries[0]) : false).toBe(true)
+    expect(
+      selectionToTransferEntries(value, new Set(["changed-date.txt"])).map(
+        (entry) => entry.relativePath,
+      ),
+    ).toEqual(["changed-date.txt"])
+  })
+
   it("labels every status for the UI", () => {
     expect(statusLabel("localOnly")).toBe("Only local")
+    expect(statusLabel("dateDiffers")).toBe("Date differs")
+    expect(statusLabel("equalContent")).toBe("Equal (content)")
     expect(statusLabel("typeMismatch")).toBe("Type mismatch")
   })
 })

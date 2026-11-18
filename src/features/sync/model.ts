@@ -9,6 +9,11 @@ export function isActionable(entry: SyncEntry_Serialize): boolean {
   return entry.action === "upload" || entry.action === "createDirectory"
 }
 
+/** Date-only differences stay unselected, but the user can choose to upload them. */
+export function isSelectable(entry: SyncEntry_Serialize): boolean {
+  return isActionable(entry) || entry.status === "dateDiffers"
+}
+
 export function defaultSelection(plan: SyncPlan_Serialize): Set<string> {
   return new Set(plan.entries.filter(isActionable).map((entry) => entry.relativePath))
 }
@@ -22,7 +27,7 @@ export function selectionToTransferEntries(
   const chosen = new Map<string, SyncEntry_Serialize>()
 
   for (const entry of plan.entries) {
-    if (!selected.has(entry.relativePath) || !isActionable(entry)) continue
+    if (!selected.has(entry.relativePath) || !isSelectable(entry)) continue
     chosen.set(entry.relativePath, entry)
   }
 
@@ -58,10 +63,16 @@ export function statusLabel(status: SyncEntryStatus): string {
       return "Only local"
     case "remoteOnly":
       return "Only remote"
-    case "different":
-      return "Changed"
+    case "sizeDiffers":
+      return "Size differs"
+    case "dateDiffers":
+      return "Date differs"
+    case "contentDiffers":
+      return "Content differs"
     case "equal":
       return "Equal"
+    case "equalContent":
+      return "Equal (content)"
     case "unknown":
       return "Unknown"
     case "typeMismatch":
@@ -73,7 +84,8 @@ export function statusLabel(status: SyncEntryStatus): string {
 
 export function selectedBytes(plan: SyncPlan_Serialize, selected: ReadonlySet<string>): number {
   return plan.entries.reduce((total, entry) => {
-    if (!selected.has(entry.relativePath) || entry.action !== "upload") return total
+    if (!selected.has(entry.relativePath) || !isSelectable(entry)) return total
+    if (entry.action !== "upload" && entry.status !== "dateDiffers") return total
     return total + (entry.localSize ?? 0)
   }, 0)
 }
@@ -86,7 +98,7 @@ export function selectedCount(
   let directories = 0
   for (const entry of plan.entries) {
     if (!selected.has(entry.relativePath)) continue
-    if (entry.action === "upload") files += 1
+    if (entry.action === "upload" || entry.status === "dateDiffers") files += 1
     if (entry.action === "createDirectory") directories += 1
   }
   return { files, directories }

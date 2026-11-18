@@ -582,10 +582,19 @@ export type SyncEntryStatus =
 "localOnly" | 
 /**  Present remotely, missing locally. Kept as-is: 1.1 does not delete. */
 "remoteOnly" | 
-/**  Both sides exist and the metadata differs. */
-"different" | 
+/**  Both sides exist as files and the sizes differ. */
+"sizeDiffers" | 
+/**
+ *  Both sides have the same size but different modification times. Content
+ *  verification can turn this into `EqualContent` or `ContentDiffers`.
+ */
+"dateDiffers" | 
+/**  Content verification found different bytes. */
+"contentDiffers" | 
 /**  Both sides exist with the same size and modification time. */
 "equal" | 
+/**  Content verification found the same bytes despite different timestamps. */
+"equalContent" | 
 /**  Both sides exist, but one side could not provide reliable metadata. */
 "unknown" | 
 /**  One side is a file and the other is a directory. */
@@ -654,7 +663,13 @@ export type SyncPlan_Deserialize = {
 	uploadFiles: number,
 	uploadBytes: number,
 	createDirectories: number,
+	/**  Size or content differences that would replace a remote file. */
+	changed: number,
+	/**  Same size, different date, content not verified (or verification skipped). */
+	dateDiffers: number,
 	equal: number,
+	/**  Equal after a bounded content check. */
+	equalContent: number,
 	remoteOnly: number,
 	unknown: number,
 	conflicts: number,
@@ -672,7 +687,13 @@ export type SyncPlan_Serialize = {
 	uploadFiles: number,
 	uploadBytes: number,
 	createDirectories: number,
+	/**  Size or content differences that would replace a remote file. */
+	changed: number,
+	/**  Same size, different date, content not verified (or verification skipped). */
+	dateDiffers: number,
 	equal: number,
+	/**  Equal after a bounded content check. */
+	equalContent: number,
 	remoteOnly: number,
 	unknown: number,
 	conflicts: number,

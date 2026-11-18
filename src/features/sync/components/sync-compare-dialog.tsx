@@ -34,6 +34,7 @@ import { syncApi } from "@/features/sync/api"
 import {
   defaultSelection,
   isActionable,
+  isSelectable,
   selectedBytes,
   selectedCount,
   selectionToTransferEntries,
@@ -109,7 +110,7 @@ export function SyncCompareDialog() {
     const query = deferredFilter.trim().toLowerCase()
     return allEntries.filter(
       (entry) =>
-        (showEqual || entry.status !== "equal") &&
+        (showEqual || (entry.status !== "equal" && entry.status !== "equalContent")) &&
         (!query || entry.relativePath.toLowerCase().includes(query)),
     )
   }, [allEntries, deferredFilter, showEqual])
@@ -121,12 +122,6 @@ export function SyncCompareDialog() {
 
   const counts = plan ? selectedCount(plan, selected) : { files: 0, directories: 0 }
   const bytes = plan ? selectedBytes(plan, selected) : 0
-  const changed = useMemo(
-    () =>
-      plan?.entries.reduce((total, entry) => total + (entry.status === "different" ? 1 : 0), 0) ??
-      0,
-    [plan],
-  )
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -137,7 +132,7 @@ export function SyncCompareDialog() {
   })
 
   const toggle = (entry: SyncEntry_Serialize) => {
-    if (!isActionable(entry)) return
+    if (!isSelectable(entry)) return
     setSelected((current) => {
       const next = new Set(current)
       if (next.has(entry.relativePath)) next.delete(entry.relativePath)
@@ -246,7 +241,8 @@ export function SyncCompareDialog() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted-foreground">
               <Summary label="To upload" value={plan.uploadFiles} />
               <Summary label="Folders" value={plan.createDirectories} />
-              <Summary label="Changed" value={changed} />
+              <Summary label="Changed" value={plan.changed} />
+              <Summary label="Date differs" value={plan.dateDiffers} warning />
               <Summary label="Equal" value={plan.equal} />
               <Summary label="Only remote" value={plan.remoteOnly} />
               {plan.unknown > 0 ? <Summary label="Unknown" value={plan.unknown} warning /> : null}
@@ -255,6 +251,11 @@ export function SyncCompareDialog() {
               ) : null}
               {plan.skipped > 0 ? <Summary label="Skipped" value={plan.skipped} /> : null}
             </div>
+
+            <p className="text-2xs text-muted-foreground">
+              Compare uses size and date. Small files with a different date are checked by content;
+              larger files stay as “Date differs” for review.
+            </p>
 
             <div className="flex flex-wrap items-center gap-3">
               <Input
@@ -341,7 +342,7 @@ export function SyncCompareDialog() {
         <DialogFooter className="gap-2 sm:justify-between">
           <p className="max-w-sm text-2xs text-muted-foreground">
             {plan ? `${formatBytes(bytes, sizeFormat)} selected. ` : ""}
-            Remote-only files are kept. Changed files are replaced on the remote side.
+            Date-only differences are not selected by default. Remote-only files are kept.
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
@@ -405,7 +406,7 @@ function SyncRow({
     >
       <Checkbox
         checked={selected}
-        disabled={!isActionable(entry)}
+        disabled={!isSelectable(entry)}
         onCheckedChange={onToggle}
         aria-label={`Select ${entry.relativePath}`}
       />
@@ -426,7 +427,9 @@ function statusClass(status: SyncEntryStatus): string {
   switch (status) {
     case "localOnly":
       return "text-primary"
-    case "different":
+    case "sizeDiffers":
+    case "dateDiffers":
+    case "contentDiffers":
     case "unknown":
       return "text-warning"
     case "typeMismatch":
