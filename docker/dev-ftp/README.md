@@ -1,8 +1,10 @@
 # Minimal dev FTP server
 
 A plain FTP server for manually testing sftply. It is intentionally small: no
-TLS, one user and a persistent volume. The automated protocol matrix (plain FTP,
-explicit FTPS, implicit FTPS and SFTP) lives in `tests/integration`.
+TLS, one user and a persistent volume. It runs Debian's pure-ftpd with `FEAT`,
+`MLSD` and `MFMT`, so listing fallbacks and timestamp-preserving uploads can be
+tested against a real server. The automated protocol matrix (plain FTP, explicit
+FTPS, implicit FTPS and SFTP) lives in `tests/integration`.
 
 ## Start
 

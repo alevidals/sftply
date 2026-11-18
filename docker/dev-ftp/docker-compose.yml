@@ -6,6 +6,11 @@ services:
       context: .
     image: sftply/dev-ftp:latest
     restart: unless-stopped
+    # Debian's pure-ftpd tries to keep these capabilities; Docker drops them
+    # by default, which makes the daemon exit with status 252.
+    cap_add:
+      - SYS_NICE
+      - DAC_READ_SEARCH
     ports:
       - "2121:21"
       - "30000-30009:30000-30009"

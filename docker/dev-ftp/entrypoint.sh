@@ -19,7 +19,7 @@ FTP_PASSIVE="${FTP_PASSIVE:-30000:30009}"
 FTP_PUBLIC_IP="${FTP_PUBLIC_IP:-127.0.0.1}"
 
 if ! id "$FTP_USER" >/dev/null 2>&1; then
-    adduser -D -h "$FTP_HOME" -s /bin/sh "$FTP_USER"
+    useradd --create-home --home-dir "$FTP_HOME" --shell /bin/sh "$FTP_USER"
 fi
 
 echo "$FTP_USER:$FTP_PASSWORD" | chpasswd
@@ -30,7 +30,10 @@ mkdir -p "$FTP_HOME" "$FTP_HOME/upload"
 # the user uploaded, so restarting the container never overwrites their data.
 # (BusyBox `cp -n` silently copies nothing when the source ends in `/.`.)
 if [ -d /seed ]; then
-    tar -C /seed -cf - . | tar -C "$FTP_HOME" -xkf - || echo "seed copy failed" >&2
+    # `tar -k` keeps files uploaded by the developer, so a restart never
+    # overwrites their data. Existing files make tar exit non-zero; that is
+    # expected here.
+    tar -C /seed -cf - . | tar -C "$FTP_HOME" -xkf - 2>/dev/null || true
 fi
 
 chown -R "$FTP_USER":"$FTP_USER" "$FTP_HOME"
