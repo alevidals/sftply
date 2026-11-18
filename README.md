@@ -47,6 +47,7 @@ Every release ships `SHA256SUMS`.
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Three protocols, one client**  | FTP, explicit and implicit FTPS, and SFTP over native Rust networking. No shelling out to `lftp` or `ssh`.                      |
 | **Dual pane, keyboard first**    | Two folders side by side, multi-select, drag between panes, command palette, path autocomplete and shortcut hints per platform. |
+| **Compare and sync**             | Dry-run diff of the current local and remote folders, with content checks and include/exclude globs. One-way upload only.       |
 | **A queue that tells the truth** | Pause and resume appear only when the server supports them. A cancelled transfer is never reported as complete.                 |
 | **Secrets stay in the keychain** | Passwords and passphrases live in the OS keychain. Config files, exports and logs never contain them.                           |
 | **Remote text editing**          | Open a UTF-8 file up to 2 MiB, edit it in place and save atomically, with stale-write detection.                                |
@@ -54,11 +55,10 @@ Every release ships `SHA256SUMS`.
 
 ## Status
 
-1.0 is out. The stable line is 1.x, and fixes ship as patch releases. The
+1.1 is out. The stable line is 1.x, and fixes ship as patch releases. The
 roadmap covers what comes next:
 
-- **1.1**: directory diff and one-way sync with a mandatory dry-run.
-- **1.2**: bidirectional sync and remote previews.
+- **1.2**: bidirectional sync, delete propagation and remote previews.
 
 ## Documentation
 

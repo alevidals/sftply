@@ -6,6 +6,10 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.1.0] - 2026-11-18
+
 ### Added
 
 - Compare the current local and remote folders with a dry-run plan. Entries are
@@ -27,8 +31,6 @@ All notable changes to sftply. The format follows
   it.
 - The development FTP server now runs a full pure-ftpd build with FEAT, MLSD
   and MFMT, so timestamp behavior can be tested locally.
-
-## [1.0.0] - 2026-11-16
 
 ## [1.0.0] - 2026-11-16
 

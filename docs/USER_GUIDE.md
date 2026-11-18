@@ -112,16 +112,16 @@ server that would otherwise create stricter files.
 The compare action compares the current local folder with the current remote
 folder. It does not write anything: it gives you a plan first.
 
-| Status | Meaning |
-| --- | --- |
-| **Only local** | Missing remotely. Uploaded when selected. |
-| **Only remote** | Missing locally. Kept; 1.1 does not delete. |
-| **Size differs** | Same name, different size. Uploaded when selected. |
-| **Date differs** | Same size, different date. Not selected by default. |
-| **Content differs** | Content verification found different bytes. Uploaded when selected. |
-| **Equal / Equal (content)** | Same metadata, or verified identical content. Skipped. |
-| **Unknown** | Missing or unreliable metadata. Review it before applying. |
-| **Type mismatch** | One side is a file and the other is a folder. Never applied automatically. |
+| Status                      | Meaning                                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| **Only local**              | Missing remotely. Uploaded when selected.                                  |
+| **Only remote**             | Missing locally. Kept; 1.1 does not delete.                                |
+| **Size differs**            | Same name, different size. Uploaded when selected.                         |
+| **Date differs**            | Same size, different date. Not selected by default.                        |
+| **Content differs**         | Content verification found different bytes. Uploaded when selected.        |
+| **Equal / Equal (content)** | Same metadata, or verified identical content. Skipped.                     |
+| **Unknown**                 | Missing or unreliable metadata. Review it before applying.                 |
+| **Type mismatch**           | One side is a file and the other is a folder. Never applied automatically. |
 
 For files up to 4 MiB, a different date is resolved by hashing both sides. The
 plan verifies at most 32 MiB and 200 files per comparison; larger date-only
