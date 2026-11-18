@@ -8,6 +8,15 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [1.1.1] - 2026-11-18
+
+### Added
+
+- Integration coverage for sync metadata and timestamp preservation against
+  plain FTP, explicit and implicit FTPS, and SFTP. The integration FTP image
+  now uses Debian's full pure-ftpd build so `FEAT`, `MLSD` and `MFMT` are
+  exercised.
+
 ## [1.1.0] - 2026-11-18
 
 ### Added
