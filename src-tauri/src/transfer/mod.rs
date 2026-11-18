@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use futures_util::FutureExt;
 use tauri::{AppHandle, Manager, Runtime};
@@ -681,6 +681,13 @@ async fn download<R: Runtime>(
     }
     ensure_local_parent(&target).await?;
     let temp = temp_download_path(&target, &item.id);
+    // Preserve the remote timestamp so a later comparison can tell that this
+    // file is the same content instead of flagging it as changed.
+    let source_modified = remote_call(client.stat(&item.source_path))
+        .await
+        .ok()
+        .and_then(|entry| entry.modified_at)
+        .filter(|value| *value > 0.0);
     let mut reader = remote_call(client.open_read(&item.source_path, 0)).await?;
     let mut writer: Box<dyn FileWriter> = Box::new(LocalWriter::open(&temp, 0).await?);
 
@@ -697,6 +704,9 @@ async fn download<R: Runtime>(
     if let Err(error) = finish_writer(writer).await {
         remove_local_temp(&temp).await;
         return Err(error);
+    }
+    if let Some(modified_at) = source_modified {
+        preserve_local_mtime(&temp, modified_at).await;
     }
 
     // If finalization fails, keep the completed partial file: it is the only
@@ -1074,6 +1084,23 @@ async fn remove_local_temp(path: &str) {
     }
 }
 
+async fn preserve_local_mtime(path: &str, modified_at: f64) {
+    let path_owned = path.to_string();
+    let millis = modified_at.max(0.0).round() as u64;
+    let result = tokio::task::spawn_blocking(move || {
+        let stamp = UNIX_EPOCH + Duration::from_millis(millis);
+        let file = std::fs::OpenOptions::new().write(true).open(&path_owned)?;
+        file.set_times(std::fs::FileTimes::new().set_modified(stamp))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => tracing::warn!(%error, path = %path, "could not preserve download mtime"),
+        Err(error) => tracing::warn!(%error, path = %path, "could not preserve download mtime"),
+    }
+}
+
 async fn replace_local_file(temp: &str, target: &str) -> Result<(), AppError> {
     if tokio::fs::try_exists(target).await.unwrap_or(false) {
         // Windows cannot rename over an existing file. Removing the target
@@ -1168,6 +1195,24 @@ mod tests {
             temp_download_path("/tmp/report.pdf", "abc"),
             "/tmp/.report.pdf.sftply-part-abc"
         );
+    }
+
+    #[tokio::test]
+    async fn preserves_the_download_timestamp() {
+        let directory = tempfile::tempdir().expect("temp dir");
+        let path = directory.path().join("report.txt");
+        tokio::fs::write(&path, b"report").await.expect("write");
+
+        preserve_local_mtime(path.to_str().expect("utf-8 path"), 1_700_000_000_000.0).await;
+
+        let modified = std::fs::metadata(&path)
+            .expect("metadata")
+            .modified()
+            .expect("mtime")
+            .duration_since(UNIX_EPOCH)
+            .expect("after epoch")
+            .as_millis() as i64;
+        assert!((modified - 1_700_000_000_000).abs() < 2_000);
     }
 
     #[test]
