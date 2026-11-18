@@ -17,7 +17,9 @@ import {
   type SecretStatus,
   type SessionInfo,
   type StartupReport,
+  type SyncEntry_Serialize,
   type SyncPlan_Serialize,
+  type SyncValidationIssue,
   type TextFile,
   type TransferConflict,
   type TransferHistoryEntry_Serialize,
@@ -262,6 +264,10 @@ export const ipc = {
 
   syncCancel(): Promise<boolean> {
     return invoke(commands.syncCancel())
+  },
+
+  syncValidate(remote: FsScope, entries: SyncEntry_Serialize[]): Promise<SyncValidationIssue[]> {
+    return invoke(commands.syncValidate(remote, entries)).then((result) => unwrap(result))
   },
 
   transferPlan(

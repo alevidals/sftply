@@ -191,6 +191,21 @@ export function SyncCompareDialog() {
     setBusy(true)
     setError(null)
     try {
+      const selectedEntries = plan.entries.filter(
+        (entry) => selected.has(entry.relativePath) && isSelectable(entry),
+      )
+      const issues = await syncApi.validate(remoteScope(activeSessionId), selectedEntries)
+      if (issues.length > 0) {
+        const first = issues[0]
+        toast.error("The remote folder changed", {
+          description: first
+            ? `${first.relativePath}: ${first.reason} The plan will be refreshed.`
+            : "The plan will be refreshed.",
+        })
+        void runCompare(globList(includeGlobs), globList(excludeGlobs))
+        return
+      }
+
       const items = await transfersApi.enqueueTree(
         LOCAL_SCOPE,
         remoteScope(activeSessionId),
@@ -415,8 +430,8 @@ export function SyncCompareDialog() {
             Date-only differences are not selected by default. Remote-only files are kept.
           </p>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
-              Cancel
+            <Button type="button" variant="ghost" disabled={busy} onClick={close}>
+              {loading ? "Stop comparing" : "Cancel"}
             </Button>
             <Button
               type="button"

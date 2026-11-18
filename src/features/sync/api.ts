@@ -1,4 +1,9 @@
-import type { FsScope, SyncPlan_Serialize } from "@/lib/ipc/bindings"
+import type {
+  FsScope,
+  SyncEntry_Serialize,
+  SyncPlan_Serialize,
+  SyncValidationIssue,
+} from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 
 /** Sync commands. Components never call `ipc` directly. */
@@ -15,5 +20,9 @@ export const syncApi = {
 
   cancel(): Promise<boolean> {
     return ipc.syncCancel()
+  },
+
+  validate(remote: FsScope, entries: SyncEntry_Serialize[]): Promise<SyncValidationIssue[]> {
+    return ipc.syncValidate(remote, entries)
   },
 }

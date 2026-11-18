@@ -98,6 +98,15 @@ impl SyncEntry {
     }
 }
 
+/// A remote target that no longer matches the dry-run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncValidationIssue {
+    pub relative_path: String,
+    pub target_path: String,
+    pub reason: String,
+}
+
 /// The complete dry-run. Applying it is a separate, explicit step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

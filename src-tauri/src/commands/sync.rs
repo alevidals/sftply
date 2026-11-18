@@ -9,7 +9,7 @@ use crate::commands::transfer::{
     join_scope_path, normalize_scope_path, scope_hash, scope_list, scope_stat,
 };
 use crate::domain::fs::{EntryKind, FsEntry, FsScope};
-use crate::domain::sync::{SyncAction, SyncEntry, SyncEntryStatus, SyncPlan};
+use crate::domain::sync::{SyncAction, SyncEntry, SyncEntryStatus, SyncPlan, SyncValidationIssue};
 use crate::error::{AppError, ErrorCode};
 
 /// Keep a comparison bounded so a large tree cannot exhaust memory or leave
@@ -85,6 +85,110 @@ pub async fn sync_compare(
 #[specta::specta]
 pub fn sync_cancel(state: State<'_, AppState>) -> bool {
     state.sync.cancel()
+}
+
+const VALIDATION_MTIME_TOLERANCE_MS: f64 = 2_000.0;
+
+/// Re-check the remote targets immediately before enqueueing a plan. A file
+/// that changed after the dry-run is reported instead of being overwritten.
+#[tauri::command]
+#[specta::specta]
+pub async fn sync_validate(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    remote: FsScope,
+    entries: Vec<SyncEntry>,
+) -> Result<Vec<SyncValidationIssue>, AppError> {
+    let remote = match remote {
+        FsScope::Remote { .. } => remote,
+        FsScope::Local => {
+            return Err(AppError::invalid_input(
+                "Choose a remote session to validate against.",
+            ));
+        }
+    };
+
+    let mut issues = Vec::new();
+    for entry in entries {
+        let selected =
+            entry.action == SyncAction::Upload || entry.status == SyncEntryStatus::DateDiffers;
+        if !selected {
+            continue;
+        }
+        let Some(target) = entry.remote_target_path.as_deref() else {
+            continue;
+        };
+
+        match scope_stat(&app, &state, &remote, target).await {
+            Ok(current) => {
+                if entry.action == SyncAction::CreateDirectory {
+                    if current.kind != EntryKind::Directory {
+                        issues.push(validation_issue(
+                            &entry,
+                            target,
+                            "The target is no longer a folder.",
+                        ));
+                    }
+                    continue;
+                }
+                if current.kind != EntryKind::File {
+                    issues.push(validation_issue(
+                        &entry,
+                        target,
+                        "The target is no longer a file.",
+                    ));
+                    continue;
+                }
+                if entry.remote_path.is_none() {
+                    issues.push(validation_issue(
+                        &entry,
+                        target,
+                        "A file now exists at the target.",
+                    ));
+                    continue;
+                }
+                let expected_size = entry.remote_size.unwrap_or(-1.0);
+                if current.size != expected_size {
+                    issues.push(validation_issue(
+                        &entry,
+                        target,
+                        "The remote size changed after the comparison.",
+                    ));
+                    continue;
+                }
+                if let (Some(expected), Some(actual)) =
+                    (entry.remote_modified_at, current.modified_at)
+                    && (expected - actual).abs() > VALIDATION_MTIME_TOLERANCE_MS
+                {
+                    issues.push(validation_issue(
+                        &entry,
+                        target,
+                        "The remote timestamp changed after the comparison.",
+                    ));
+                }
+            }
+            Err(error) if error.code == ErrorCode::NotFound => {
+                if entry.remote_path.is_some() {
+                    issues.push(validation_issue(
+                        &entry,
+                        target,
+                        "The remote file was removed after the comparison.",
+                    ));
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    Ok(issues)
+}
+
+fn validation_issue(entry: &SyncEntry, target: &str, reason: &str) -> SyncValidationIssue {
+    SyncValidationIssue {
+        relative_path: entry.relative_path.clone(),
+        target_path: target.to_string(),
+        reason: reason.to_string(),
+    }
 }
 
 fn cancelled() -> AppError {

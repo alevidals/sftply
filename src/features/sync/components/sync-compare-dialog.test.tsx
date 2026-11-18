@@ -9,13 +9,18 @@ import { useUiStore } from "@/stores/ui-store"
 const state = vi.hoisted(() => ({
   compare: vi.fn(),
   cancel: vi.fn(),
+  validate: vi.fn(),
   enqueueTree: vi.fn(),
   invalidateQueries: vi.fn(),
   updateSettings: vi.fn(),
 }))
 
 vi.mock("@/features/sync/api", () => ({
-  syncApi: { compare: state.compare, cancel: state.cancel },
+  syncApi: {
+    compare: state.compare,
+    cancel: state.cancel,
+    validate: state.validate,
+  },
 }))
 
 vi.mock("@/features/transfers/api", () => ({
@@ -106,6 +111,7 @@ const plan: SyncPlan_Serialize = {
 beforeEach(() => {
   state.compare.mockReset().mockResolvedValue(plan)
   state.cancel.mockReset().mockResolvedValue(true)
+  state.validate.mockReset().mockResolvedValue([])
   state.enqueueTree.mockReset().mockResolvedValue([{ id: "transfer-1" }])
   state.invalidateQueries.mockReset()
   state.updateSettings.mockReset().mockResolvedValue(undefined)
@@ -146,6 +152,7 @@ describe("SyncCompareDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Sync 2 files" }))
 
+    await waitFor(() => expect(state.validate).toHaveBeenCalled())
     await waitFor(() => expect(state.enqueueTree).toHaveBeenCalled())
     expect(state.enqueueTree).toHaveBeenCalledWith(
       { kind: "local" },
@@ -160,24 +167,53 @@ describe("SyncCompareDialog", () => {
     )
     expect(useUiStore.getState().syncCompareOpen).toBe(false)
   })
-})
 
-it("reloads the plan with include and exclude globs", async () => {
-  const user = userEvent.setup({ pointerEventsCheck: 0 })
-  render(<SyncCompareDialog />)
+  it("refreshes instead of applying when the remote changed", async () => {
+    state.validate.mockResolvedValueOnce([
+      {
+        relativePath: "a.txt",
+        targetPath: "/remote/a.txt",
+        reason: "The remote size changed after the comparison.",
+      },
+    ])
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
 
-  await waitFor(() => expect(state.compare).toHaveBeenCalled())
-  await user.type(screen.getByLabelText("Include globs"), "src/**, **/*.md")
-  await user.type(screen.getByLabelText("Exclude globs"), "node_modules/**")
-  await user.click(screen.getByRole("button", { name: "Apply filters" }))
+    await user.click(await screen.findByRole("button", { name: "Sync 1 file" }))
 
-  await waitFor(() =>
-    expect(state.compare).toHaveBeenLastCalledWith(
-      "/local",
-      { kind: "remote", sessionId: "session-1" },
-      "/remote",
-      ["src/**", "**/*.md"],
-      ["node_modules/**"],
-    ),
-  )
+    await waitFor(() => expect(state.validate).toHaveBeenCalled())
+    expect(state.enqueueTree).not.toHaveBeenCalled()
+    await waitFor(() => expect(state.compare).toHaveBeenCalledTimes(2))
+  })
+
+  it("cancels a comparison that is still loading", async () => {
+    state.compare.mockReturnValueOnce(new Promise(() => {}))
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
+
+    await user.click(await screen.findByRole("button", { name: "Stop comparing" }))
+
+    expect(state.cancel).toHaveBeenCalled()
+    expect(useUiStore.getState().syncCompareOpen).toBe(false)
+  })
+
+  it("reloads the plan with include and exclude globs", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
+
+    await waitFor(() => expect(state.compare).toHaveBeenCalled())
+    await user.type(screen.getByLabelText("Include globs"), "src/**, **/*.md")
+    await user.type(screen.getByLabelText("Exclude globs"), "node_modules/**")
+    await user.click(screen.getByRole("button", { name: "Apply filters" }))
+
+    await waitFor(() =>
+      expect(state.compare).toHaveBeenLastCalledWith(
+        "/local",
+        { kind: "remote", sessionId: "session-1" },
+        "/remote",
+        ["src/**", "**/*.md"],
+        ["node_modules/**"],
+      ),
+    )
+  })
 })

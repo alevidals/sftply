@@ -84,6 +84,11 @@ export const commands = {
 	 */
 	syncCompare: (localPath: string, remote: FsScope, remotePath: string, include: string[], exclude: string[]) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath, include, exclude })),
 	syncCancel: () => __TAURI_INVOKE<boolean>("sync_cancel"),
+	/**
+	 *  Re-check the remote targets immediately before enqueueing a plan. A file
+	 *  that changed after the dry-run is reported instead of being overwritten.
+	 */
+	syncValidate: (remote: FsScope, entries: SyncEntry_Deserialize[]) => typedError<SyncValidationIssue[], AppError_Serialize>(__TAURI_INVOKE("sync_validate", { remote, entries })),
 };
 
 /** Events */
@@ -702,6 +707,13 @@ export type SyncPlan_Serialize = {
 	/**  True when the walk hit the entry limit before finishing. */
 	truncated: boolean,
 	warnings: string[],
+};
+
+/**  A remote target that no longer matches the dry-run. */
+export type SyncValidationIssue = {
+	relativePath: string,
+	targetPath: string,
+	reason: string,
 };
 
 /**  A UTF-8 text file loaded for editing. */
