@@ -4,9 +4,9 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | Yes       |
+| 1.x     | Yes       |
 
-Pre-1.0 builds receive fixes on the latest release only.
+The latest 1.x release receives fixes.
 
 ## Reporting a vulnerability
 

@@ -54,17 +54,17 @@ Every release ships `SHA256SUMS`.
 
 ## Status
 
-Pre-1.0. The app is usable and tested, but behaviour can still change before
-1.0. The roadmap is explicit about what comes next:
+1.0 is out. The stable line is 1.x, and fixes ship as patch releases. The
+roadmap covers what comes next:
 
-- **1.0**: hardening: real-server matrix, soak tests, parser fuzzing, audits.
 - **1.1**: directory diff and one-way sync with a mandatory dry-run.
 - **1.2**: bidirectional sync and remote previews.
 
 ## Documentation
 
 - [User guide](docs/USER_GUIDE.md): connections, host keys, transfers, troubleshooting
-- [Release and packaging](docs/RELEASE.md): CI, artifacts, unsigned builds
+- [Release and packaging](docs/RELEASE.md): CI, artifacts, branch policy, unsigned builds
+- [Contributing](CONTRIBUTING.md): setup, tests and pull request workflow
 - [Changelog](CHANGELOG.md): what changed in each release
 - [Architecture](docs/ARCHITECTURE.md): layers, IPC contract, security model
 - [Roadmap](docs/ROADMAP.md): milestones and exit criteria
@@ -74,7 +74,8 @@ Pre-1.0. The app is usable and tested, but behaviour can still change before
 
 ## Development
 
-Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies.
+Prerequisites: Bun 1.4+, Rust 1.99+, platform Tauri dependencies. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the branch and test workflow.
 
 ```bash
 bun install
@@ -96,6 +97,13 @@ The landing page lives in `web/` and is its own Bun project:
 bun run web:dev        # Astro dev server
 bun run web:build      # static output in web/dist
 ```
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup, branch workflow and checks. By participating, you agree to
+follow the [Code of Conduct](CODE_OF_CONDUCT.md). Security reports go through
+[SECURITY.md](SECURITY.md), not public issues.
 
 ## Stack
 

@@ -205,6 +205,33 @@ bun run bindings
 in `src-tauri/examples/`, not `src-tauri/src/bin/`, so release builds stay
 bundleable.
 
+## Branching and maintenance
+
+`main` is the stable 1.x line. Bug fixes and release commits land there, and each
+release is tagged `v1.x.y`.
+
+The next major version is developed on a long-lived `v2` branch, created when the
+first v2 change is ready. Feature branches target `v2`, never `main`, and `v2` is
+not merged into `main` until the release is ready.
+
+After every v1 release, merge `main` into `v2` and run the full test suite. If
+v2 rewrote the affected code, port the test and the behavior instead of forcing
+the merge.
+
+Version files on `v2` stay at `2.0.0-alpha.N`. When `main` is merged in, resolve
+conflicts in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and
+`src-tauri/tauri.conf.json` in favor of the v2 version.
+
+When v2 ships:
+
+1. Create `release/1.x` from the last v1 tag if v1 still receives fixes.
+2. Merge `v2` into `main`.
+3. Tag `v2.0.0`.
+4. Merge v1 fixes from `release/1.x` into `main` until v1 is retired.
+
+When the `v2` branch is created, add it to the `ci.yml` push triggers so merges
+from `main` are tested before they land.
+
 ## Local unsigned build
 
 ```sh

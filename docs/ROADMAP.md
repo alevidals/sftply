@@ -1,6 +1,6 @@
 # sftply: Implementation Roadmap
 
-**Status:** Implemented through 0.2.0. Release 1.0 is hardening; 1.1 and 1.2 are planned.
+**Status:** Implemented through 1.0.0. 1.1 and 1.2 are planned.
 **Method:** Incremental phases with explicit exit criteria. Each phase ends with a runnable build and a review gate. Later phases are not started while an earlier phase has unresolved reliability or security defects.
 
 Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar commitments. The critical-path risk is protocol/FTPS/SFTP correctness, so Phase 0 exists specifically to retire it before UI work expands.
