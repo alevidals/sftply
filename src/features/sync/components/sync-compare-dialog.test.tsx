@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   compare: vi.fn(),
   cancel: vi.fn(),
   validate: vi.fn(),
+  delete: vi.fn(),
   enqueueTree: vi.fn(),
   invalidateQueries: vi.fn(),
   updateSettings: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/features/sync/api", () => ({
     compare: state.compare,
     cancel: state.cancel,
     validate: state.validate,
+    delete: state.delete,
   },
 }))
 
@@ -115,6 +117,7 @@ beforeEach(() => {
   state.compare.mockReset().mockResolvedValue(plan)
   state.cancel.mockReset().mockResolvedValue(true)
   state.validate.mockReset().mockResolvedValue([])
+  state.delete.mockReset().mockResolvedValue(1)
   state.enqueueTree.mockReset().mockResolvedValue([{ id: "transfer-1" }])
   state.invalidateQueries.mockReset()
   state.updateSettings.mockReset().mockResolvedValue(undefined)
@@ -263,6 +266,41 @@ describe("SyncCompareDialog", () => {
         }),
       ],
       [],
+    )
+  })
+
+  it("requires confirmation before deleting target-only items", async () => {
+    const deletePlan: SyncPlan_Serialize = {
+      ...plan,
+      entries: [
+        ...plan.entries,
+        entry("old.txt", "skip", {
+          status: "remoteOnly",
+          remotePath: "/remote/old.txt",
+          remoteTargetPath: "/remote/old.txt",
+          remoteSize: 4,
+        }),
+      ],
+      remoteOnly: 1,
+    }
+    state.compare.mockResolvedValueOnce(deletePlan)
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
+
+    await user.click(await screen.findByRole("button", { name: /Delete 1 target-only/ }))
+    const confirm = screen.getByRole("button", { name: "Delete 1 item" })
+    expect(confirm).toBeDisabled()
+
+    await user.click(screen.getByLabelText("I understand these items will be permanently deleted"))
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
+
+    await waitFor(() =>
+      expect(state.delete).toHaveBeenCalledWith(
+        { kind: "remote", sessionId: "session-1" },
+        "upload",
+        [expect.objectContaining({ relativePath: "old.txt" })],
+      ),
     )
   })
 

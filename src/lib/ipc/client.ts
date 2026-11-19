@@ -278,6 +278,17 @@ export const ipc = {
     )
   },
 
+  syncDelete(
+    remote: FsScope,
+    direction: SyncDirection,
+    entries: SyncEntry_Serialize[],
+    confirm: boolean,
+  ): Promise<number> {
+    return invoke(commands.syncDelete(remote, direction, entries, confirm)).then((result) =>
+      unwrap(result),
+    )
+  },
+
   transferPlan(
     source: FsScope,
     sourcePaths: string[],

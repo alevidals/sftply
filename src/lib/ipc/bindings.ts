@@ -86,6 +86,11 @@ export const commands = {
 	syncCancel: () => __TAURI_INVOKE<boolean>("sync_cancel"),
 	/**  Re-check the target immediately before enqueueing a plan. */
 	syncValidate: (remote: FsScope, direction: SyncDirection, entries: SyncEntry_Deserialize[]) => typedError<SyncValidationIssue[], AppError_Serialize>(__TAURI_INVOKE("sync_validate", { remote, direction, entries })),
+	/**
+	 *  Delete entries that exist only on the target side. The caller must confirm
+	 *  explicitly; this is never part of the normal upload/download apply path.
+	 */
+	syncDelete: (remote: FsScope, direction: SyncDirection, entries: SyncEntry_Deserialize[], confirm: boolean) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("sync_delete", { remote, direction, entries, confirm })),
 };
 
 /** Events */

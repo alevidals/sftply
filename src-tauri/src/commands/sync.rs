@@ -5,6 +5,7 @@ use tauri::{AppHandle, State};
 use tokio_util::sync::CancellationToken;
 
 use crate::app_state::AppState;
+use crate::commands::fs::delete_scope;
 use crate::commands::transfer::{
     join_scope_path, normalize_scope_path, scope_hash, scope_list, scope_stat,
 };
@@ -208,6 +209,86 @@ pub async fn sync_validate(
     }
 
     Ok(issues)
+}
+
+/// Delete entries that exist only on the target side. The caller must confirm
+/// explicitly; this is never part of the normal upload/download apply path.
+#[tauri::command]
+#[specta::specta]
+pub async fn sync_delete(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    remote: FsScope,
+    direction: SyncDirection,
+    entries: Vec<SyncEntry>,
+    confirm: bool,
+) -> Result<u32, AppError> {
+    if !confirm {
+        return Err(AppError::invalid_input(
+            "Deleting target-only items requires explicit confirmation.",
+        ));
+    }
+    let remote = match remote {
+        FsScope::Remote { .. } => remote,
+        FsScope::Local => {
+            return Err(AppError::invalid_input(
+                "Choose a remote session to delete against.",
+            ));
+        }
+    };
+    let target_scope = match direction {
+        SyncDirection::Upload => remote,
+        SyncDirection::Download => FsScope::Local,
+    };
+
+    let mut deleted = 0u32;
+    for entry in entries {
+        let target_only = match direction {
+            SyncDirection::Upload => entry.status == SyncEntryStatus::RemoteOnly,
+            SyncDirection::Download => entry.status == SyncEntryStatus::LocalOnly,
+        };
+        if !target_only {
+            continue;
+        }
+        let target_path = match direction {
+            SyncDirection::Upload => entry.remote_target_path.as_deref(),
+            SyncDirection::Download => entry.local_target_path.as_deref(),
+        };
+        let Some(target_path) = target_path else {
+            continue;
+        };
+        if target_path == "/" {
+            continue;
+        }
+        let expected_kind = match direction {
+            SyncDirection::Upload => entry.remote_kind,
+            SyncDirection::Download => entry.local_kind,
+        };
+
+        match scope_stat(&app, &state, &target_scope, target_path).await {
+            Ok(current) => {
+                if expected_kind != Some(current.kind) {
+                    return Err(AppError::new(
+                        ErrorCode::Conflict,
+                        "The target changed after the comparison. Refresh the plan and try again.",
+                    ));
+                }
+                delete_scope(
+                    &app,
+                    &state,
+                    &target_scope,
+                    target_path,
+                    current.kind == EntryKind::Directory,
+                )
+                .await?;
+                deleted += 1;
+            }
+            Err(error) if error.code == ErrorCode::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+
+    Ok(deleted)
 }
 
 fn validation_issue(entry: &SyncEntry, target: &str, reason: &str) -> SyncValidationIssue {

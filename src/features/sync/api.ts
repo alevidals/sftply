@@ -31,4 +31,12 @@ export const syncApi = {
   ): Promise<SyncValidationIssue[]> {
     return ipc.syncValidate(remote, direction, entries)
   },
+
+  delete(
+    remote: FsScope,
+    direction: SyncDirection,
+    entries: SyncEntry_Serialize[],
+  ): Promise<number> {
+    return ipc.syncDelete(remote, direction, entries, true)
+  },
 }

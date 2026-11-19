@@ -6,6 +6,7 @@ import {
   ArrowLeftRightIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
+  Trash2Icon,
 } from "lucide-react"
 import {
   type CSSProperties,
@@ -77,6 +78,10 @@ export function SyncCompareDialog() {
   const [excludeGlobs, setExcludeGlobs] = useState("")
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const requestIdRef = useRef(0)
@@ -91,6 +96,9 @@ export function SyncCompareDialog() {
       setError(null)
       setPlan(null)
       setSelected(new Set())
+      setDeleteOpen(false)
+      setDeleteConfirmed(false)
+      setDeleteError(null)
       try {
         const next = await syncApi.compare(
           localPath,
@@ -164,6 +172,28 @@ export function SyncCompareDialog() {
 
   const counts = plan ? selectedCount(plan, selected) : { files: 0, directories: 0 }
   const bytes = plan ? selectedBytes(plan, selected) : 0
+  const targetOnly = useMemo(() => {
+    if (!plan) return []
+    return plan.entries.filter((entry) =>
+      plan.direction === "upload" ? entry.status === "remoteOnly" : entry.status === "localOnly",
+    )
+  }, [plan])
+
+  const confirmDelete = async () => {
+    if (!plan || !activeSessionId || deleteBusy || !deleteConfirmed) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      const deleted = await syncApi.delete(remoteScope(activeSessionId), plan.direction, targetOnly)
+      toast.success(`Deleted ${deleted} item${deleted === 1 ? "" : "s"}`)
+      setDeleteOpen(false)
+      void runCompare(plan.direction, globList(includeGlobs), globList(excludeGlobs))
+    } catch (cause) {
+      setDeleteError(errorMessage(cause))
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -263,241 +293,335 @@ export function SyncCompareDialog() {
   const missingPaths = !localPath || !remotePath || !activeSessionId
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) close()
-      }}
-    >
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ArrowLeftRightIcon className="size-4 text-primary" />
-            Compare folders
-          </DialogTitle>
-          <DialogDescription className="selectable truncate font-mono text-2xs">
-            {direction === "upload"
-              ? `${localPath ?? "No local folder"} → ${remotePath ?? "No remote folder"}`
-              : `${remotePath ?? "No remote folder"} → ${localPath ?? "No local folder"}`}
-            {sessionName ? ` · ${sessionName}` : ""}
-          </DialogDescription>
-          <div className="flex items-center gap-1">
-            <span className="mr-1 text-2xs text-muted-foreground">Direction</span>
-            <Button
-              type="button"
-              size="sm"
-              variant={direction === "upload" ? "default" : "outline"}
-              disabled={loading}
-              onClick={() => changeDirection("upload")}
-            >
-              Local → remote
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={direction === "download" ? "default" : "outline"}
-              disabled={loading}
-              onClick={() => changeDirection("download")}
-            >
-              Remote → local
-            </Button>
-          </div>
-        </DialogHeader>
-
-        {missingPaths ? (
-          <EmptyState
-            title="Open both folders first"
-            description="Navigate to a local folder and connect a remote session, then compare again."
-          />
-        ) : loading ? (
-          <div className="flex h-52 flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-            <LoaderCircleIcon className="size-5 animate-spin" />
-            Comparing folders…
-          </div>
-        ) : error ? (
-          <div className="flex h-52 flex-col items-center justify-center gap-3 text-center">
-            <AlertTriangleIcon className="size-5 text-destructive" />
-            <p className="max-w-md text-xs text-destructive" role="alert">
-              {error}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void runCompare(direction, globList(includeGlobs), globList(excludeGlobs))
-              }
-            >
-              <RefreshCwIcon className="size-3.5" />
-              Try again
-            </Button>
-          </div>
-        ) : plan ? (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted-foreground">
-              <Summary
-                label={plan.direction === "upload" ? "To upload" : "To download"}
-                value={plan.transferFiles}
-              />
-              <Summary label="Folders" value={plan.createDirectories} />
-              <Summary label="Changed" value={plan.changed} />
-              <Summary label="Date differs" value={plan.dateDiffers} warning />
-              <Summary label="Equal" value={plan.equal} />
-              <Summary label="Only local" value={plan.localOnly} />
-              <Summary label="Only remote" value={plan.remoteOnly} />
-              {plan.unknown > 0 ? <Summary label="Unknown" value={plan.unknown} warning /> : null}
-              {plan.conflicts > 0 ? (
-                <Summary label="Conflicts" value={plan.conflicts} danger />
-              ) : null}
-              {plan.skipped > 0 ? <Summary label="Skipped" value={plan.skipped} /> : null}
-            </div>
-
-            <p className="text-2xs text-muted-foreground">
-              Compare uses size and date. Small files with a different date are checked by content;
-              larger files stay as “Date differs” for review. Globs are relative to the compared
-              folders.
-            </p>
-
-            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <Input
-                value={includeGlobs}
-                onChange={(event) => setIncludeGlobs(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !loading) applyFilters()
-                }}
-                placeholder="Include: src/**, **/*.md"
-                aria-label="Include globs"
-                className="h-8 text-xs"
-              />
-              <Input
-                value={excludeGlobs}
-                onChange={(event) => setExcludeGlobs(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !loading) applyFilters()
-                }}
-                placeholder="Exclude: node_modules/**, .git/**"
-                aria-label="Exclude globs"
-                className="h-8 text-xs"
-              />
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) close()
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRightIcon className="size-4 text-primary" />
+              Compare folders
+            </DialogTitle>
+            <DialogDescription className="selectable truncate font-mono text-2xs">
+              {direction === "upload"
+                ? `${localPath ?? "No local folder"} → ${remotePath ?? "No remote folder"}`
+                : `${remotePath ?? "No remote folder"} → ${localPath ?? "No local folder"}`}
+              {sessionName ? ` · ${sessionName}` : ""}
+            </DialogDescription>
+            <div className="flex items-center gap-1">
+              <span className="mr-1 text-2xs text-muted-foreground">Direction</span>
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
+                variant={direction === "upload" ? "default" : "outline"}
                 disabled={loading}
-                onClick={applyFilters}
+                onClick={() => changeDirection("upload")}
               >
-                Apply filters
+                Local → remote
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={direction === "download" ? "default" : "outline"}
+                disabled={loading}
+                onClick={() => changeDirection("download")}
+              >
+                Remote → local
               </Button>
             </div>
+          </DialogHeader>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Input
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder="Filter results…"
-                className="h-8 flex-1 text-xs"
-              />
-              <span className="flex items-center gap-2 text-2xs text-muted-foreground">
-                <Checkbox
-                  checked={showEqual}
-                  onCheckedChange={(value) => setShowEqual(value === true)}
-                  aria-label="Show equal files"
-                />
-                Show equal
-              </span>
+          {missingPaths ? (
+            <EmptyState
+              title="Open both folders first"
+              description="Navigate to a local folder and connect a remote session, then compare again."
+            />
+          ) : loading ? (
+            <div className="flex h-52 flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+              <LoaderCircleIcon className="size-5 animate-spin" />
+              Comparing folders…
             </div>
-
-            <div className="overflow-hidden rounded-md border border-border">
-              <div className="flex items-center gap-3 border-b border-border bg-panel-header px-3 py-2 text-2xs text-muted-foreground">
-                <Checkbox
-                  checked={allVisibleSelected}
-                  disabled={visibleActionable.length === 0}
-                  onCheckedChange={toggleVisible}
-                  aria-label="Select visible changes"
-                />
-                <span className="flex-1">
-                  {visibleActionable.length} change{visibleActionable.length === 1 ? "" : "s"}{" "}
-                  visible
-                </span>
-                <span>{entries.length} entries</span>
-              </div>
-              <div ref={scrollRef} className="h-[42vh] overflow-auto">
-                {entries.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    No entries match this filter.
-                  </div>
-                ) : (
-                  <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-                    {virtualizer.getVirtualItems().map((row) => {
-                      const entry = entries[row.index]
-                      if (!entry) return null
-                      return (
-                        <SyncRow
-                          key={entry.relativePath}
-                          entry={entry}
-                          selected={selected.has(entry.relativePath)}
-                          sizeFormat={sizeFormat}
-                          onToggle={() => toggle(entry)}
-                          style={{
-                            height: ROW_HEIGHT,
-                            transform: `translateY(${row.start}px)`,
-                          }}
-                        />
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {plan.truncated ? (
-              <p className="text-2xs text-warning" role="status">
-                Stopped at {plan.entries.length.toLocaleString()} entries. Compare a smaller folder
-                for a complete plan.
+          ) : error ? (
+            <div className="flex h-52 flex-col items-center justify-center gap-3 text-center">
+              <AlertTriangleIcon className="size-5 text-destructive" />
+              <p className="max-w-md text-xs text-destructive" role="alert">
+                {error}
               </p>
-            ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void runCompare(direction, globList(includeGlobs), globList(excludeGlobs))
+                }
+              >
+                <RefreshCwIcon className="size-3.5" />
+                Try again
+              </Button>
+            </div>
+          ) : plan ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted-foreground">
+                <Summary
+                  label={plan.direction === "upload" ? "To upload" : "To download"}
+                  value={plan.transferFiles}
+                />
+                <Summary label="Folders" value={plan.createDirectories} />
+                <Summary label="Changed" value={plan.changed} />
+                <Summary label="Date differs" value={plan.dateDiffers} warning />
+                <Summary label="Equal" value={plan.equal} />
+                <Summary label="Only local" value={plan.localOnly} />
+                <Summary label="Only remote" value={plan.remoteOnly} />
+                {plan.unknown > 0 ? <Summary label="Unknown" value={plan.unknown} warning /> : null}
+                {plan.conflicts > 0 ? (
+                  <Summary label="Conflicts" value={plan.conflicts} danger />
+                ) : null}
+                {plan.skipped > 0 ? <Summary label="Skipped" value={plan.skipped} /> : null}
+              </div>
 
-            {plan.warnings.length > 0 ? (
-              <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-2xs">
-                <summary className="cursor-pointer text-muted-foreground">
-                  {plan.warnings.length} warning{plan.warnings.length === 1 ? "" : "s"}
-                </summary>
-                <ul className="mt-2 space-y-1 text-muted-foreground">
-                  {plan.warnings.slice(0, 20).map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </details>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-2xs text-muted-foreground">
+                  Compare uses size and date. Small files with a different date are checked by
+                  content; larger files stay as “Date differs” for review. Globs are relative to the
+                  compared folders.
+                </p>
+                {targetOnly.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto text-destructive"
+                    onClick={() => {
+                      setDeleteConfirmed(false)
+                      setDeleteError(null)
+                      setDeleteOpen(true)
+                    }}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                    Delete {targetOnly.length} target-only…
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <Input
+                  value={includeGlobs}
+                  onChange={(event) => setIncludeGlobs(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !loading) applyFilters()
+                  }}
+                  placeholder="Include: src/**, **/*.md"
+                  aria-label="Include globs"
+                  className="h-8 text-xs"
+                />
+                <Input
+                  value={excludeGlobs}
+                  onChange={(event) => setExcludeGlobs(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !loading) applyFilters()
+                  }}
+                  placeholder="Exclude: node_modules/**, .git/**"
+                  aria-label="Exclude globs"
+                  className="h-8 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={applyFilters}
+                >
+                  Apply filters
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder="Filter results…"
+                  className="h-8 flex-1 text-xs"
+                />
+                <span className="flex items-center gap-2 text-2xs text-muted-foreground">
+                  <Checkbox
+                    checked={showEqual}
+                    onCheckedChange={(value) => setShowEqual(value === true)}
+                    aria-label="Show equal files"
+                  />
+                  Show equal
+                </span>
+              </div>
+
+              <div className="overflow-hidden rounded-md border border-border">
+                <div className="flex items-center gap-3 border-b border-border bg-panel-header px-3 py-2 text-2xs text-muted-foreground">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    disabled={visibleActionable.length === 0}
+                    onCheckedChange={toggleVisible}
+                    aria-label="Select visible changes"
+                  />
+                  <span className="flex-1">
+                    {visibleActionable.length} change{visibleActionable.length === 1 ? "" : "s"}{" "}
+                    visible
+                  </span>
+                  <span>{entries.length} entries</span>
+                </div>
+                <div ref={scrollRef} className="h-[42vh] overflow-auto">
+                  {entries.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                      No entries match this filter.
+                    </div>
+                  ) : (
+                    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+                      {virtualizer.getVirtualItems().map((row) => {
+                        const entry = entries[row.index]
+                        if (!entry) return null
+                        return (
+                          <SyncRow
+                            key={entry.relativePath}
+                            entry={entry}
+                            selected={selected.has(entry.relativePath)}
+                            sizeFormat={sizeFormat}
+                            onToggle={() => toggle(entry)}
+                            style={{
+                              height: ROW_HEIGHT,
+                              transform: `translateY(${row.start}px)`,
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {plan.truncated ? (
+                <p className="text-2xs text-warning" role="status">
+                  Stopped at {plan.entries.length.toLocaleString()} entries. Compare a smaller
+                  folder for a complete plan.
+                </p>
+              ) : null}
+
+              {plan.warnings.length > 0 ? (
+                <details className="rounded-md border border-border bg-muted/30 px-3 py-2 text-2xs">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    {plan.warnings.length} warning{plan.warnings.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-muted-foreground">
+                    {plan.warnings.slice(0, 20).map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <p className="max-w-sm text-2xs text-muted-foreground">
+              {plan ? `${formatBytes(bytes, sizeFormat)} selected. ` : ""}
+              Date-only differences are not selected by default.{" "}
+              {plan?.direction === "download"
+                ? "Local-only items are kept unless you delete them explicitly."
+                : "Remote-only items are kept unless you delete them explicitly."}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" disabled={busy} onClick={close}>
+                {loading ? "Stop comparing" : "Cancel"}
+              </Button>
+              <Button
+                type="button"
+                disabled={busy || missingPaths || counts.files + counts.directories === 0}
+                onClick={() => void apply()}
+              >
+                {busy
+                  ? "Queueing…"
+                  : counts.files > 0
+                    ? `${plan?.direction === "download" ? "Download" : "Upload"} ${counts.files} file${counts.files === 1 ? "" : "s"}`
+                    : `Create ${counts.directories} folder${counts.directories === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(next) => {
+          if (!deleteBusy) setDeleteOpen(next)
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangleIcon className="size-4 text-destructive" />
+              Delete target-only items?
+            </DialogTitle>
+            <DialogDescription>
+              These items exist only in the {plan?.direction === "download" ? "local" : "remote"}{" "}
+              folder. Folders are deleted with their contents. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-44 space-y-1 overflow-auto rounded-md border border-border bg-muted/30 p-2 text-2xs">
+            {targetOnly.slice(0, 30).map((entry) => (
+              <div key={entry.relativePath} className="flex items-center gap-3">
+                <span className="selectable min-w-0 flex-1 truncate font-mono text-muted-foreground">
+                  {entry.relativePath}
+                </span>
+                <span className="shrink-0 text-muted-foreground/80">
+                  {entry.localKind === "directory" || entry.remoteKind === "directory"
+                    ? "folder"
+                    : "file"}
+                </span>
+              </div>
+            ))}
+            {targetOnly.length > 30 ? (
+              <div className="text-muted-foreground">…and {targetOnly.length - 30} more</div>
             ) : null}
           </div>
-        ) : null}
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          <p className="max-w-sm text-2xs text-muted-foreground">
-            {plan ? `${formatBytes(bytes, sizeFormat)} selected. ` : ""}
-            Date-only differences are not selected by default.{" "}
-            {plan?.direction === "download"
-              ? "Local-only files are kept."
-              : "Remote-only files are kept."}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" disabled={busy} onClick={close}>
-              {loading ? "Stop comparing" : "Cancel"}
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              checked={deleteConfirmed}
+              onCheckedChange={(value) => setDeleteConfirmed(value === true)}
+              aria-label="I understand these items will be permanently deleted"
+            />
+            I understand these items will be permanently deleted.
+          </span>
+
+          {deleteError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={deleteBusy}
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancel
             </Button>
             <Button
               type="button"
-              disabled={busy || missingPaths || counts.files + counts.directories === 0}
-              onClick={() => void apply()}
+              variant="destructive"
+              disabled={!deleteConfirmed || deleteBusy}
+              onClick={() => void confirmDelete()}
             >
-              {busy
-                ? "Queueing…"
-                : counts.files > 0
-                  ? `${plan?.direction === "download" ? "Download" : "Upload"} ${counts.files} file${counts.files === 1 ? "" : "s"}`
-                  : `Create ${counts.directories} folder${counts.directories === 1 ? "" : "s"}`}
+              {deleteBusy
+                ? "Deleting…"
+                : `Delete ${targetOnly.length} item${targetOnly.length === 1 ? "" : "s"}`}
             </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

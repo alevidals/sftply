@@ -155,6 +155,30 @@ pub async fn fs_rename(
     }
 }
 
+pub(crate) async fn delete_scope(
+    app: &AppHandle,
+    state: &AppState,
+    scope: &FsScope,
+    path: &str,
+    recursive: bool,
+) -> Result<(), AppError> {
+    match scope {
+        FsScope::Local => local::delete(path, recursive).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(state, scope)?;
+            let path = path.to_string();
+            let result = run_operation(&session, operation_timeout(state), |client| {
+                Box::pin(async move { client.delete(&path, recursive).await })
+            })
+            .await;
+            if let Err(error) = &result {
+                report_operation_failure(app, &session, error);
+            }
+            result
+        }
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn fs_delete(
@@ -164,20 +188,7 @@ pub async fn fs_delete(
     path: String,
     recursive: bool,
 ) -> Result<(), AppError> {
-    match &scope {
-        FsScope::Local => local::delete(&path, recursive).await,
-        FsScope::Remote { .. } => {
-            let session = remote_session(&state, &scope)?;
-            let result = run_operation(&session, operation_timeout(&state), |client| {
-                Box::pin(async move { client.delete(&path, recursive).await })
-            })
-            .await;
-            if let Err(error) = &result {
-                report_operation_failure(&app, &session, error);
-            }
-            result
-        }
-    }
+    delete_scope(&app, &state, &scope, &path, recursive).await
 }
 
 #[tauri::command]
