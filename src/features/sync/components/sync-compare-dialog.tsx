@@ -317,7 +317,7 @@ export function SyncCompareDialog() {
           if (!next) close()
         }}
       >
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowLeftRightIcon className="size-4 text-primary" />
@@ -380,7 +380,7 @@ export function SyncCompareDialog() {
               </Button>
             </div>
           ) : plan ? (
-            <div className="space-y-3">
+            <div className="min-h-0 space-y-3 overflow-y-auto">
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted-foreground">
                 <Summary
                   label={plan.direction === "upload" ? "To upload" : "To download"}
@@ -589,7 +589,7 @@ export function SyncCompareDialog() {
           if (!deleteBusy) setDeleteOpen(next)
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="size-4 text-destructive" />
