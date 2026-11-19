@@ -324,6 +324,7 @@ export function CommandPalette() {
           >
             <ArrowLeftRightIcon className="text-muted-foreground" />
             Compare folders…
+            <CommandShortcut>{shortcutLabel("compare")}</CommandShortcut>
           </CommandItem>
         </CommandGroup>
 

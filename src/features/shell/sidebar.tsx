@@ -43,6 +43,7 @@ function SidebarImpl() {
             >
               <ArrowLeftRightIcon />
               Compare folders
+              <Kbd className="ml-auto">{shortcutLabel("compare")}</Kbd>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>

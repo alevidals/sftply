@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { tinykeys } from "tinykeys"
 import { useSettings } from "@/features/settings/settings-context"
 import { errorMessage } from "@/lib/errors"
+import { useSessionStore } from "@/stores/session-store"
 import { type PaneId, useUiStore } from "@/stores/ui-store"
 
 export function useGlobalShortcuts() {
@@ -10,6 +11,10 @@ export function useGlobalShortcuts() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
   const setSettingsTab = useUiStore((state) => state.setSettingsTab)
   const setActivePane = useUiStore((state) => state.setActivePane)
+  const setSyncCompareOpen = useUiStore((state) => state.setSyncCompareOpen)
+  const localPath = useUiStore((state) => state.localSummary.path)
+  const remotePath = useUiStore((state) => state.remoteSummary.path)
+  const activeSessionId = useSessionStore((state) => state.activeSessionId)
   const { settings, updateSettings } = useSettings()
 
   const focusPane = useCallback(
@@ -55,7 +60,27 @@ export function useGlobalShortcuts() {
           event.preventDefault()
           focusPane("remote")
         },
+        "$mod+Shift+KeyC": (event) => {
+          const state = useUiStore.getState()
+          if (state.paletteOpen || state.settingsOpen || state.syncCompareOpen) return
+          event.preventDefault()
+          if (!localPath || !remotePath || !activeSessionId) {
+            toast.info("Open a local folder and connect a remote session first.")
+            return
+          }
+          setSyncCompareOpen(true)
+        },
       }),
-    [focusPane, setSettingsOpen, setSettingsTab, toggleBottomPanel, togglePalette],
+    [
+      activeSessionId,
+      focusPane,
+      localPath,
+      remotePath,
+      setSettingsOpen,
+      setSettingsTab,
+      setSyncCompareOpen,
+      toggleBottomPanel,
+      togglePalette,
+    ],
   )
 }

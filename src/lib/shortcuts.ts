@@ -93,6 +93,11 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     ],
   },
   {
+    id: "sync",
+    title: "Sync",
+    shortcuts: [{ id: "compare", label: "Compare folders", mac: ["mod+Shift+KeyC"] }],
+  },
+  {
     id: "browse",
     title: "Browsing",
     shortcuts: [

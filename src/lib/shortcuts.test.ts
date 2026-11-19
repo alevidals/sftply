@@ -63,6 +63,8 @@ describe("shortcutLabel", () => {
     expect(shortcutLabel("delete", true)).toBe("⌘⌫")
     expect(shortcutLabel("delete", false)).toBe("Delete")
     expect(shortcutLabel("open", false)).toBe("Enter")
+    expect(shortcutLabel("compare", true)).toBe("⌘⇧C")
+    expect(shortcutLabel("compare", false)).toBe("Ctrl+Shift+C")
   })
 
   it("returns an empty label for an unknown id", () => {
