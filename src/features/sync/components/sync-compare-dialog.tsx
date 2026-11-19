@@ -203,6 +203,7 @@ export function SyncCompareDialog() {
         deleteTargets,
       )
       toast.success(`Deleted ${deleted} item${deleted === 1 ? "" : "s"}`)
+      void queryClient.invalidateQueries({ queryKey: ["fs"] })
       setDeleteOpen(false)
       void runCompare(plan.direction, globList(includeGlobs), globList(excludeGlobs))
     } catch (cause) {
