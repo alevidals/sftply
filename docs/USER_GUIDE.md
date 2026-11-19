@@ -6,12 +6,14 @@ Everything the app can do today, and what to do when a server says no.
 
 Download the build for your system from
 [Releases](https://github.com/alevidals/sftply/releases/latest). Builds are not
-OS-signed, so the first launch asks for confirmation:
+Developer ID signed or notarized, so the first launch asks for confirmation:
 
-- **macOS**: right-click `sftply.app` → **Open** → **Open**, or run
+- **macOS**: the app is ad-hoc signed, not Developer ID signed and not
+  notarized. Right-click `sftply.app` → **Open** → **Open**, or run
   `xattr -dr com.apple.quarantine /Applications/sftply.app`.
-- **Windows**: SmartScreen → **More info** → **Run anyway**. The portable `.exe`
-  needs the WebView2 runtime that ships with Windows 10 (1803+) and 11.
+- **Windows**: builds are unsigned, so SmartScreen shows a warning. Choose
+  **More info** → **Run anyway**. The portable `.exe` needs the WebView2 runtime
+  that ships with Windows 10 (1803+) and 11.
 - **Linux**: make the AppImage executable (`chmod +x`). It needs FUSE 2, or run
   it with `--appimage-extract-and-run`. WebKitGTK 4.1 comes from your
   distribution.

@@ -3,6 +3,11 @@
 `sftply` ships as a Tauri 2 desktop app. Bundles are produced per operating
 system; Tauri does not cross-compile installers.
 
+**Signing status:** Release builds are not Developer ID signed or notarized. The
+macOS workflow applies an ad-hoc signature (`APPLE_SIGNING_IDENTITY: "-"`) and
+Windows builds are unsigned. The optional signing sections below describe what
+would change with real certificates; they are not active.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main`, every pull request and
@@ -59,9 +64,9 @@ Portable caveats:
   Windows 10 (1803+) and Windows 11. It does not register file associations or
   an uninstaller.
 - **macOS**: the `.app` is ad-hoc signed in CI, so Apple Silicon will run it, but
-  Gatekeeper still requires the user to allow an app from an unknown developer.
-  Real signing and notarization need a Developer ID certificate and the steps
-  below.
+  Gatekeeper still asks the user to allow an app from a developer it does not
+  recognize. Ad-hoc signing is not Developer ID signing, and nothing is
+  notarized. The optional sections below cover real signing.
 - **Linux**: the AppImage is a single executable, but it may need FUSE 2 (or
   `--appimage-extract-and-run`) and the WebKitGTK libraries provided by the
   distribution. Both architectures are built on Ubuntu 22.04 to keep the glibc
@@ -72,8 +77,8 @@ Portable caveats:
 
 ### macOS: "cannot be opened because the developer cannot be verified"
 
-The `.app` is ad-hoc signed but not notarized, so Gatekeeper quarantines the
-download. Pick either path:
+The `.app` is ad-hoc signed, not Developer ID signed and not notarized, so
+Gatekeeper quarantines the download. Pick either path:
 
 1. **Finder**: right-click `sftply.app` → **Open** → **Open**. macOS remembers
    the choice, so later launches are normal.
@@ -162,12 +167,17 @@ the intent: free to use, contributions welcome, no licensing paperwork.
 Third-party dependencies keep their own licenses. `cargo deny`/`cargo license`
 would be the next step if the app is ever distributed commercially.
 
-## Unsigned distribution
+## Unsigned (ad-hoc) distribution
 
-There is no Apple Developer ID certificate and no Windows code-signing
-certificate, so **no release is OS-signed**. This is a permanent constraint of the
-project, not a pending task, and the documentation says so everywhere a user
-might look:
+There is no Apple Developer account, no Developer ID certificate and no Windows
+code-signing certificate, so **no release is signed for distribution**.
+
+The macOS workflow applies an **ad-hoc** signature
+(`APPLE_SIGNING_IDENTITY: "-"`). It requires no Apple account and keeps Apple
+Silicon from reporting the downloaded app as damaged, but it is not Developer ID
+signing and it does not notarize the app. Gatekeeper still warns on first
+launch. Windows builds are unsigned, so SmartScreen warns until the download
+gains reputation.
 
 - `README.md` and the landing page explain the first-launch prompts.
 - `SECURITY.md` states the trade-off and points at `SHA256SUMS`.
@@ -175,15 +185,15 @@ might look:
 
 What users see:
 
-| Platform | Effect                                                                         | Workaround                                          |
-| -------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
-| macOS    | Gatekeeper blocks the first launch; ad-hoc signature keeps Apple Silicon happy | Right-click → Open, or clear `com.apple.quarantine` |
-| Windows  | SmartScreen warns until the download gains reputation                          | "More info" → "Run anyway"                          |
+| Platform | Effect                                                                       | Workaround                                          |
+| -------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
+| macOS    | Gatekeeper warns on first launch; ad-hoc signature keeps Apple Silicon happy | Right-click → Open, or clear `com.apple.quarantine` |
+| Windows  | SmartScreen warns until the download gains reputation                        | "More info" → "Run anyway"                          |
 
-Integrity still comes from `SHA256SUMS`, which is generated per release. Do not
-add signing instructions to the docs until there is a certificate; the workflow
-already accepts `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD` and
-`APPLE_TEAM_ID` the day that changes.
+Integrity still comes from `SHA256SUMS`, which is generated per release. The
+optional signing sections below describe the procedure for when certificates
+exist; they are not used by the current release workflow, which applies an ad-hoc
+macOS signature only.
 
 ## Version bump
 
@@ -232,7 +242,7 @@ When v2 ships:
 When the `v2` branch is created, add it to the `ci.yml` push triggers so merges
 from `main` are tested before they land.
 
-## Local unsigned build
+## Local development build
 
 ```sh
 bun run check                 # typecheck, Biome, tests, frontend build
@@ -246,10 +256,17 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 - Linux: `deb/`, `rpm/`, `appimage/`
 - Windows: `msi/`, `nsis/`
 
-An unsigned macOS build runs locally but Gatekeeper blocks it on other
-machines. Treat it as a smoke test, not a release.
+A local macOS build runs on this machine, but it is not Developer ID signed or
+notarized, so Gatekeeper blocks it on other machines. Treat it as a smoke test,
+not a release.
 
-## macOS signing and notarization
+## Optional: macOS signing and notarization (not active)
+
+> **Not active.** This requires a paid Apple Developer account, a Developer ID
+> Application certificate and an app-specific password. sftply does not have
+> them today, so the release workflow keeps the ad-hoc signature. The steps
+> below are the procedure for when that changes; they are not part of the
+> current release.
 
 Prerequisites: an Apple Developer ID Application certificate in the login
 keychain and an app-specific password for the Apple ID.
@@ -270,6 +287,21 @@ not sandboxed; if sandboxing is added later, add
 `keychain-access-groups` to an entitlements file and reference it from
 `bundle.macOS.entitlements`.
 
+For CI, the equivalent inputs are repository secrets. Tauri imports a base64
+`.p12` certificate and uses the identity and notarization credentials:
+
+| Secret                       | Purpose                                |
+| ---------------------------- | -------------------------------------- |
+| `APPLE_CERTIFICATE`          | Base64-encoded Developer ID `.p12`     |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for that `.p12`               |
+| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: … (TEAMID)` |
+| `APPLE_ID`                   | Apple ID email                         |
+| `APPLE_PASSWORD`             | App-specific password                  |
+| `APPLE_TEAM_ID`              | Apple Developer team ID                |
+
+The macOS build step must receive those secrets and stop hardcoding `-` before
+notarization can run in CI.
+
 Verify a finished artifact:
 
 ```sh
@@ -278,7 +310,10 @@ spctl --assess --type execute --verbose=2 "src-tauri/target/release/bundle/macos
 xcrun stapler validate "src-tauri/target/release/bundle/dmg/sftply_<version>_<arch>.dmg"
 ```
 
-## Windows signing
+## Optional: Windows signing (not active)
+
+> **Not active.** This requires a Windows code-signing certificate. sftply does
+> not have one today, so Windows builds are unsigned.
 
 Set a certificate thumbprint in `bundle.windows.certificateThumbprint`, or use a
 custom `bundle.windows.signCommand`. The default WebView2 install mode is
@@ -346,7 +381,8 @@ and Linux before publishing a build, using the same checklist for each.
 - [ ] Version bumped in the three files and bindings regenerated.
 - [ ] `bun run check` and `bun run rust:lint && bun run rust:test` pass.
 - [ ] Installer built on each target OS.
-- [ ] macOS artifact signed, notarized and stapled.
+- [ ] macOS artifact ad-hoc signed. Developer ID signing, notarization and
+  stapling only when the optional signing setup is active.
 - [ ] App launches, opens a loopback test server, and reads/writes a file.
 - [ ] Saved credentials survive a restart through the OS keychain.
 - [ ] Release notes and changelog updated.

@@ -28,14 +28,16 @@ Out of scope: the absence of an OS code-signing certificate (see below),
 vulnerabilities in servers you connect to, and anything that requires an
 already-compromised machine.
 
-## Unsigned builds
+## Unsigned (ad-hoc) builds
 
-Releases are **not** signed with an Apple Developer ID nor a Windows code-signing
-certificate. That is a deliberate trade-off, not a bug:
+There is no Apple Developer account or Developer ID certificate and no Windows
+code-signing certificate, so releases are **not signed for distribution**.
 
-- macOS builds are ad-hoc signed, so Apple Silicon runs them, but Gatekeeper
-  asks for confirmation on first launch.
-- Windows builds trigger SmartScreen until the file build up reputation.
+- macOS builds are ad-hoc signed, so Apple Silicon runs them, but Gatekeeper asks
+  for confirmation on first launch. Ad-hoc signing is not Developer ID signing
+  and does not notarize the app.
+- Windows builds are unsigned and trigger SmartScreen until the file builds up
+  reputation.
 
 `SHA256SUMS` is published with every release so you can verify what you
 downloaded. Verify it before running a build from an unexpected mirror.

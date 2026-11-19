@@ -36,8 +36,10 @@
 
 Every release ships `SHA256SUMS`.
 
-> **Unsigned builds.** macOS asks for confirmation on first launch (ad-hoc
-> signed, not notarized) and Windows shows a SmartScreen warning. The
+> **Not Developer ID signed or notarized.** macOS builds carry an ad-hoc
+> signature, which keeps Apple Silicon from reporting them as damaged, but
+> Gatekeeper still asks for confirmation on first launch. Windows builds are
+> unsigned and show a SmartScreen warning. The
 > [user guide](docs/USER_GUIDE.md#install) has the exact steps, and
 > [SECURITY.md](SECURITY.md) explains the trade-off.
 
