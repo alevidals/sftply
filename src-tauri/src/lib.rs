@@ -41,6 +41,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::fs::fs_delete,
             commands::fs::fs_chmod,
             commands::fs::fs_read_text,
+            commands::fs::fs_preview,
             commands::fs::fs_write_text,
             commands::fs::local_create_file,
             commands::fs::local_open_editor,

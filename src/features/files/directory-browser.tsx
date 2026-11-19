@@ -69,6 +69,7 @@ import {
 import { type FileAction, FileTable } from "@/features/files/components/file-table"
 import { PaneEmpty } from "@/features/files/components/pane-empty"
 import { PathBar } from "@/features/files/components/path-bar"
+import { PreviewDialog } from "@/features/files/components/preview-dialog"
 import { TextEditorDialog } from "@/features/files/components/text-editor-dialog"
 import { fsListingKey, useFsListing } from "@/features/files/hooks/use-fs-listing"
 import { usePathNavigation } from "@/features/files/hooks/use-path-navigation"
@@ -117,6 +118,8 @@ interface DirectoryBrowserProps {
   initialPath: string
   /** Whether files can be opened (local) or only folders navigated (remote). */
   allowOpenFile: boolean
+  /** Remote files can be previewed without downloading them first. */
+  allowPreview?: boolean
   allowReveal: boolean
   /** Persist the current folder (local settings). */
   onPathChange?: (path: string) => void
@@ -140,6 +143,7 @@ export function DirectoryBrowser({
   scope,
   initialPath,
   allowOpenFile,
+  allowPreview = false,
   allowReveal,
   onPathChange,
   headerExtra,
@@ -170,6 +174,8 @@ export function DirectoryBrowser({
     scope,
   )
 
+  const [previewEntry, setPreviewEntry] = useState<FsEntry | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
   const [columns, setColumns] = useState<ColumnOptions>({ permissions: true })
   const [filter, setFilter] = useState("")
@@ -315,6 +321,11 @@ export function DirectoryBrowser({
           openEditor(entry)
           return
         }
+        if (allowPreview) {
+          setPreviewEntry(entry)
+          setPreviewOpen(true)
+          return
+        }
         toast.info("Remote files cannot be opened here yet. Download the file first.")
         return
       }
@@ -322,7 +333,7 @@ export function DirectoryBrowser({
         reportError(`Could not open “${entry.name}”`, error)
       })
     },
-    [allowOpenFile, canEditEntry, navigate, openEditor, reportError],
+    [allowOpenFile, allowPreview, canEditEntry, navigate, openEditor, reportError],
   )
 
   const revealEntry = useCallback(
@@ -349,6 +360,12 @@ export function DirectoryBrowser({
       switch (action) {
         case "open":
           if (activeEntry) openEntry(activeEntry)
+          break
+        case "preview":
+          if (activeEntry?.kind === "file" && allowPreview) {
+            setPreviewEntry(activeEntry)
+            setPreviewOpen(true)
+          }
           break
         case "edit":
           if (activeEntry) openEditor(activeEntry)
@@ -407,6 +424,7 @@ export function DirectoryBrowser({
     },
     [
       activeEntry,
+      allowPreview,
       allowReveal,
       canChmod,
       listing,
@@ -786,6 +804,7 @@ export function DirectoryBrowser({
           ) : null}
           <ActionsMenu
             canOpen={Boolean(activeEntry) && (activeEntry?.kind === "directory" || allowOpenFile)}
+            canPreview={Boolean(activeEntry) && activeEntry?.kind === "file" && allowPreview}
             canEdit={canEditEntry(activeEntry)}
             canRename={Boolean(activeEntry) && canRename}
             canDelete={selectedEntries.length > 0 && canRemove}
@@ -1010,6 +1029,7 @@ export function DirectoryBrowser({
           canChmod={canChmod}
           canEdit={canEdit}
           allowOpen={allowOpenFile}
+          allowPreview={allowPreview}
           allowReveal={allowReveal}
           canTransfer={canTransfer}
           transferLabel={transferLabel}
@@ -1083,6 +1103,13 @@ export function DirectoryBrowser({
         onOpenChange={setPermissionsOpen}
         onConfirm={applyPermissions}
       />
+      <PreviewDialog
+        open={previewOpen}
+        scope={scope}
+        entry={previewEntry}
+        onOpenChange={setPreviewOpen}
+      />
+
       <TextEditorDialog
         open={editorOpen}
         entry={editorTarget}
@@ -1157,6 +1184,7 @@ function ToolbarButton({
 
 function ActionsMenu({
   canOpen,
+  canPreview,
   canEdit,
   canRename,
   canDelete,
@@ -1169,6 +1197,7 @@ function ActionsMenu({
   onAction,
 }: {
   canOpen: boolean
+  canPreview: boolean
   canEdit: boolean
   canRename: boolean
   canDelete: boolean
@@ -1206,6 +1235,12 @@ function ActionsMenu({
           Open
           <DropdownMenuShortcut>{shortcutLabel("open")}</DropdownMenuShortcut>
         </DropdownMenuItem>
+        {canPreview ? (
+          <DropdownMenuItem onSelect={() => onAction("preview")}>
+            <EyeIcon />
+            Preview
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem disabled={!canEdit} onSelect={() => onAction("edit")}>
           <FileTextIcon />
           Edit text…

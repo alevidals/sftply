@@ -1,11 +1,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::{open_path, reveal_item_in_dir};
 
 use crate::app_state::AppState;
 use crate::domain::fs::{EntryKind, FsEntry, FsScope, Listing};
+use crate::domain::preview::{MAX_IMAGE_PREVIEW_BYTES, PreviewKind, PreviewPayload, image_mime};
 use crate::domain::text::{MAX_TEXT_FILE_BYTES, TextFile, text_version};
 use crate::domain::transfer::ConflictPolicy;
 use crate::error::{AppError, ErrorCode};
@@ -238,6 +241,141 @@ pub async fn fs_read_text(
             result
         }
     }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn fs_preview(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    scope: FsScope,
+    path: String,
+) -> Result<PreviewPayload, AppError> {
+    match &scope {
+        FsScope::Local => preview_local(&path).await,
+        FsScope::Remote { .. } => {
+            let session = remote_session(&state, &scope)?;
+            let result = run_operation(&session, operation_timeout(&state), |client| {
+                Box::pin(async move { preview_remote(client, &path).await })
+            })
+            .await;
+            if let Err(error) = &result {
+                report_operation_failure(&app, &session, error);
+            }
+            result
+        }
+    }
+}
+
+async fn preview_local(path: &str) -> Result<PreviewPayload, AppError> {
+    let entry = local::stat(path).await?;
+    if entry.kind != EntryKind::File {
+        return Err(AppError::invalid_input("Only files can be previewed."));
+    }
+    if let Some(mime) = image_mime(path) {
+        if entry.size > MAX_IMAGE_PREVIEW_BYTES as f64 {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "This image is too large to preview.",
+            ));
+        }
+        let bytes = tokio::fs::read(path).await.map_err(AppError::from)?;
+        if bytes.len() as u64 > MAX_IMAGE_PREVIEW_BYTES {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "This image is too large to preview.",
+            ));
+        }
+        return Ok(PreviewPayload {
+            kind: PreviewKind::Image,
+            path: entry.path,
+            content: None,
+            mime_type: Some(mime.to_string()),
+            data_url: Some(data_url(mime, &bytes)),
+            size: entry.size,
+            modified_at: entry.modified_at,
+        });
+    }
+
+    let text = local::read_text(path).await?;
+    Ok(PreviewPayload {
+        kind: PreviewKind::Text,
+        path: text.path,
+        content: Some(text.content),
+        mime_type: None,
+        data_url: None,
+        size: text.size,
+        modified_at: text.modified_at,
+    })
+}
+
+async fn preview_remote(
+    client: &mut Box<dyn RemoteFs>,
+    path: &str,
+) -> Result<PreviewPayload, AppError> {
+    let entry = client.stat(path).await?;
+    if entry.kind != EntryKind::File {
+        return Err(AppError::invalid_input("Only files can be previewed."));
+    }
+    if let Some(mime) = image_mime(path) {
+        if entry.size > MAX_IMAGE_PREVIEW_BYTES as f64 {
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "This image is too large to preview.",
+            ));
+        }
+        let bytes = read_remote_bytes(client, path, MAX_IMAGE_PREVIEW_BYTES).await?;
+        return Ok(PreviewPayload {
+            kind: PreviewKind::Image,
+            path: entry.path,
+            content: None,
+            mime_type: Some(mime.to_string()),
+            data_url: Some(data_url(mime, &bytes)),
+            size: entry.size,
+            modified_at: entry.modified_at,
+        });
+    }
+
+    let text = read_remote_text(client, path).await?;
+    Ok(PreviewPayload {
+        kind: PreviewKind::Text,
+        path: text.path,
+        content: Some(text.content),
+        mime_type: None,
+        data_url: None,
+        size: text.size,
+        modified_at: text.modified_at,
+    })
+}
+
+async fn read_remote_bytes(
+    client: &mut Box<dyn RemoteFs>,
+    path: &str,
+    max_bytes: u64,
+) -> Result<Vec<u8>, AppError> {
+    let mut reader = client.open_read(path, 0).await?;
+    let mut bytes = Vec::new();
+    let mut buffer = vec![0u8; 64 * 1024];
+    loop {
+        let read = reader.read(&mut buffer).await?;
+        if read == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buffer[..read]);
+        if bytes.len() as u64 > max_bytes {
+            let _ = reader.finish().await;
+            return Err(AppError::new(
+                ErrorCode::Unsupported,
+                "This file is too large to preview.",
+            ));
+        }
+    }
+    reader.finish().await?;
+    Ok(bytes)
+}
+
+fn data_url(mime: &str, bytes: &[u8]) -> String {
+    format!("data:{mime};base64,{}", BASE64.encode(bytes))
 }
 
 #[tauri::command]

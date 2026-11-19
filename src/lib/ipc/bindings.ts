@@ -20,6 +20,7 @@ export const commands = {
 	fsDelete: (scope: FsScope, path: string, recursive: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_delete", { scope, path, recursive })),
 	fsChmod: (scope: FsScope, path: string, mode: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("fs_chmod", { scope, path, mode })),
 	fsReadText: (scope: FsScope, path: string) => typedError<TextFile_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_read_text", { scope, path })),
+	fsPreview: (scope: FsScope, path: string) => typedError<PreviewPayload_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_preview", { scope, path })),
 	fsWriteText: (scope: FsScope, path: string, content: string, expectedVersion: string | null, force: boolean) => typedError<TextFile_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_write_text", { scope, path, content, expectedVersion, force })),
 	localCreateFile: (parent: string, name: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("local_create_file", { parent, name })),
 	localOpenEditor: (path: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("local_open_editor", { path })),
@@ -500,6 +501,42 @@ export type Listing_Serialize = {
 	readAt: number,
 	/**  Non-fatal problems such as entries that could not be read. */
 	warnings: string[],
+};
+
+export type PreviewKind = "text" | "image";
+
+/**
+ *  A file preview. Text is rendered as preformatted text; images are rendered
+ *  as `<img>`. HTML and SVG are treated as text, never executed.
+ */
+export type PreviewPayload = PreviewPayload_Serialize | PreviewPayload_Deserialize;
+
+/**
+ *  A file preview. Text is rendered as preformatted text; images are rendered
+ *  as `<img>`. HTML and SVG are treated as text, never executed.
+ */
+export type PreviewPayload_Deserialize = {
+	kind: PreviewKind,
+	path: string,
+	content?: string | null,
+	mimeType?: string | null,
+	dataUrl?: string | null,
+	size: number,
+	modifiedAt?: number | null,
+};
+
+/**
+ *  A file preview. Text is rendered as preformatted text; images are rendered
+ *  as `<img>`. HTML and SVG are treated as text, never executed.
+ */
+export type PreviewPayload_Serialize = {
+	kind: PreviewKind,
+	path: string,
+	content: string | null,
+	mimeType: string | null,
+	dataUrl: string | null,
+	size: number,
+	modifiedAt: number | null,
 };
 
 export type ResumeSupport = "supported" | "conditional" | "unsupported";

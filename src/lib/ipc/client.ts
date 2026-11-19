@@ -13,6 +13,7 @@ import {
   type FsScope,
   type KnownHost,
   type Listing,
+  type PreviewPayload_Serialize,
   type SecretKind,
   type SecretStatus,
   type SessionInfo,
@@ -97,6 +98,10 @@ export const ipc = {
 
   fsReadText(scope: FsScope, path: string): Promise<TextFile> {
     return invoke(commands.fsReadText(scope, path)).then((result) => unwrap(result))
+  },
+
+  fsPreview(scope: FsScope, path: string): Promise<PreviewPayload_Serialize> {
+    return invoke(commands.fsPreview(scope, path)).then((result) => unwrap(result))
   },
 
   fsWriteText(

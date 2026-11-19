@@ -276,6 +276,7 @@ export function RemotePane() {
             scope={remoteScope(active.id)}
             initialPath={paths[active.id] ?? active.initialPath}
             allowOpenFile={false}
+            allowPreview
             allowReveal={false}
             statusLabel={`${PROTOCOL_LABELS[active.protocol]} · ${active.host}:${active.port}`}
             bookmarkKey={active.connectionId}

@@ -4,6 +4,7 @@ import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
   CopyIcon,
+  EyeIcon,
   FilePlusIcon,
   FileTextIcon,
   FolderPlusIcon,
@@ -65,6 +66,7 @@ function hideNativeDragImage(transfer: DataTransfer) {
 
 export type FileAction =
   | "open"
+  | "preview"
   | "edit"
   | "rename"
   | "delete"
@@ -86,6 +88,8 @@ interface FileTableProps {
   canChmod: boolean
   /** Whether regular files in this pane can be opened in the text editor. */
   canEdit: boolean
+  /** Whether remote files can be previewed in a read-only dialog. */
+  allowPreview: boolean
   /** Whether non-directory entries can be opened. Remote panes only navigate. */
   allowOpen: boolean
   /** Whether items can be revealed in the OS file manager (local only). */
@@ -119,6 +123,7 @@ export function FileTable({
   canChmod,
   canEdit,
   allowOpen,
+  allowPreview,
   allowReveal,
   canTransfer,
   transferLabel,
@@ -188,6 +193,8 @@ export function FileTable({
     switch (action) {
       case "open":
         return !menuEntry || (menuEntry.kind !== "directory" && !allowOpen)
+      case "preview":
+        return menuEntry?.kind !== "file" || !allowPreview
       case "edit":
         return menuEntry?.kind !== "file" || !canEdit || !isEditableTextSize(menuEntry.size)
       case "rename":
@@ -530,6 +537,15 @@ export function FileTable({
               Open
               <ContextMenuShortcut>{shortcutLabel("open")}</ContextMenuShortcut>
             </ContextMenuItem>
+            {allowPreview ? (
+              <ContextMenuItem
+                disabled={actionDisabled("preview")}
+                onSelect={() => onAction("preview")}
+              >
+                <EyeIcon />
+                Preview
+              </ContextMenuItem>
+            ) : null}
             <ContextMenuItem disabled={actionDisabled("edit")} onSelect={() => onAction("edit")}>
               <FileTextIcon />
               Edit text…

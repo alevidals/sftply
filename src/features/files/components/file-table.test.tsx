@@ -87,6 +87,7 @@ function renderTable(
       canChmod
       canEdit={overrides.canEdit ?? true}
       allowOpen
+      allowPreview={false}
       allowReveal={overrides.allowReveal ?? true}
       canTransfer
       transferLabel="Download to local"

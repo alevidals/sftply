@@ -1,4 +1,10 @@
-import type { FsEntry, FsScope, Listing, TextFile } from "@/lib/ipc/bindings"
+import type {
+  FsEntry,
+  FsScope,
+  Listing,
+  PreviewPayload_Serialize,
+  TextFile,
+} from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 
 export const LOCAL_SCOPE: FsScope = { kind: "local" }
@@ -41,6 +47,10 @@ export function filesApi(scope: FsScope) {
 
     readText(path: string): Promise<TextFile> {
       return ipc.fsReadText(scope, path)
+    },
+
+    preview(path: string): Promise<PreviewPayload_Serialize> {
+      return ipc.fsPreview(scope, path)
     },
 
     writeText(

@@ -36,6 +36,7 @@ async-trait = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 globset = "0.4"
+base64 = "0.22"
 # Manual update check only; see src/update.rs.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 
