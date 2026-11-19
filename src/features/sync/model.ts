@@ -6,10 +6,12 @@ import type {
 } from "@/lib/ipc/bindings"
 
 export function isActionable(entry: SyncEntry_Serialize): boolean {
-  return entry.action === "upload" || entry.action === "createDirectory"
+  return (
+    entry.action === "upload" || entry.action === "download" || entry.action === "createDirectory"
+  )
 }
 
-/** Date-only differences stay unselected, but the user can choose to upload them. */
+/** Date-only differences stay unselected, but the user can choose to transfer them. */
 export function isSelectable(entry: SyncEntry_Serialize): boolean {
   return isActionable(entry) || entry.status === "dateDiffers"
 }
@@ -43,14 +45,19 @@ export function selectionToTransferEntries(
   }
 
   return [...chosen.values()].flatMap((entry) => {
-    if (!entry.localPath || !entry.remoteTargetPath) return []
+    const upload = plan.direction === "upload"
+    const sourcePath = upload ? entry.localPath : entry.remotePath
+    const targetPath = upload ? entry.remoteTargetPath : entry.localTargetPath
+    const kind = upload ? entry.localKind : entry.remoteKind
+    const size = upload ? entry.localSize : entry.remoteSize
+    if (!sourcePath || !targetPath) return []
     return [
       {
-        sourcePath: entry.localPath,
-        targetPath: entry.remoteTargetPath,
+        sourcePath,
+        targetPath,
         relativePath: entry.relativePath,
-        kind: entry.localKind ?? "file",
-        size: entry.localSize ?? 0,
+        kind: kind ?? "file",
+        size: size ?? 0,
         conflict: null,
       },
     ]
@@ -85,8 +92,14 @@ export function statusLabel(status: SyncEntryStatus): string {
 export function selectedBytes(plan: SyncPlan_Serialize, selected: ReadonlySet<string>): number {
   return plan.entries.reduce((total, entry) => {
     if (!selected.has(entry.relativePath) || !isSelectable(entry)) return total
-    if (entry.action !== "upload" && entry.status !== "dateDiffers") return total
-    return total + (entry.localSize ?? 0)
+    if (
+      entry.action !== "upload" &&
+      entry.action !== "download" &&
+      entry.status !== "dateDiffers"
+    ) {
+      return total
+    }
+    return total + ((plan.direction === "upload" ? entry.localSize : entry.remoteSize) ?? 0)
   }, 0)
 }
 
@@ -98,7 +111,13 @@ export function selectedCount(
   let directories = 0
   for (const entry of plan.entries) {
     if (!selected.has(entry.relativePath)) continue
-    if (entry.action === "upload" || entry.status === "dateDiffers") files += 1
+    if (
+      entry.action === "upload" ||
+      entry.action === "download" ||
+      entry.status === "dateDiffers"
+    ) {
+      files += 1
+    }
     if (entry.action === "createDirectory") directories += 1
   }
   return { files, directories }

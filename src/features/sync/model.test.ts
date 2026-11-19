@@ -20,6 +20,7 @@ function entry(
     name,
     localPath: `/local/${relativePath}`,
     remotePath: null,
+    localTargetPath: null,
     remoteTargetPath: `/remote/${relativePath}`,
     localKind: "file",
     remoteKind: null,
@@ -33,18 +34,29 @@ function entry(
   }
 }
 
-function plan(entries: SyncEntry_Serialize[]): SyncPlan_Serialize {
+function plan(
+  entries: SyncEntry_Serialize[],
+  direction: SyncPlan_Serialize["direction"] = "upload",
+): SyncPlan_Serialize {
   return {
+    direction,
     localRoot: "/local",
     remoteRoot: "/remote",
     entries,
-    uploadFiles: entries.filter((entry) => entry.action === "upload").length,
-    uploadBytes: entries.reduce((total, entry) => total + (entry.localSize ?? 0), 0),
+    transferFiles: entries.filter(
+      (entry) => entry.action === "upload" || entry.action === "download",
+    ).length,
+    transferBytes: entries.reduce(
+      (total, entry) =>
+        total + ((direction === "upload" ? entry.localSize : entry.remoteSize) ?? 0),
+      0,
+    ),
     createDirectories: entries.filter((entry) => entry.action === "createDirectory").length,
     changed: 0,
     dateDiffers: 0,
     equal: 0,
     equalContent: 0,
+    localOnly: 0,
     remoteOnly: 0,
     unknown: 0,
     conflicts: 0,
@@ -126,6 +138,38 @@ describe("sync model", () => {
         (entry) => entry.relativePath,
       ),
     ).toEqual(["changed-date.txt"])
+  })
+
+  it("maps a download plan from the remote source to the local target", () => {
+    const value = plan(
+      [
+        entry("report.txt", "download", {
+          localPath: null,
+          localKind: null,
+          localSize: null,
+          remotePath: "/remote/report.txt",
+          remoteSize: 8,
+          localTargetPath: "/local/report.txt",
+          status: "remoteOnly",
+        }),
+      ],
+      "download",
+    )
+
+    const transfers = selectionToTransferEntries(value, new Set(["report.txt"]))
+    expect(transfers).toEqual([
+      expect.objectContaining({
+        sourcePath: "/remote/report.txt",
+        targetPath: "/local/report.txt",
+        kind: "file",
+        size: 8,
+      }),
+    ])
+    expect(selectedBytes(value, new Set(["report.txt"]))).toBe(8)
+    expect(selectedCount(value, new Set(["report.txt"]))).toEqual({
+      files: 1,
+      directories: 0,
+    })
   })
 
   it("labels every status for the UI", () => {

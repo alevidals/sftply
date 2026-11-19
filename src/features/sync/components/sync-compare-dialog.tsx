@@ -43,7 +43,12 @@ import {
 import { transfersApi } from "@/features/transfers/api"
 import { errorMessage } from "@/lib/errors"
 import { formatBytes } from "@/lib/format"
-import type { SyncEntry_Serialize, SyncEntryStatus, SyncPlan_Serialize } from "@/lib/ipc/bindings"
+import type {
+  SyncDirection,
+  SyncEntry_Serialize,
+  SyncEntryStatus,
+  SyncPlan_Serialize,
+} from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
 import { useSessionStore } from "@/stores/session-store"
 import { useUiStore } from "@/stores/ui-store"
@@ -64,6 +69,7 @@ export function SyncCompareDialog() {
   const queryClient = useQueryClient()
 
   const [plan, setPlan] = useState<SyncPlan_Serialize | null>(null)
+  const [direction, setDirection] = useState<SyncDirection>("upload")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState("")
   const [showEqual, setShowEqual] = useState(false)
@@ -78,7 +84,7 @@ export function SyncCompareDialog() {
   const sessionName = activeSessionId ? sessions[activeSessionId]?.name : null
 
   const runCompare = useCallback(
-    async (include: string[], exclude: string[]) => {
+    async (nextDirection: SyncDirection, include: string[], exclude: string[]) => {
       if (!localPath || !remotePath || !activeSessionId) return
       const requestId = ++requestIdRef.current
       setLoading(true)
@@ -90,6 +96,7 @@ export function SyncCompareDialog() {
           localPath,
           remoteScope(activeSessionId),
           remotePath,
+          nextDirection,
           include,
           exclude,
         )
@@ -111,12 +118,19 @@ export function SyncCompareDialog() {
     setShowEqual(false)
     setIncludeGlobs("")
     setExcludeGlobs("")
-    void runCompare([], [])
+    setDirection("upload")
+    void runCompare("upload", [], [])
   }, [open, runCompare])
+
+  const changeDirection = (next: SyncDirection) => {
+    if (loading || next === direction) return
+    setDirection(next)
+    void runCompare(next, globList(includeGlobs), globList(excludeGlobs))
+  }
 
   const applyFilters = () => {
     if (loading) return
-    void runCompare(globList(includeGlobs), globList(excludeGlobs))
+    void runCompare(direction, globList(includeGlobs), globList(excludeGlobs))
   }
 
   const close = () => {
@@ -194,37 +208,41 @@ export function SyncCompareDialog() {
       const selectedEntries = plan.entries.filter(
         (entry) => selected.has(entry.relativePath) && isSelectable(entry),
       )
-      const issues = await syncApi.validate(remoteScope(activeSessionId), selectedEntries)
+      const issues = await syncApi.validate(
+        remoteScope(activeSessionId),
+        plan.direction,
+        selectedEntries,
+      )
       if (issues.length > 0) {
         const first = issues[0]
-        toast.error("The remote folder changed", {
+        toast.error("The target folder changed", {
           description: first
             ? `${first.relativePath}: ${first.reason} The plan will be refreshed.`
             : "The plan will be refreshed.",
         })
-        void runCompare(globList(includeGlobs), globList(excludeGlobs))
+        void runCompare(plan.direction, globList(includeGlobs), globList(excludeGlobs))
         return
       }
 
-      const items = await transfersApi.enqueueTree(
-        LOCAL_SCOPE,
-        remoteScope(activeSessionId),
-        "overwrite",
-        transferEntries,
-        [],
-      )
+      const remote = remoteScope(activeSessionId)
+      const source = plan.direction === "upload" ? LOCAL_SCOPE : remote
+      const target = plan.direction === "upload" ? remote : LOCAL_SCOPE
+      const verb = plan.direction === "upload" ? "upload" : "download"
+      const items = await transfersApi.enqueueTree(source, target, "overwrite", transferEntries, [])
       const folders = transferEntries.filter((entry) => entry.kind === "directory").length
       if (items.length > 0) {
-        toast.success(`Queued ${items.length} upload${items.length === 1 ? "" : "s"}`)
+        toast.success(`Queued ${items.length} ${verb}${items.length === 1 ? "" : "s"}`)
         recordActivity(
           "info",
-          `Queued ${items.length} upload${items.length === 1 ? "" : "s"} from ${localPath} to ${sessionName ?? "remote"}`,
+          plan.direction === "upload"
+            ? `Queued ${items.length} upload${items.length === 1 ? "" : "s"} from ${localPath} to ${sessionName ?? "remote"}`
+            : `Queued ${items.length} download${items.length === 1 ? "" : "s"} from ${sessionName ?? "remote"} to ${localPath}`,
         )
       } else if (folders > 0) {
         toast.success(`Created ${folders} folder${folders === 1 ? "" : "s"}`)
         recordActivity(
           "info",
-          `Created ${folders} folder${folders === 1 ? "" : "s"} in ${sessionName ?? "remote"}`,
+          `Created ${folders} folder${folders === 1 ? "" : "s"} in ${plan.direction === "upload" ? (sessionName ?? "remote") : localPath}`,
         )
       }
       setBottomTab("transfers")
@@ -258,9 +276,32 @@ export function SyncCompareDialog() {
             Compare folders
           </DialogTitle>
           <DialogDescription className="selectable truncate font-mono text-2xs">
-            {localPath ?? "No local folder"} → {remotePath ?? "No remote folder"}
+            {direction === "upload"
+              ? `${localPath ?? "No local folder"} → ${remotePath ?? "No remote folder"}`
+              : `${remotePath ?? "No remote folder"} → ${localPath ?? "No local folder"}`}
             {sessionName ? ` · ${sessionName}` : ""}
           </DialogDescription>
+          <div className="flex items-center gap-1">
+            <span className="mr-1 text-2xs text-muted-foreground">Direction</span>
+            <Button
+              type="button"
+              size="sm"
+              variant={direction === "upload" ? "default" : "outline"}
+              disabled={loading}
+              onClick={() => changeDirection("upload")}
+            >
+              Local → remote
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={direction === "download" ? "default" : "outline"}
+              disabled={loading}
+              onClick={() => changeDirection("download")}
+            >
+              Remote → local
+            </Button>
+          </div>
         </DialogHeader>
 
         {missingPaths ? (
@@ -282,7 +323,9 @@ export function SyncCompareDialog() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void runCompare(globList(includeGlobs), globList(excludeGlobs))}
+              onClick={() =>
+                void runCompare(direction, globList(includeGlobs), globList(excludeGlobs))
+              }
             >
               <RefreshCwIcon className="size-3.5" />
               Try again
@@ -291,11 +334,15 @@ export function SyncCompareDialog() {
         ) : plan ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted-foreground">
-              <Summary label="To upload" value={plan.uploadFiles} />
+              <Summary
+                label={plan.direction === "upload" ? "To upload" : "To download"}
+                value={plan.transferFiles}
+              />
               <Summary label="Folders" value={plan.createDirectories} />
               <Summary label="Changed" value={plan.changed} />
               <Summary label="Date differs" value={plan.dateDiffers} warning />
               <Summary label="Equal" value={plan.equal} />
+              <Summary label="Only local" value={plan.localOnly} />
               <Summary label="Only remote" value={plan.remoteOnly} />
               {plan.unknown > 0 ? <Summary label="Unknown" value={plan.unknown} warning /> : null}
               {plan.conflicts > 0 ? (
@@ -427,7 +474,10 @@ export function SyncCompareDialog() {
         <DialogFooter className="gap-2 sm:justify-between">
           <p className="max-w-sm text-2xs text-muted-foreground">
             {plan ? `${formatBytes(bytes, sizeFormat)} selected. ` : ""}
-            Date-only differences are not selected by default. Remote-only files are kept.
+            Date-only differences are not selected by default.{" "}
+            {plan?.direction === "download"
+              ? "Local-only files are kept."
+              : "Remote-only files are kept."}
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" disabled={busy} onClick={close}>
@@ -441,7 +491,7 @@ export function SyncCompareDialog() {
               {busy
                 ? "Queueing…"
                 : counts.files > 0
-                  ? `Sync ${counts.files} file${counts.files === 1 ? "" : "s"}`
+                  ? `${plan?.direction === "download" ? "Download" : "Upload"} ${counts.files} file${counts.files === 1 ? "" : "s"}`
                   : `Create ${counts.directories} folder${counts.directories === 1 ? "" : "s"}`}
             </Button>
           </div>

@@ -79,16 +79,13 @@ export const commands = {
 	transferHistory: () => __TAURI_INVOKE<TransferHistoryEntry_Serialize[]>("transfer_history"),
 	transferClearHistory: () => __TAURI_INVOKE<number>("transfer_clear_history"),
 	/**
-	 *  Compare a local folder with a remote folder. This is the dry-run for the
-	 *  one-way local -> remote sync; it never writes to either side.
+	 *  Compare the current local and remote folders. The plan is a dry-run and
+	 *  never writes to either side.
 	 */
-	syncCompare: (localPath: string, remote: FsScope, remotePath: string, include: string[], exclude: string[]) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath, include, exclude })),
+	syncCompare: (localPath: string, remote: FsScope, remotePath: string, direction: SyncDirection, include: string[], exclude: string[]) => typedError<SyncPlan_Serialize, AppError_Serialize>(__TAURI_INVOKE("sync_compare", { localPath, remote, remotePath, direction, include, exclude })),
 	syncCancel: () => __TAURI_INVOKE<boolean>("sync_cancel"),
-	/**
-	 *  Re-check the remote targets immediately before enqueueing a plan. A file
-	 *  that changed after the dry-run is reported instead of being overwritten.
-	 */
-	syncValidate: (remote: FsScope, entries: SyncEntry_Deserialize[]) => typedError<SyncValidationIssue[], AppError_Serialize>(__TAURI_INVOKE("sync_validate", { remote, entries })),
+	/**  Re-check the target immediately before enqueueing a plan. */
+	syncValidate: (remote: FsScope, direction: SyncDirection, entries: SyncEntry_Deserialize[]) => typedError<SyncValidationIssue[], AppError_Serialize>(__TAURI_INVOKE("sync_validate", { remote, direction, entries })),
 };
 
 /** Events */
@@ -574,7 +571,9 @@ export type StartupReport = {
  *  What the plan proposes for an entry. `Review` and `Skip` are never applied
  *  without an explicit user decision.
  */
-export type SyncAction = "upload" | "createDirectory" | "skip" | "review";
+export type SyncAction = "upload" | "download" | "createDirectory" | "skip" | "review";
+
+export type SyncDirection = "upload" | "download";
 
 /**
  *  One entry in a comparison plan. Paths are absolute on each side; the
@@ -584,9 +583,9 @@ export type SyncEntry = SyncEntry_Serialize | SyncEntry_Deserialize;
 
 /**  Result of comparing one local entry with its remote counterpart. */
 export type SyncEntryStatus = 
-/**  Present locally, missing remotely. Directories are created; files are uploaded. */
+/**  Present locally, missing remotely. */
 "localOnly" | 
-/**  Present remotely, missing locally. Kept as-is: 1.1 does not delete. */
+/**  Present remotely, missing locally. */
 "remoteOnly" | 
 /**  Both sides exist as files and the sizes differ. */
 "sizeDiffers" | 
@@ -619,8 +618,13 @@ export type SyncEntry_Deserialize = {
 	localPath?: string | null,
 	remotePath?: string | null,
 	/**
-	 *  Where this entry would be written on the remote side. Present even for
-	 *  local-only entries, so the UI does not have to join remote paths.
+	 *  Where a remote source would be written on the local side. Present even
+	 *  for remote-only entries, so the UI does not have to join paths.
+	 */
+	localTargetPath?: string | null,
+	/**
+	 *  Where a local source would be written on the remote side. Present even
+	 *  for local-only entries.
 	 */
 	remoteTargetPath?: string | null,
 	localKind?: EntryKind | null,
@@ -644,8 +648,13 @@ export type SyncEntry_Serialize = {
 	localPath: string | null,
 	remotePath: string | null,
 	/**
-	 *  Where this entry would be written on the remote side. Present even for
-	 *  local-only entries, so the UI does not have to join remote paths.
+	 *  Where a remote source would be written on the local side. Present even
+	 *  for remote-only entries, so the UI does not have to join paths.
+	 */
+	localTargetPath: string | null,
+	/**
+	 *  Where a local source would be written on the remote side. Present even
+	 *  for local-only entries.
 	 */
 	remoteTargetPath: string | null,
 	localKind: EntryKind | null,
@@ -663,19 +672,21 @@ export type SyncPlan = SyncPlan_Serialize | SyncPlan_Deserialize;
 
 /**  The complete dry-run. Applying it is a separate, explicit step. */
 export type SyncPlan_Deserialize = {
+	direction: SyncDirection,
 	localRoot: string,
 	remoteRoot: string,
 	entries: SyncEntry_Deserialize[],
-	uploadFiles: number,
-	uploadBytes: number,
+	transferFiles: number,
+	transferBytes: number,
 	createDirectories: number,
-	/**  Size or content differences that would replace a remote file. */
+	/**  Size or content differences that would replace a target file. */
 	changed: number,
 	/**  Same size, different date, content not verified (or verification skipped). */
 	dateDiffers: number,
 	equal: number,
 	/**  Equal after a bounded content check. */
 	equalContent: number,
+	localOnly: number,
 	remoteOnly: number,
 	unknown: number,
 	conflicts: number,
@@ -687,19 +698,21 @@ export type SyncPlan_Deserialize = {
 
 /**  The complete dry-run. Applying it is a separate, explicit step. */
 export type SyncPlan_Serialize = {
+	direction: SyncDirection,
 	localRoot: string,
 	remoteRoot: string,
 	entries: SyncEntry_Serialize[],
-	uploadFiles: number,
-	uploadBytes: number,
+	transferFiles: number,
+	transferBytes: number,
 	createDirectories: number,
-	/**  Size or content differences that would replace a remote file. */
+	/**  Size or content differences that would replace a target file. */
 	changed: number,
 	/**  Same size, different date, content not verified (or verification skipped). */
 	dateDiffers: number,
 	equal: number,
 	/**  Equal after a bounded content check. */
 	equalContent: number,
+	localOnly: number,
 	remoteOnly: number,
 	unknown: number,
 	conflicts: number,
@@ -709,7 +722,7 @@ export type SyncPlan_Serialize = {
 	warnings: string[],
 };
 
-/**  A remote target that no longer matches the dry-run. */
+/**  A target that no longer matches the dry-run. */
 export type SyncValidationIssue = {
 	relativePath: string,
 	targetPath: string,

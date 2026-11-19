@@ -17,6 +17,7 @@ import {
   type SecretStatus,
   type SessionInfo,
   type StartupReport,
+  type SyncDirection,
   type SyncEntry_Serialize,
   type SyncPlan_Serialize,
   type SyncValidationIssue,
@@ -254,20 +255,27 @@ export const ipc = {
     localPath: string,
     remote: FsScope,
     remotePath: string,
+    direction: SyncDirection,
     include: string[],
     exclude: string[],
   ): Promise<SyncPlan_Serialize> {
-    return invoke(commands.syncCompare(localPath, remote, remotePath, include, exclude)).then(
-      (result) => unwrap(result),
-    )
+    return invoke(
+      commands.syncCompare(localPath, remote, remotePath, direction, include, exclude),
+    ).then((result) => unwrap(result))
   },
 
   syncCancel(): Promise<boolean> {
     return invoke(commands.syncCancel())
   },
 
-  syncValidate(remote: FsScope, entries: SyncEntry_Serialize[]): Promise<SyncValidationIssue[]> {
-    return invoke(commands.syncValidate(remote, entries)).then((result) => unwrap(result))
+  syncValidate(
+    remote: FsScope,
+    direction: SyncDirection,
+    entries: SyncEntry_Serialize[],
+  ): Promise<SyncValidationIssue[]> {
+    return invoke(commands.syncValidate(remote, direction, entries)).then((result) =>
+      unwrap(result),
+    )
   },
 
   transferPlan(

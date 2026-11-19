@@ -1175,7 +1175,7 @@ mod integration {
     }
 
     async fn exercise_sync_metadata(protocol: ConnectionProtocol, port: u16, secure: bool) {
-        use crate::domain::sync::{SyncAction, SyncEntryStatus, classify};
+        use crate::domain::sync::{SyncAction, SyncDirection, SyncEntryStatus, classify};
         use std::time::{Duration, UNIX_EPOCH};
 
         let profile = profile(protocol, port);
@@ -1223,7 +1223,11 @@ mod integration {
             .expect("stat local");
 
         assert_eq!(
-            classify(Some(&local_entry), Some(&remote_entry)),
+            classify(
+                SyncDirection::Upload,
+                Some(&local_entry),
+                Some(&remote_entry)
+            ),
             (SyncEntryStatus::Equal, SyncAction::Skip)
         );
 
@@ -1232,7 +1236,11 @@ mod integration {
             .await
             .expect("stat changed local");
         assert_eq!(
-            classify(Some(&changed_local), Some(&remote_entry)),
+            classify(
+                SyncDirection::Upload,
+                Some(&changed_local),
+                Some(&remote_entry)
+            ),
             (SyncEntryStatus::DateDiffers, SyncAction::Review)
         );
 

@@ -1,5 +1,6 @@
 import type {
   FsScope,
+  SyncDirection,
   SyncEntry_Serialize,
   SyncPlan_Serialize,
   SyncValidationIssue,
@@ -12,17 +13,22 @@ export const syncApi = {
     localPath: string,
     remote: FsScope,
     remotePath: string,
+    direction: SyncDirection,
     include: string[],
     exclude: string[],
   ): Promise<SyncPlan_Serialize> {
-    return ipc.syncCompare(localPath, remote, remotePath, include, exclude)
+    return ipc.syncCompare(localPath, remote, remotePath, direction, include, exclude)
   },
 
   cancel(): Promise<boolean> {
     return ipc.syncCancel()
   },
 
-  validate(remote: FsScope, entries: SyncEntry_Serialize[]): Promise<SyncValidationIssue[]> {
-    return ipc.syncValidate(remote, entries)
+  validate(
+    remote: FsScope,
+    direction: SyncDirection,
+    entries: SyncEntry_Serialize[],
+  ): Promise<SyncValidationIssue[]> {
+    return ipc.syncValidate(remote, direction, entries)
   },
 }

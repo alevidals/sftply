@@ -66,6 +66,7 @@ function entry(
     name: relativePath.split("/").pop() ?? relativePath,
     localPath: `/local/${relativePath}`,
     remotePath: null,
+    localTargetPath: null,
     remoteTargetPath: `/remote/${relativePath}`,
     localKind: "file",
     remoteKind: null,
@@ -80,6 +81,7 @@ function entry(
 }
 
 const plan: SyncPlan_Serialize = {
+  direction: "upload",
   localRoot: "/local",
   remoteRoot: "/remote",
   entries: [
@@ -93,13 +95,14 @@ const plan: SyncPlan_Serialize = {
       remoteModifiedAt: 2_000,
     }),
   ],
-  uploadFiles: 1,
-  uploadBytes: 10,
+  transferFiles: 1,
+  transferBytes: 10,
   createDirectories: 1,
   changed: 0,
   dateDiffers: 1,
   equal: 1,
   equalContent: 0,
+  localOnly: 0,
   remoteOnly: 0,
   unknown: 0,
   conflicts: 0,
@@ -140,6 +143,7 @@ describe("SyncCompareDialog", () => {
         "/local",
         { kind: "remote", sessionId: "session-1" },
         "/remote",
+        "upload",
         [],
         [],
       ),
@@ -150,7 +154,7 @@ describe("SyncCompareDialog", () => {
     expect(dateOnly).toHaveAttribute("aria-checked", "false")
     await user.click(dateOnly)
 
-    await user.click(screen.getByRole("button", { name: "Sync 2 files" }))
+    await user.click(screen.getByRole("button", { name: "Upload 2 files" }))
 
     await waitFor(() => expect(state.validate).toHaveBeenCalled())
     await waitFor(() => expect(state.enqueueTree).toHaveBeenCalled())
@@ -179,7 +183,7 @@ describe("SyncCompareDialog", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     render(<SyncCompareDialog />)
 
-    await user.click(await screen.findByRole("button", { name: "Sync 1 file" }))
+    await user.click(await screen.findByRole("button", { name: "Upload 1 file" }))
 
     await waitFor(() => expect(state.validate).toHaveBeenCalled())
     expect(state.enqueueTree).not.toHaveBeenCalled()
@@ -197,6 +201,71 @@ describe("SyncCompareDialog", () => {
     expect(useUiStore.getState().syncCompareOpen).toBe(false)
   })
 
+  it("can compare and apply in the download direction", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
+
+    await waitFor(() => expect(state.compare).toHaveBeenCalled())
+    await user.click(screen.getByRole("button", { name: "Remote → local" }))
+
+    await waitFor(() =>
+      expect(state.compare).toHaveBeenLastCalledWith(
+        "/local",
+        { kind: "remote", sessionId: "session-1" },
+        "/remote",
+        "download",
+        [],
+        [],
+      ),
+    )
+  })
+
+  it("downloads remote-only files into the local folder", async () => {
+    const downloadPlan: SyncPlan_Serialize = {
+      ...plan,
+      direction: "download",
+      entries: [
+        entry("remote.txt", "download", {
+          localPath: null,
+          localKind: null,
+          localSize: null,
+          remotePath: "/remote/remote.txt",
+          remoteSize: 8,
+          localTargetPath: "/local/remote.txt",
+          status: "remoteOnly",
+        }),
+      ],
+      transferFiles: 1,
+      transferBytes: 8,
+      createDirectories: 0,
+      dateDiffers: 0,
+      equal: 0,
+      localOnly: 0,
+      remoteOnly: 1,
+    }
+    state.compare.mockResolvedValueOnce(plan).mockResolvedValueOnce(downloadPlan)
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SyncCompareDialog />)
+
+    await waitFor(() => expect(state.compare).toHaveBeenCalled())
+    await user.click(screen.getByRole("button", { name: "Remote → local" }))
+    await user.click(await screen.findByRole("button", { name: "Download 1 file" }))
+
+    await waitFor(() => expect(state.enqueueTree).toHaveBeenCalled())
+    expect(state.enqueueTree).toHaveBeenCalledWith(
+      { kind: "remote", sessionId: "session-1" },
+      { kind: "local" },
+      "overwrite",
+      [
+        expect.objectContaining({
+          sourcePath: "/remote/remote.txt",
+          targetPath: "/local/remote.txt",
+        }),
+      ],
+      [],
+    )
+  })
+
   it("reloads the plan with include and exclude globs", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     render(<SyncCompareDialog />)
@@ -211,6 +280,7 @@ describe("SyncCompareDialog", () => {
         "/local",
         { kind: "remote", sessionId: "session-1" },
         "/remote",
+        "upload",
         ["src/**", "**/*.md"],
         ["node_modules/**"],
       ),
