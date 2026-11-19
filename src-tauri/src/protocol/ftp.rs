@@ -1230,6 +1230,22 @@ mod integration {
             ),
             (SyncEntryStatus::Equal, SyncAction::Skip)
         );
+        assert_eq!(
+            classify(
+                SyncDirection::Download,
+                Some(&local_entry),
+                Some(&remote_entry)
+            ),
+            (SyncEntryStatus::Equal, SyncAction::Skip)
+        );
+        assert_eq!(
+            classify(SyncDirection::Download, Some(&local_entry), None),
+            (SyncEntryStatus::LocalOnly, SyncAction::Skip)
+        );
+        assert_eq!(
+            classify(SyncDirection::Download, None, Some(&remote_entry)),
+            (SyncEntryStatus::RemoteOnly, SyncAction::Download)
+        );
 
         std::fs::write(&local_path, b"repprt").expect("rewrite local");
         let changed_local = crate::fs::local::stat(local_path.to_str().expect("utf-8 path"))
@@ -1238,6 +1254,14 @@ mod integration {
         assert_eq!(
             classify(
                 SyncDirection::Upload,
+                Some(&changed_local),
+                Some(&remote_entry)
+            ),
+            (SyncEntryStatus::DateDiffers, SyncAction::Review)
+        );
+        assert_eq!(
+            classify(
+                SyncDirection::Download,
                 Some(&changed_local),
                 Some(&remote_entry)
             ),
