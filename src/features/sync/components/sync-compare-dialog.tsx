@@ -317,7 +317,7 @@ export function SyncCompareDialog() {
           if (!next) close()
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-3xl">
+        <DialogContent className="max-h-[min(600px,calc(100vh-3rem))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowLeftRightIcon className="size-4 text-primary" />
@@ -493,7 +493,7 @@ export function SyncCompareDialog() {
                   </span>
                   <span>{entries.length} entries</span>
                 </div>
-                <div ref={scrollRef} className="h-[42vh] overflow-auto">
+                <div ref={scrollRef} className="h-[min(42vh,340px)] overflow-auto">
                   {entries.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                       No entries match this filter.
@@ -589,7 +589,7 @@ export function SyncCompareDialog() {
           if (!deleteBusy) setDeleteOpen(next)
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[min(520px,calc(100vh-3rem))] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="size-4 text-destructive" />
