@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { SyncCompareDialog } from "@/features/sync/components/sync-compare-dialog"
 import type { SessionInfo, SyncEntry_Serialize, SyncPlan_Serialize } from "@/lib/ipc/bindings"
 import { useSessionStore } from "@/stores/session-store"
@@ -139,7 +140,11 @@ beforeEach(() => {
 describe("SyncCompareDialog", () => {
   it("shows the dry-run and queues the selected uploads", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await waitFor(() =>
       expect(state.compare).toHaveBeenCalledWith(
@@ -184,7 +189,11 @@ describe("SyncCompareDialog", () => {
       },
     ])
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await user.click(await screen.findByRole("button", { name: "Upload 1 file" }))
 
@@ -196,7 +205,11 @@ describe("SyncCompareDialog", () => {
   it("cancels a comparison that is still loading", async () => {
     state.compare.mockReturnValueOnce(new Promise(() => {}))
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await user.click(await screen.findByRole("button", { name: "Stop comparing" }))
 
@@ -206,7 +219,11 @@ describe("SyncCompareDialog", () => {
 
   it("can compare and apply in the download direction", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await waitFor(() => expect(state.compare).toHaveBeenCalled())
     await user.click(screen.getByRole("button", { name: "Remote → local" }))
@@ -248,7 +265,11 @@ describe("SyncCompareDialog", () => {
     }
     state.compare.mockResolvedValueOnce(plan).mockResolvedValueOnce(downloadPlan)
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await waitFor(() => expect(state.compare).toHaveBeenCalled())
     await user.click(screen.getByRole("button", { name: "Remote → local" }))
@@ -285,9 +306,13 @@ describe("SyncCompareDialog", () => {
     }
     state.compare.mockResolvedValueOnce(deletePlan)
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
-    await user.click(await screen.findByRole("button", { name: /Delete 1 target-only/ }))
+    await user.click(await screen.findByLabelText("Delete from remote: old.txt"))
     const confirm = screen.getByRole("button", { name: "Delete 1 item" })
     expect(confirm).toBeDisabled()
 
@@ -306,7 +331,11 @@ describe("SyncCompareDialog", () => {
 
   it("reloads the plan with include and exclude globs", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    render(<SyncCompareDialog />)
+    render(
+      <TooltipProvider>
+        <SyncCompareDialog />
+      </TooltipProvider>,
+    )
 
     await waitFor(() => expect(state.compare).toHaveBeenCalled())
     await user.type(screen.getByLabelText("Include globs"), "src/**, **/*.md")

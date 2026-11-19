@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { LOCAL_SCOPE, remoteScope } from "@/features/files/api"
 import { useFormatPreferences, useSettings } from "@/features/settings/settings-context"
 import { syncApi } from "@/features/sync/api"
@@ -79,6 +80,7 @@ export function SyncCompareDialog() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteTargets, setDeleteTargets] = useState<SyncEntry_Serialize[]>([])
   const [deleteConfirmed, setDeleteConfirmed] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -97,6 +99,7 @@ export function SyncCompareDialog() {
       setPlan(null)
       setSelected(new Set())
       setDeleteOpen(false)
+      setDeleteTargets([])
       setDeleteConfirmed(false)
       setDeleteError(null)
       try {
@@ -179,12 +182,26 @@ export function SyncCompareDialog() {
     )
   }, [plan])
 
+  const openDelete = (targets: SyncEntry_Serialize[]) => {
+    if (targets.length === 0) return
+    setDeleteTargets(targets)
+    setDeleteConfirmed(false)
+    setDeleteError(null)
+    setDeleteOpen(true)
+  }
+
   const confirmDelete = async () => {
-    if (!plan || !activeSessionId || deleteBusy || !deleteConfirmed) return
+    if (!plan || !activeSessionId || deleteBusy || !deleteConfirmed || deleteTargets.length === 0) {
+      return
+    }
     setDeleteBusy(true)
     setDeleteError(null)
     try {
-      const deleted = await syncApi.delete(remoteScope(activeSessionId), plan.direction, targetOnly)
+      const deleted = await syncApi.delete(
+        remoteScope(activeSessionId),
+        plan.direction,
+        deleteTargets,
+      )
       toast.success(`Deleted ${deleted} item${deleted === 1 ? "" : "s"}`)
       setDeleteOpen(false)
       void runCompare(plan.direction, globList(includeGlobs), globList(excludeGlobs))
@@ -382,29 +399,31 @@ export function SyncCompareDialog() {
                 {plan.skipped > 0 ? <Summary label="Skipped" value={plan.skipped} /> : null}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-2xs text-muted-foreground">
-                  Compare uses size and date. Small files with a different date are checked by
-                  content; larger files stay as “Date differs” for review. Globs are relative to the
-                  compared folders.
-                </p>
-                {targetOnly.length > 0 ? (
+              <p className="text-2xs text-muted-foreground">
+                Compare uses size and date. Small files with a different date are checked by
+                content; larger files stay as “Date differs” for review. Globs are relative to the
+                compared folders.
+              </p>
+
+              {targetOnly.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-2xs text-muted-foreground">
+                  <Trash2Icon className="size-3.5 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    {targetOnly.length} item{targetOnly.length === 1 ? "" : "s"} exist
+                    {plan.direction === "download" ? " only locally" : " only remotely"} and are
+                    kept by default. Use the trash icon on a row, or delete them all.
+                  </span>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="ml-auto text-destructive"
-                    onClick={() => {
-                      setDeleteConfirmed(false)
-                      setDeleteError(null)
-                      setDeleteOpen(true)
-                    }}
+                    className="text-destructive"
+                    onClick={() => openDelete(targetOnly)}
                   >
-                    <Trash2Icon className="size-3.5" />
-                    Delete {targetOnly.length} target-only…
+                    Delete all {targetOnly.length}…
                   </Button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
 
               <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                 <Input
@@ -485,6 +504,17 @@ export function SyncCompareDialog() {
                             entry={entry}
                             selected={selected.has(entry.relativePath)}
                             sizeFormat={sizeFormat}
+                            targetOnly={
+                              plan.direction === "upload"
+                                ? entry.status === "remoteOnly"
+                                : entry.status === "localOnly"
+                            }
+                            deleteLabel={
+                              plan.direction === "upload"
+                                ? "Delete from remote"
+                                : "Delete from local"
+                            }
+                            onDelete={() => openDelete([entry])}
                             onToggle={() => toggle(entry)}
                             style={{
                               height: ROW_HEIGHT,
@@ -558,16 +588,17 @@ export function SyncCompareDialog() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="size-4 text-destructive" />
-              Delete target-only items?
+              Delete {deleteTargets.length === 1 ? "this item" : "these items"}?
             </DialogTitle>
             <DialogDescription>
-              These items exist only in the {plan?.direction === "download" ? "local" : "remote"}{" "}
-              folder. Folders are deleted with their contents. This cannot be undone.
+              {deleteTargets.length === 1 ? "This item exists" : "These items exist"} only in the{" "}
+              {plan?.direction === "download" ? "local" : "remote"} folder. Folders are deleted with
+              their contents. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-44 space-y-1 overflow-auto rounded-md border border-border bg-muted/30 p-2 text-2xs">
-            {targetOnly.slice(0, 30).map((entry) => (
+            {deleteTargets.slice(0, 30).map((entry) => (
               <div key={entry.relativePath} className="flex items-center gap-3">
                 <span className="selectable min-w-0 flex-1 truncate font-mono text-muted-foreground">
                   {entry.relativePath}
@@ -579,8 +610,8 @@ export function SyncCompareDialog() {
                 </span>
               </div>
             ))}
-            {targetOnly.length > 30 ? (
-              <div className="text-muted-foreground">…and {targetOnly.length - 30} more</div>
+            {deleteTargets.length > 30 ? (
+              <div className="text-muted-foreground">…and {deleteTargets.length - 30} more</div>
             ) : null}
           </div>
 
@@ -616,7 +647,7 @@ export function SyncCompareDialog() {
             >
               {deleteBusy
                 ? "Deleting…"
-                : `Delete ${targetOnly.length} item${targetOnly.length === 1 ? "" : "s"}`}
+                : `Delete ${deleteTargets.length} item${deleteTargets.length === 1 ? "" : "s"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -647,12 +678,18 @@ function SyncRow({
   entry,
   selected,
   sizeFormat,
+  targetOnly,
+  deleteLabel,
+  onDelete,
   onToggle,
   style,
 }: {
   entry: SyncEntry_Serialize
   selected: boolean
   sizeFormat: "binary" | "decimal"
+  targetOnly: boolean
+  deleteLabel: string
+  onDelete: () => void
   onToggle: () => void
   style: CSSProperties
 }) {
@@ -663,12 +700,34 @@ function SyncRow({
       className="absolute top-0 left-0 flex w-full items-center gap-3 border-b border-border/50 px-3"
       style={style}
     >
-      <Checkbox
-        checked={selected}
-        disabled={!isSelectable(entry)}
-        onCheckedChange={onToggle}
-        aria-label={`Select ${entry.relativePath}`}
-      />
+      <span className="flex w-6 shrink-0 items-center justify-center">
+        {targetOnly ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="text-muted-foreground hover:text-destructive"
+                aria-label={`${deleteLabel}: ${entry.relativePath}`}
+                onClick={onDelete}
+              >
+                <Trash2Icon className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              {deleteLabel}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Checkbox
+            checked={selected}
+            disabled={!isSelectable(entry)}
+            onCheckedChange={onToggle}
+            aria-label={`Select ${entry.relativePath}`}
+          />
+        )}
+      </span>
       <span className={cn("w-24 shrink-0 text-2xs", statusClass(entry.status))}>
         {statusLabel(entry.status)}
       </span>
