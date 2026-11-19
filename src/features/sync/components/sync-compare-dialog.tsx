@@ -408,18 +408,23 @@ export function SyncCompareDialog() {
               {targetOnly.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-2xs text-muted-foreground">
                   <Trash2Icon className="size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1">
-                    {targetOnly.length} item{targetOnly.length === 1 ? "" : "s"} exist
-                    {plan.direction === "download" ? " only locally" : " only remotely"} and are
-                    kept by default. Use the trash icon on a row, or delete them all.
+                  <span className="min-w-0 flex-1 text-foreground">
+                    {targetOnly.length} item{targetOnly.length === 1 ? "" : "s"}{" "}
+                    <span className="text-muted-foreground">
+                      exist
+                      {plan.direction === "download" ? " only locally" : " only remotely"} and are
+                      kept by default. Use the trash icon on a row, or delete them all.
+                    </span>
                   </span>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
-                    className="text-destructive"
+                    className="shrink-0"
+                    aria-label={`Delete all ${targetOnly.length} ${plan.direction === "download" ? "local-only" : "remote-only"} items`}
                     onClick={() => openDelete(targetOnly)}
                   >
+                    <Trash2Icon className="size-3.5" />
                     Delete all {targetOnly.length}…
                   </Button>
                 </div>
