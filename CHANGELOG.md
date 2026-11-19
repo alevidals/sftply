@@ -8,6 +8,27 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [1.2.0] - 2026-11-19
+
+### Added
+
+- Compare and sync in both directions: Local → remote and Remote → local, with
+  direction-aware statuses, counts, target paths and queue scopes.
+- Explicit deletion of target-only items from a row trash action or **Delete
+  all**. Normal Sync never deletes; the delete flow lists the paths, warns about
+  folder contents and requires confirmation.
+- Read-only previews for remote text and raster images. Text is capped at
+  2 MiB, images at 8 MiB; SVG and HTML are shown as text and never executed.
+- `⌘⇧C` / `Ctrl+Shift+C` opens the folder comparison.
+- Integration coverage classifies local/remote metadata in both directions
+  against FTP, explicit/implicit FTPS and SFTP.
+
+### Changed
+
+- File listings refresh immediately after deleting target-only items.
+- The compare dialog is capped in height and scrolls internally on short
+  windows.
+
 ## [1.1.1] - 2026-11-18
 
 ### Added

@@ -1,6 +1,6 @@
 # sftply: Implementation Roadmap
 
-**Status:** Implemented through 1.0.0. 1.1 and 1.2 are planned.
+**Status:** Implemented through 1.2.0.
 **Method:** Incremental phases with explicit exit criteria. Each phase ends with a runnable build and a review gate. Later phases are not started while an earlier phase has unresolved reliability or security defects.
 
 Sizes are relative (`S` ≈ small, `M` ≈ medium, `L` ≈ large), not calendar commitments. The critical-path risk is protocol/FTPS/SFTP correctness, so Phase 0 exists specifically to retire it before UI work expands.
@@ -242,9 +242,9 @@ matrix runs would mix new failures with baseline ones.
 - No new product surface. Fixes and error-message polish only.
 - Portable builds and installers for macOS, Windows and Linux.
 
-### 1.1: comparison and one-way sync
+### 1.1: comparison and one-way sync (shipped)
 
-Ship only when every point below is true:
+Shipped when every point below was true:
 
 1. Directory diff (name, size, mtime) with a virtualized view and explicit
    "unknown" when the server gives no reliable mtime.
@@ -259,7 +259,7 @@ Ship only when every point below is true:
 6. Tests cover classification (new/changed/equal/unknown), planner output and
    cancellation; integration tests run against the loopback FTP/FTPS/SFTP stack.
 
-### 1.2: bidirectional sync and previews
+### 1.2: bidirectional sync and previews (shipped)
 
 - Reverse direction and delete propagation, each behind a separate confirmation.
 - Remote previews for text and images with size caps and no HTML execution.

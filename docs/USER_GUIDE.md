@@ -110,18 +110,19 @@ server that would otherwise create stricter files.
 ## Compare and sync
 
 The compare action compares the current local folder with the current remote
-folder. It does not write anything: it gives you a plan first.
+folder. Choose **Local → remote** or **Remote → local** before reviewing the
+plan. It does not write anything: it gives you a plan first.
 
-| Status                      | Meaning                                                                    |
-| --------------------------- | -------------------------------------------------------------------------- |
-| **Only local**              | Missing remotely. Uploaded when selected.                                  |
-| **Only remote**             | Missing locally. Kept; 1.1 does not delete.                                |
-| **Size differs**            | Same name, different size. Uploaded when selected.                         |
-| **Date differs**            | Same size, different date. Not selected by default.                        |
-| **Content differs**         | Content verification found different bytes. Uploaded when selected.        |
-| **Equal / Equal (content)** | Same metadata, or verified identical content. Skipped.                     |
-| **Unknown**                 | Missing or unreliable metadata. Review it before applying.                 |
-| **Type mismatch**           | One side is a file and the other is a folder. Never applied automatically. |
+| Status                      | Meaning                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| **Only local**              | Exists locally, missing remotely. Uploaded in Local → remote; kept in Remote → local.   |
+| **Only remote**             | Exists remotely, missing locally. Downloaded in Remote → local; kept in Local → remote. |
+| **Size differs**            | Same name, different size. Transferred in the selected direction when selected.         |
+| **Date differs**            | Same size, different date. Not selected by default.                                     |
+| **Content differs**         | Content verification found different bytes. Transferred when selected.                  |
+| **Equal / Equal (content)** | Same metadata, or verified identical content. Skipped.                                  |
+| **Unknown**                 | Missing or unreliable metadata. Review it before applying.                              |
+| **Type mismatch**           | One side is a file and the other is a folder. Never applied automatically.              |
 
 For files up to 4 MiB, a different date is resolved by hashing both sides. The
 plan verifies at most 32 MiB and 200 files per comparison; larger date-only
@@ -130,12 +131,25 @@ modification times.
 
 Use **Include** and **Exclude** globs to limit the plan, for example
 `src/**, **/*.md` and `node_modules/**, .git/**`. Patterns are relative to the
-compared folders.
+source folder.
 
-**Sync** uploads the selected files and creates the folders they need. Remote
-files that are not in the local folder are never deleted. Before queueing, the
-app checks the remote targets again; if one changed after the plan was built,
-the plan refreshes instead of overwriting it.
+**Sync** transfers the selected files and creates the folders they need. Before
+queueing, the app checks the target again; if it changed after the plan was
+built, the plan refreshes instead of overwriting it.
+
+### Deleting target-only items
+
+Items that exist only in the target folder are kept by default. To remove them,
+use the trash icon on a row or **Delete all**. A separate confirmation lists
+the paths, warns that folders are deleted with their contents, and requires an
+explicit acknowledgement. Normal Sync never deletes anything. Deletion cannot
+be undone.
+
+### Previews
+
+Remote files can be previewed without downloading them first. Text is shown as
+plain preformatted text, up to 2 MiB. Raster images up to 8 MiB are shown
+inline. SVG and HTML files are shown as text and are never executed.
 
 ## Editing remote text files
 

@@ -43,22 +43,25 @@ Every release ships `SHA256SUMS`.
 
 ## Highlights
 
-|                                  |                                                                                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Three protocols, one client**  | FTP, explicit and implicit FTPS, and SFTP over native Rust networking. No shelling out to `lftp` or `ssh`.                      |
-| **Dual pane, keyboard first**    | Two folders side by side, multi-select, drag between panes, command palette, path autocomplete and shortcut hints per platform. |
-| **Compare and sync**             | Dry-run diff of the current local and remote folders, with content checks and include/exclude globs. One-way upload only.       |
-| **A queue that tells the truth** | Pause and resume appear only when the server supports them. A cancelled transfer is never reported as complete.                 |
-| **Secrets stay in the keychain** | Passwords and passphrases live in the OS keychain. Config files, exports and logs never contain them.                           |
-| **Remote text editing**          | Open a UTF-8 file up to 2 MiB, edit it in place and save atomically, with stale-write detection.                                |
-| **Themes and migrations**        | Dark by default, light first-class, named palettes contrast-tested. Connections import and export as credential-free JSON.      |
+|                                   |                                                                                                                                        |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Three protocols, one client**   | FTP, explicit and implicit FTPS, and SFTP over native Rust networking. No shelling out to `lftp` or `ssh`.                             |
+| **Dual pane, keyboard first**     | Two folders side by side, multi-select, drag between panes, command palette, path autocomplete and shortcut hints per platform.        |
+| **Compare and sync**              | Dry-run diff of the current local and remote folders in both directions, with content checks and include/exclude globs.                |
+| **Explicit deletes and previews** | Target-only items are removed only after a separate confirmation. Text and images preview without downloading; HTML and SVG never run. |
+| **A queue that tells the truth**  | Pause and resume appear only when the server supports them. A cancelled transfer is never reported as complete.                        |
+| **Secrets stay in the keychain**  | Passwords and passphrases live in the OS keychain. Config files, exports and logs never contain them.                                  |
+| **Remote text editing**           | Open a UTF-8 file up to 2 MiB, edit it in place and save atomically, with stale-write detection.                                       |
+| **Themes and migrations**         | Dark by default, light first-class, named palettes contrast-tested. Connections import and export as credential-free JSON.             |
 
 ## Status
 
-1.1 is out. The stable line is 1.x, and fixes ship as patch releases. The
-roadmap covers what comes next:
+1.2 is out. The stable line is 1.x, and fixes ship as patch releases.
 
-- **1.2**: bidirectional sync, delete propagation and remote previews.
+Comparison now works in both directions. Target-only items are deleted only
+through an explicit, confirmed flow, and normal Sync never deletes. Remote text
+and raster images can be previewed without downloading them first; HTML and SVG
+are shown as text and never executed.
 
 ## Documentation
 

@@ -15,7 +15,17 @@ const capabilities = [
   {
     label: "Compare",
     detail:
-      "Dry-run diff with include/exclude globs and content checks. One-way upload; remote-only files stay.",
+      "Dry-run diff in both directions, with include/exclude globs and content checks.",
+  },
+  {
+    label: "Preview",
+    detail:
+      "Read-only text and raster images without downloading. HTML and SVG never run.",
+  },
+  {
+    label: "Deletes",
+    detail:
+      "Target-only items go only through a separate confirmation. Sync never deletes.",
   },
   {
     label: "Secrets",
