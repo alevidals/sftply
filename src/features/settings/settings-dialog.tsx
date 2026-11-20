@@ -397,10 +397,12 @@ export function SettingsDialog() {
                     <p className="text-xs font-medium">How custom themes work</p>
                     <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
                       A <span className="font-mono">.toml</span> theme must define every color
-                      token; nothing is derived. Export a built-in theme for a complete template,
-                      use <span className="font-medium text-foreground">Edit</span> to open a custom
-                      theme in your editor, then press{" "}
-                      <span className="font-medium text-foreground">Reload</span>.
+                      token; nothing is derived.{" "}
+                      <span className="font-medium text-foreground">New</span> starts from the
+                      currently applied theme; Export gives you a complete template. Use{" "}
+                      <span className="font-medium text-foreground">Edit</span> to change a theme,
+                      then press <span className="font-medium text-foreground">Reload</span> after
+                      changing a file outside the app.
                     </p>
                     <Button
                       type="button"
