@@ -103,11 +103,11 @@ export function HostKeyDialog() {
               <span className="text-muted-foreground">Key type</span>
               <span className="font-mono text-foreground">{challenge.keyType}</span>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <span className="text-muted-foreground">Fingerprint</span>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border/60 bg-background/40 pr-1.5">
                 <div className="min-w-0 overflow-x-auto overscroll-x-contain">
-                  <code className="block w-max whitespace-nowrap px-3 py-2 font-mono text-2xs text-foreground">
+                  <code className="block w-max whitespace-nowrap px-4 py-2.5 font-mono text-2xs text-foreground">
                     {challenge.fingerprint}
                   </code>
                 </div>
