@@ -23,6 +23,29 @@ pub struct ThemeList {
 
 pub const THEME_FILE_MAX_BYTES: u64 = 128 * 1024;
 
+/// Names reserved by the built-in palette gallery.
+pub const BUILTIN_THEME_NAMES: &[&str] = &[
+    "system",
+    "dark",
+    "light",
+    "one dark",
+    "gruvbox dark",
+    "gruvbox light",
+    "nord",
+    "dracula",
+    "solarized light",
+    "tokyo night",
+    "catppuccin mocha",
+];
+
+/// Compare theme names without case or repeated whitespace.
+pub fn normalized_theme_name(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
 /// Every color token used by the UI. A custom theme must define all of them;
 /// this keeps files explicit instead of inheriting values from another theme.
 pub const THEME_TOKEN_KEYS: &[&str] = &[

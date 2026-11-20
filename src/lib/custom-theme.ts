@@ -1,7 +1,13 @@
 import { PaletteIcon } from "lucide-react"
 import type { CustomTheme } from "@/lib/ipc/bindings"
 import { readAppliedThemeTokens } from "@/lib/theme"
-import { THEME_OPTIONS, THEME_TOKEN_KEYS, type ThemeOption, themeOption } from "@/lib/themes"
+import {
+  normalizeThemeName,
+  THEME_OPTIONS,
+  THEME_TOKEN_KEYS,
+  type ThemeOption,
+  themeOption,
+} from "@/lib/themes"
 
 /** Turn a loaded theme file into a gallery card. */
 export function customThemeOption(theme: CustomTheme): ThemeOption {
@@ -21,7 +27,15 @@ export function customThemeOption(theme: CustomTheme): ThemeOption {
 }
 
 export function allThemeOptions(themes: CustomTheme[]): ThemeOption[] {
-  return [...THEME_OPTIONS, ...themes.map(customThemeOption)]
+  const options = [...THEME_OPTIONS]
+  const seen = new Set(THEME_OPTIONS.map((theme) => normalizeThemeName(theme.label)))
+  for (const theme of themes) {
+    const name = normalizeThemeName(theme.name)
+    if (seen.has(name)) continue
+    seen.add(name)
+    options.push(customThemeOption(theme))
+  }
+  return options
 }
 
 /** Serialize a theme for export, with the app's full semantic token set. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { customThemeOption, themeExportText } from "@/lib/custom-theme"
+import { allThemeOptions, customThemeOption, themeExportText } from "@/lib/custom-theme"
 import type { CustomTheme } from "@/lib/ipc/bindings"
 
 const theme: CustomTheme = {
@@ -21,6 +21,14 @@ describe("customThemeOption", () => {
     expect(option.dark).toBe(true)
     expect(option.preview.background).toBe("#101010")
     expect(option.preview.accent).toBe("#4488ff")
+  })
+})
+
+describe("allThemeOptions", () => {
+  it("hides duplicate names from menus", () => {
+    const duplicate = { ...theme, id: "custom:mine-copy" }
+    const options = allThemeOptions([theme, duplicate])
+    expect(options.filter((option) => option.label === "Mine")).toHaveLength(1)
   })
 })
 

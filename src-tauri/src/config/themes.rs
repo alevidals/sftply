@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::domain::theme::{CustomTheme, THEME_FILE_MAX_BYTES, ThemeList, parse_theme};
+use crate::domain::theme::{
+    BUILTIN_THEME_NAMES, CustomTheme, THEME_FILE_MAX_BYTES, ThemeList, normalized_theme_name,
+    parse_theme,
+};
 
 const THEME_EXTENSIONS: &[&str] = &["toml"];
 
@@ -11,6 +14,7 @@ pub fn list(dir: &Path) -> ThemeList {
     let mut themes = Vec::new();
     let mut warnings = Vec::new();
     let mut seen = HashSet::new();
+    let mut seen_names = HashSet::new();
 
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -37,14 +41,46 @@ pub fn list(dir: &Path) -> ThemeList {
             }
         };
         if !seen.insert(theme.id.clone()) {
-            warnings.push(format!("{file_name}: another theme uses the same name."));
+            warnings.push(format!(
+                "{file_name}: another theme uses the same file name."
+            ));
             continue;
+        }
+        let normalized_name = normalized_theme_name(&theme.name);
+        if BUILTIN_THEME_NAMES.contains(&normalized_name.as_str()) {
+            warnings.push(format!(
+                "{file_name}: \"{}\" is reserved by a built-in theme.",
+                theme.name
+            ));
+        } else if !seen_names.insert(normalized_name) {
+            warnings.push(format!(
+                "{file_name}: another theme already uses the name \"{}\".",
+                theme.name
+            ));
         }
         themes.push(theme);
     }
 
     themes.sort_by_key(|theme| theme.name.to_lowercase());
     ThemeList { themes, warnings }
+}
+
+fn check_name_available(dir: &Path, id: &str, name: &str) -> Result<(), String> {
+    let normalized = normalized_theme_name(name);
+    if normalized.is_empty() {
+        return Err("The theme name is empty.".into());
+    }
+    if BUILTIN_THEME_NAMES.contains(&normalized.as_str()) {
+        return Err("A built-in theme already uses that name.".into());
+    }
+    let existing = list(dir).themes;
+    if existing
+        .iter()
+        .any(|theme| theme.id != id && normalized_theme_name(&theme.name) == normalized)
+    {
+        return Err("A theme with this name already exists.".into());
+    }
+    Ok(())
 }
 
 /// Parse a theme file without copying it.
@@ -61,6 +97,7 @@ pub fn destination(dir: &Path, id: &str) -> PathBuf {
 /// the theme id; an existing file with the same id is replaced.
 pub fn import(dir: &Path, source: &Path) -> Result<CustomTheme, String> {
     let theme = inspect(source)?;
+    check_name_available(dir, &theme.id, &theme.name)?;
     let contents = std::fs::read_to_string(source)
         .map_err(|error| format!("The theme file could not be read: {error}"))?;
     std::fs::create_dir_all(dir)
@@ -101,6 +138,8 @@ pub fn save(
         normalized.insert((*key).to_string(), value);
     }
 
+    let requested_id = id.unwrap_or("custom:new");
+    check_name_available(dir, requested_id, name)?;
     let id = match id {
         Some(id) if id.starts_with("custom:") => id.to_string(),
         _ => unique_id(dir, name),
@@ -275,6 +314,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_importing_a_duplicate_name() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let source_dir = tempfile::tempdir().expect("source dir");
+        let first = source_dir.path().join("first.toml");
+        let second = source_dir.path().join("second.toml");
+        std::fs::write(&first, theme_file("Same", "#111111", "#eeeeee")).unwrap();
+        std::fs::write(&second, theme_file("same", "#222222", "#dddddd")).unwrap();
+        import(dir.path(), &first).expect("first import");
+        let error = import(dir.path(), &second).unwrap_err();
+        assert!(error.contains("already exists"));
+    }
+
+    #[test]
     fn rejects_unknown_theme_deletion() {
         let dir = tempfile::tempdir().expect("temp dir");
         assert!(delete(dir.path(), "dark").is_err());
@@ -310,11 +362,21 @@ mod save_tests {
     }
 
     #[test]
-    fn gives_repeated_new_names_unique_ids() {
+    fn rejects_duplicate_names_and_allows_editing_the_same_theme() {
         let dir = tempfile::tempdir().expect("temp dir");
         let first = save(dir.path(), None, "Mine", true, &colors()).expect("first");
-        let second = save(dir.path(), None, "Mine", true, &colors()).expect("second");
-        assert_eq!(first.id, "custom:mine");
-        assert_eq!(second.id, "custom:mine-2");
+        let error = save(dir.path(), None, "  mine  ", true, &colors()).unwrap_err();
+        assert!(error.contains("already exists"));
+
+        let renamed = save(dir.path(), Some(&first.id), "Mine", false, &colors()).expect("edit");
+        assert_eq!(renamed.id, first.id);
+        assert!(!renamed.dark);
+    }
+
+    #[test]
+    fn rejects_builtin_names() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let error = save(dir.path(), None, "One Dark", true, &colors()).unwrap_err();
+        assert!(error.contains("built-in"));
     }
 }

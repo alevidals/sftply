@@ -172,6 +172,11 @@ export const THEME_TOKEN_KEYS = [
   "info",
 ] as const
 
+/** Compare theme names without case or repeated whitespace. */
+export function normalizeThemeName(name: string): string {
+  return name.trim().split(/\s+/).join(" ").toLocaleLowerCase()
+}
+
 export const THEME_LABELS = Object.fromEntries(
   THEME_OPTIONS.map((option) => [option.value, option.label]),
 ) as Record<string, string>
