@@ -241,7 +241,12 @@ export type ConnectionAuth = { kind: "password" } | { kind: "key";
 /**  Absolute local path to an OpenSSH or PEM private key. */
 keyPath: string; 
 /**  Whether the key is expected to need a passphrase in the keychain. */
-passphraseProtected: boolean };
+passphraseProtected: boolean } | 
+/**
+ *  Delegate public-key authentication to the system SSH agent. Only valid
+ *  for SFTP; the private key never enters the app.
+ */
+{ kind: "agent" };
 
 /**  Summary returned after writing a connections bundle. */
 export type ConnectionExportSummary = {

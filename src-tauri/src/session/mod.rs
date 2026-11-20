@@ -25,6 +25,7 @@ use crate::protocol::sftp::{SftpCredentials, SftpRemote};
 pub enum SessionCredentials {
     Password(String),
     Key { passphrase: Option<String> },
+    Agent,
 }
 
 /// A live remote connection. Commands are serialized per session because FTP
@@ -112,20 +113,17 @@ pub async fn connect_client(
 ) -> Result<Box<dyn RemoteFs>, AppError> {
     match profile.protocol {
         ConnectionProtocol::Sftp => {
-            let (password, passphrase) = match credentials {
-                SessionCredentials::Password(password) => (Some(password.clone()), None),
-                SessionCredentials::Key { passphrase } => (None, passphrase.clone()),
+            let sftp_credentials = match credentials {
+                SessionCredentials::Password(password) => {
+                    SftpCredentials::Password(password.clone())
+                }
+                SessionCredentials::Key { passphrase } => SftpCredentials::Key {
+                    passphrase: passphrase.clone(),
+                },
+                SessionCredentials::Agent => SftpCredentials::Agent,
             };
             Ok(Box::new(
-                SftpRemote::connect(
-                    profile,
-                    SftpCredentials {
-                        password,
-                        passphrase,
-                    },
-                    trusted,
-                )
-                .await?,
+                SftpRemote::connect(profile, sftp_credentials, trusted).await?,
             ))
         }
         _ => {
@@ -135,6 +133,12 @@ pub async fn connect_client(
                     return Err(AppError::new(
                         ErrorCode::AuthFailed,
                         "No password is saved for this connection.",
+                    ));
+                }
+                SessionCredentials::Agent => {
+                    return Err(AppError::new(
+                        ErrorCode::AuthFailed,
+                        "The SSH agent can only be used with SFTP connections.",
                     ));
                 }
             };

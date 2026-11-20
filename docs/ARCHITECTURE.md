@@ -773,11 +773,12 @@ FTPS profiles carry `tls: { mode: "explicit" | "implicit", verify: true, caFile?
 - Release builds: no devtools, no remote URLs, no updater until signing is in place.
 - The webview loads only bundled assets. No user-supplied HTML is rendered as HTML; text previews render as plain text.
 
-### Private keys
+### Private keys and SSH agents
 
-- The app reads the key file at connect time; the passphrase is fetched from the keychain only when needed.
+- The app reads a key file at connect time; the passphrase is fetched from the keychain only when needed.
 - Key contents are never persisted by the app. Only the path and a `hasPassphrase` hint are stored.
 - Supported formats are determined by russh's `decode_secret_key` (OpenSSH, PEM/PKCS#8); unsupported formats produce a clear error, not a fallback to a system binary.
+- Agent authentication uses `SSH_AUTH_SOCK` (with a macOS `launchctl` fallback) or the Windows OpenSSH/Pageant agent. sftply lists the loaded identities, asks the agent to sign, and never reads or stores key material for this mode. Switching to the agent removes any saved password or passphrase for that connection.
 - Memory zeroization is best-effort (`Zeroizing<Vec<u8>>` for key material, `SecretString` for passphrases). Rust cannot guarantee zeroization of all copies; this is documented rather than overstated.
 
 ## 12. Protocol notes
@@ -795,7 +796,7 @@ FTPS profiles carry `tls: { mode: "explicit" | "implicit", verify: true, caFile?
 
 ### SFTP (russh + russh-sftp)
 
-- Pure-Rust SSH; password and public-key auth; passphrase-protected keys.
+- Pure-Rust SSH; password, public-key and SSH agent auth; passphrase-protected keys.
 - Host-key verification via the app's known_hosts (no automatic trust).
 - SFTP v3 with extension detection: `limits@openssh.com`, `fsync@openssh.com`, `hardlink@openssh.com`, `statvfs@openssh.com`, `expand-path@openssh.com`.
 - `realpath`/`expand-path` resolves the initial directory at connect; displayed path is server-resolved.
@@ -839,7 +840,7 @@ UX mapping:
 - Property tests (`proptest`) for path/name invariants and parser robustness (no panics, bounded output).
 - Fuzz targets (later) for FTP listing parsers.
 - Integration tests: protocol adapters against Dockerized servers:
-  - OpenSSH SFTP (password + key + passphrase key; host-key flows).
+  - OpenSSH SFTP (password + key + passphrase key + SSH agent; host-key flows).
   - vsftpd or ProFTPD (plain FTP, explicit FTPS, implicit FTPS; MLSD and LIST-only modes; resume).
   - Test fixtures live in `tests/fixtures/`; servers in `docker-compose.test.yml`; run in CI on Linux, opt-in locally.
 - No real network access in default `cargo test`. Integration tests use a feature flag or `#[ignore]` plus a dedicated CI job.

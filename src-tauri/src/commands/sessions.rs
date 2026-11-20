@@ -56,8 +56,9 @@ pub async fn session_connect_quick(
 ) -> Result<SessionInfo, AppError> {
     let input = input.normalized().map_err(AppError::invalid_input)?;
     let secret_kind = match input.auth {
-        ConnectionAuth::Password => SecretKind::Password,
-        ConnectionAuth::Key { .. } => SecretKind::Passphrase,
+        ConnectionAuth::Password => Some(SecretKind::Password),
+        ConnectionAuth::Key { .. } => Some(SecretKind::Passphrase),
+        ConnectionAuth::Agent => None,
     };
 
     let (profile, stores_secret) = if save {
@@ -70,8 +71,10 @@ pub async fn session_connect_quick(
                 passphrase_protected,
                 ..
             } => passphrase_protected,
+            ConnectionAuth::Agent => false,
         };
         if stores_secret
+            && let Some(secret_kind) = secret_kind
             && let Err(error) = credentials::set_secret(&saved.id, secret_kind, &secret).await
         {
             // Do not leave a saved row whose credentials failed to persist.
@@ -95,6 +98,7 @@ pub async fn session_connect_quick(
         ConnectionAuth::Key { .. } => SessionCredentials::Key {
             passphrase: (!secret.is_empty()).then_some(secret),
         },
+        ConnectionAuth::Agent => SessionCredentials::Agent,
     };
 
     let result = open_session(
@@ -110,7 +114,7 @@ pub async fn session_connect_quick(
     // A failed save must not leave a half-configured profile behind. This also
     // keeps the host-key retry from duplicating the saved connection.
     if save && result.is_err() {
-        if stores_secret {
+        if stores_secret && let Some(secret_kind) = secret_kind {
             let _ = credentials::delete_secret(&profile.id, secret_kind).await;
         }
         let _ = state.connections.delete(&profile.id).await;
@@ -411,6 +415,7 @@ pub(crate) async fn resolve_credentials(
             }
             Ok(SessionCredentials::Key { passphrase })
         }
+        ConnectionAuth::Agent => Ok(SessionCredentials::Agent),
     }
 }
 

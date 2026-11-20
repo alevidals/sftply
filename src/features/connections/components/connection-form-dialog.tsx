@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useQueryClient } from "@tanstack/react-query"
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog"
 import {
+  FingerprintIcon,
   FolderOpenIcon,
   KeyRoundIcon,
   LockKeyholeIcon,
@@ -82,7 +83,11 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   }, [open, connection, form])
 
   const existingSecret =
-    authKind === "key" ? secretStatus.data?.passphrase : secretStatus.data?.password
+    authKind === "agent"
+      ? undefined
+      : authKind === "key"
+        ? secretStatus.data?.passphrase
+        : secretStatus.data?.password
 
   const changeProtocol = (value: string, onChange: (next: ConnectionProtocol) => void) => {
     const next = value as ConnectionProtocol
@@ -90,7 +95,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
     if (!currentPort || Number(currentPort) === defaultPort(protocol)) {
       form.setValue("port", String(defaultPort(next)))
     }
-    if (next !== "sftp" && form.getValues("authKind") === "key") {
+    if (next !== "sftp" && ["key", "agent"].includes(form.getValues("authKind"))) {
       form.setValue("authKind", "password")
     }
     onChange(next)
@@ -127,8 +132,9 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
         ? await connectionsApi.update(connection.id, input)
         : await connectionsApi.create(input)
 
-      if (values.secret) {
-        await connectionsApi.setSecret(saved.id, secretKindFor(values), values.secret)
+      const secretKind = secretKindFor(values)
+      if (values.secret && secretKind) {
+        await connectionsApi.setSecret(saved.id, secretKind, values.secret)
       }
 
       await Promise.all([
@@ -175,8 +181,10 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
 
   const removeSecret = async () => {
     if (!connection) return
+    const secretKind = secretKindFor(form.getValues())
+    if (!secretKind) return
     try {
-      await connectionsApi.deleteSecret(connection.id, secretKindFor(form.getValues()))
+      await connectionsApi.deleteSecret(connection.id, secretKind)
       await queryClient.invalidateQueries({ queryKey: secretStatusQueryKey(connection.id) })
       toast.success("Removed the saved secret")
     } catch (cause) {
@@ -305,6 +313,10 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                           <KeyRoundIcon />
                           SSH key
                         </SelectItem>
+                        <SelectItem value="agent" disabled={protocol !== "sftp"}>
+                          <FingerprintIcon />
+                          SSH agent
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -355,34 +367,46 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                 </div>
               ) : null}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="connection-secret">
-                  {authKind === "key" ? "Passphrase" : "Password"}
-                </Label>
-                <Input
-                  id="connection-secret"
-                  type="password"
-                  {...form.register("secret")}
-                  autoComplete="new-password"
-                  placeholder={
-                    existingSecret
-                      ? "Saved in keychain — leave blank to keep"
-                      : "Not saved yet — enter to store in keychain"
-                  }
-                />
-                <div className="flex items-center justify-between gap-2">
-                  <FieldMessage message={form.formState.errors.secret?.message} />
-                  {existingSecret ? (
-                    <button
-                      type="button"
-                      onClick={removeSecret}
-                      className="text-2xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
-                    >
-                      Remove saved secret
-                    </button>
-                  ) : null}
+              {authKind === "agent" ? (
+                <div className="space-y-1 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-medium">System SSH agent</p>
+                  <p className="text-2xs leading-relaxed text-muted-foreground">
+                    sftply asks your running SSH agent to sign. No private key or passphrase is read
+                    or stored. Unlock the agent in its own app if it asks.
+                  </p>
                 </div>
-              </div>
+              ) : null}
+
+              {authKind !== "agent" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="connection-secret">
+                    {authKind === "key" ? "Passphrase" : "Password"}
+                  </Label>
+                  <Input
+                    id="connection-secret"
+                    type="password"
+                    {...form.register("secret")}
+                    autoComplete="new-password"
+                    placeholder={
+                      existingSecret
+                        ? "Saved in keychain — leave blank to keep"
+                        : "Not saved yet — enter to store in keychain"
+                    }
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldMessage message={form.formState.errors.secret?.message} />
+                    {existingSecret ? (
+                      <button
+                        type="button"
+                        onClick={removeSecret}
+                        className="text-2xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
+                      >
+                        Remove saved secret
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

@@ -81,6 +81,13 @@ describe("connectionSchema", () => {
     expect(connectionSchema.safeParse({ ...base, keyPath: "" }).success).toBe(false)
     expect(connectionSchema.safeParse({ ...base, protocol: "ftp" as const }).success).toBe(false)
   })
+
+  it("keeps the SSH agent to SFTP and needs no secret", () => {
+    const base = { ...valid, authKind: "agent" as const, secret: "" }
+    expect(connectionSchema.safeParse(base).success).toBe(true)
+    expect(connectionSchema.safeParse({ ...base, protocol: "ftp" as const }).success).toBe(false)
+    expect(toConnectionInput(base).auth).toEqual({ kind: "agent" })
+  })
 })
 
 describe("quickConnectSchema", () => {
@@ -127,6 +134,19 @@ describe("quickConnectSchema", () => {
     }
     expect(quickConnectSchema.safeParse(key).success).toBe(true)
     expect(quickConnectSchema.safeParse({ ...key, passphraseProtected: true }).success).toBe(false)
+  })
+
+  it("allows saving SSH agent auth without a secret", () => {
+    const agent = {
+      ...quick,
+      protocol: "sftp" as const,
+      authKind: "agent" as const,
+      save: true,
+      name: "Saved agent",
+      secret: "",
+    }
+    expect(quickConnectSchema.safeParse(agent).success).toBe(true)
+    expect(toQuickConnectInput(agent).auth).toEqual({ kind: "agent" })
   })
 
   it("falls back to user@host for transient names", () => {
@@ -181,6 +201,7 @@ describe("form conversion", () => {
   it("maps auth kinds to secret kinds", () => {
     expect(secretKindFor({ authKind: "password" })).toBe("password")
     expect(secretKindFor({ authKind: "key" })).toBe("passphrase")
+    expect(secretKindFor({ authKind: "agent" })).toBeNull()
   })
 
   it("uses the conventional default ports", () => {

@@ -6,7 +6,11 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- SFTP connections can authenticate with the system SSH agent. sftply tries the
+  identities already loaded in the agent and never reads or stores the private
+  key or passphrase.
 
 ## [1.2.1] - 2026-11-20
 

@@ -24,16 +24,17 @@ Verify `SHA256SUMS` before running a file from a mirror you do not control.
 
 **New connection** asks for:
 
-| Field          | Notes                                             |
-| -------------- | ------------------------------------------------- |
-| Protocol       | FTP, FTPS (explicit), FTPS (implicit) or SFTP     |
-| Host and port  | Defaults per protocol: 21, 21, 990, 22            |
-| Username       | Required for SFTP; use `anonymous` for public FTP |
-| Authentication | Password or a private key file (SFTP)             |
-| Initial path   | Opened after connecting; defaults to `/`          |
+| Field          | Notes                                                 |
+| -------------- | ----------------------------------------------------- |
+| Protocol       | FTP, FTPS (explicit), FTPS (implicit) or SFTP         |
+| Host and port  | Defaults per protocol: 21, 21, 990, 22                |
+| Username       | Required for SFTP; use `anonymous` for public FTP     |
+| Authentication | Password, a private key file, or the SSH agent (SFTP) |
+| Initial path   | Opened after connecting; defaults to `/`              |
 
-The password or passphrase is written to the operating system keychain, never to
-`connections.json`. Deleting a connection deletes its keychain entries.
+For password and key-file connections, the password or passphrase is written to
+the operating system keychain, never to `connections.json`. Deleting a
+connection deletes its keychain entries. SSH agent connections store no secret.
 
 **Test connection** probes the values you have typed: it opens a throwaway
 connection, lists the initial folder and reports the latency and how many items
@@ -49,6 +50,21 @@ button.
 Point at an OpenSSH or PEM private key. If it has a passphrase, sftply asks for
 it once and stores it in the keychain. Keys are never copied into the app
 configuration.
+
+### SSH agent authentication (SFTP)
+
+Choose **SSH agent** to let your existing agent sign the login. sftply never
+reads the private key or stores a passphrase; it asks the agent for its loaded
+identities and tries them until the server accepts one.
+
+- macOS and Linux use `SSH_AUTH_SOCK`. On macOS, sftply also checks the login
+  session through `launchctl` when the environment variable is missing.
+- Windows uses the OpenSSH Authentication Agent, with Pageant as a fallback.
+- If the agent is locked, unlock it in its own app (1Password, Secretive,
+  KeePassXC, the Windows service, and so on) and reconnect.
+
+Switching a saved connection to the agent removes any password or passphrase
+that was stored for it.
 
 ## Host keys and certificates
 
@@ -215,6 +231,11 @@ by a firewall. sftply falls back to `LIST` when `MLSD` is unavailable.
 **TLS errors on FTPS.** Check the certificate chain first. For private CAs, set
 the CA bundle in the connection; for self-signed certificates, pin the SHA-256
 fingerprint instead of disabling validation.
+
+**“No SSH agent was found” or no identities.** Start your agent, add a key with
+`ssh-add`, and reconnect. On macOS, an app opened from Finder may not see an
+agent started only in a terminal; configure the agent for the login session or
+choose a private key file instead.
 
 **“Permission denied” when writing.** SFTP returns the server's error for the
 remote path; check the parent directory mode with the permissions dialog. FTP

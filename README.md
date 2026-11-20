@@ -54,6 +54,7 @@ Every release ships `SHA256SUMS`.
 | **A queue that tells the truth**  | Pause and resume appear only when the server supports them. A cancelled transfer is never reported as complete.                        |
 | **Secrets stay in the keychain**  | Passwords and passphrases live in the OS keychain. Config files, exports and logs never contain them.                                  |
 | **Remote text editing**           | Open a UTF-8 file up to 2 MiB, edit it in place and save atomically, with stale-write detection.                                       |
+| **SSH agent auth**                | SFTP can sign in with the identities already loaded in your system agent, without storing the key or passphrase.                       |
 | **Themes and migrations**         | Dark by default, light first-class, named palettes contrast-tested. Connections import and export as credential-free JSON.             |
 
 ## Status

@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use crate::app_state::AppState;
 use crate::config::connection_bundle;
 use crate::credentials;
-use crate::domain::connection::{ConnectionInput, ConnectionProfile};
+use crate::domain::connection::{ConnectionAuth, ConnectionInput, ConnectionProfile};
 use crate::domain::credentials::{SecretKind, SecretStatus};
 use crate::domain::host_key::KnownHost;
 use crate::domain::session::SessionState;
@@ -36,7 +36,17 @@ pub async fn connection_update(
     id: String,
     input: ConnectionInput,
 ) -> Result<ConnectionProfile, AppError> {
-    state.connections.update(&id, input).await
+    let updated = state.connections.update(&id, input).await?;
+
+    // Switching to the agent means the saved password or key passphrase is no
+    // longer used. Drop it instead of leaving a stale secret in the keychain.
+    if matches!(updated.auth, ConnectionAuth::Agent)
+        && let Err(error) = credentials::delete_all(&id).await
+    {
+        tracing::warn!(%error, "could not remove keychain entries after switching to the SSH agent");
+    }
+
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -284,6 +294,7 @@ pub async fn connection_test(
             ConnectionAuth::Key { .. } => SessionCredentials::Key {
                 passphrase: Some(secret),
             },
+            ConnectionAuth::Agent => SessionCredentials::Agent,
         },
         None => match id {
             Some(id) => {
@@ -298,6 +309,7 @@ pub async fn connection_test(
             None => match &profile.auth {
                 ConnectionAuth::Password => SessionCredentials::Password(String::new()),
                 ConnectionAuth::Key { .. } => SessionCredentials::Key { passphrase: None },
+                ConnectionAuth::Agent => SessionCredentials::Agent,
             },
         },
     };

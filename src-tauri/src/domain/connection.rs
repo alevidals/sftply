@@ -120,6 +120,9 @@ pub enum ConnectionAuth {
         /// Whether the key is expected to need a passphrase in the keychain.
         passphrase_protected: bool,
     },
+    /// Delegate public-key authentication to the system SSH agent. Only valid
+    /// for SFTP; the private key never enters the app.
+    Agent,
 }
 
 /// Non-secret connection metadata persisted in `connections.json`.
@@ -290,12 +293,19 @@ impl ConnectionInput {
                     passphrase_protected,
                 }
             }
+            ConnectionAuth::Agent => ConnectionAuth::Agent,
         };
 
-        if !matches!(self.protocol, ConnectionProtocol::Sftp)
-            && matches!(auth, ConnectionAuth::Key { .. })
-        {
-            return Err("SSH keys can only be used with SFTP connections.".into());
+        if !matches!(self.protocol, ConnectionProtocol::Sftp) {
+            match auth {
+                ConnectionAuth::Key { .. } => {
+                    return Err("SSH keys can only be used with SFTP connections.".into());
+                }
+                ConnectionAuth::Agent => {
+                    return Err("The SSH agent can only be used with SFTP connections.".into());
+                }
+                ConnectionAuth::Password => {}
+            }
         }
 
         let initial_path = if self.initial_path.trim().is_empty() {
@@ -409,6 +419,16 @@ mod tests {
 
         with_key.protocol = ConnectionProtocol::Ftp;
         assert!(with_key.normalized().is_err());
+    }
+
+    #[test]
+    fn the_ssh_agent_is_sftp_only() {
+        let mut with_agent = input();
+        with_agent.auth = ConnectionAuth::Agent;
+        assert!(with_agent.clone().normalized().is_ok());
+
+        with_agent.protocol = ConnectionProtocol::Ftp;
+        assert!(with_agent.normalized().is_err());
     }
 
     #[test]

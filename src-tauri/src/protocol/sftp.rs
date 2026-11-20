@@ -5,6 +5,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use russh::Disconnect;
 use russh::client::{self, Handle};
+use russh::keys::agent::AgentIdentity;
+use russh::keys::agent::client::{AgentClient, AgentStream};
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, load_secret_key};
 use russh_sftp::client::SftpSession;
 use russh_sftp::client::error::Error as SftpError;
@@ -26,9 +28,10 @@ use crate::protocol::{RemoteFs, listing, ms_from_secs, protocol_error, sanitize_
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
-pub struct SftpCredentials {
-    pub password: Option<String>,
-    pub passphrase: Option<String>,
+pub enum SftpCredentials {
+    Password(String),
+    Key { passphrase: Option<String> },
+    Agent,
 }
 
 struct SftpReader {
@@ -153,33 +156,6 @@ impl SftpRemote {
         credentials: SftpCredentials,
         trusted: Vec<KnownHost>,
     ) -> Result<Self, AppError> {
-        let key = match &profile.auth {
-            ConnectionAuth::Password => None,
-            ConnectionAuth::Key { key_path, .. } => {
-                let path = key_path.clone();
-                let passphrase = credentials.passphrase.clone();
-                Some(
-                    tokio::task::spawn_blocking(move || {
-                        load_secret_key(Path::new(&path), passphrase.as_deref())
-                    })
-                    .await
-                    .map_err(|error| {
-                        AppError::internal(
-                            "Could not read the private key.",
-                            format!("key loading task failed: {error}"),
-                        )
-                    })?
-                    .map_err(|error| {
-                        AppError::new(
-                            ErrorCode::AuthFailed,
-                            "The private key could not be read. Check the file and passphrase.",
-                        )
-                        .with_detail(error.to_string())
-                    })?,
-                )
-            }
-        };
-
         let config = Arc::new(client::Config {
             keepalive_interval: Some(Duration::from_secs(30)),
             keepalive_max: 3,
@@ -207,42 +183,72 @@ impl SftpRemote {
         })?
         .map_err(|error| map_connect_error(error, profile))?;
 
-        if let Some(key) = key {
-            let hash = session
-                .best_supported_rsa_hash()
+        match &profile.auth {
+            ConnectionAuth::Agent => authenticate_with_agent(&mut session, profile).await?,
+            ConnectionAuth::Key { key_path, .. } => {
+                let path = key_path.clone();
+                let passphrase = match &credentials {
+                    SftpCredentials::Key { passphrase } => passphrase.clone(),
+                    _ => None,
+                };
+                let key = tokio::task::spawn_blocking(move || {
+                    load_secret_key(Path::new(&path), passphrase.as_deref())
+                })
                 .await
-                .ok()
-                .flatten()
-                .flatten();
-            let result = session
-                .authenticate_publickey(
-                    profile.username.as_str(),
-                    PrivateKeyWithHashAlg::new(Arc::new(key), hash),
-                )
-                .await
-                .map_err(map_russh_error)?;
-            if !result.success() {
-                return Err(AppError::new(
-                    ErrorCode::AuthFailed,
-                    "The server rejected the SSH key.",
-                ));
+                .map_err(|error| {
+                    AppError::internal(
+                        "Could not read the private key.",
+                        format!("key loading task failed: {error}"),
+                    )
+                })?
+                .map_err(|error| {
+                    AppError::new(
+                        ErrorCode::AuthFailed,
+                        "The private key could not be read. Check the file and passphrase.",
+                    )
+                    .with_detail(error.to_string())
+                })?;
+
+                let hash = session
+                    .best_supported_rsa_hash()
+                    .await
+                    .ok()
+                    .flatten()
+                    .flatten();
+                let result = session
+                    .authenticate_publickey(
+                        profile.username.as_str(),
+                        PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                    )
+                    .await
+                    .map_err(map_russh_error)?;
+                if !result.success() {
+                    return Err(AppError::new(
+                        ErrorCode::AuthFailed,
+                        "The server rejected the SSH key.",
+                    ));
+                }
             }
-        } else {
-            let password = credentials.password.ok_or_else(|| {
-                AppError::new(
-                    ErrorCode::AuthFailed,
-                    "No password is saved for this connection.",
-                )
-            })?;
-            let result = session
-                .authenticate_password(profile.username.as_str(), password)
-                .await
-                .map_err(map_russh_error)?;
-            if !result.success() {
-                return Err(AppError::new(
-                    ErrorCode::AuthFailed,
-                    "The server rejected the username or password.",
-                ));
+            ConnectionAuth::Password => {
+                let password = match credentials {
+                    SftpCredentials::Password(password) => password,
+                    _ => {
+                        return Err(AppError::new(
+                            ErrorCode::AuthFailed,
+                            "No password is saved for this connection.",
+                        ));
+                    }
+                };
+                let result = session
+                    .authenticate_password(profile.username.as_str(), password)
+                    .await
+                    .map_err(map_russh_error)?;
+                if !result.success() {
+                    return Err(AppError::new(
+                        ErrorCode::AuthFailed,
+                        "The server rejected the username or password.",
+                    ));
+                }
             }
         }
 
@@ -302,6 +308,151 @@ impl SftpRemote {
         }
         Ok(())
     }
+}
+
+type Agent = AgentClient<Box<dyn AgentStream + Send + Unpin>>;
+
+fn dynamic_agent<S>(client: AgentClient<S>) -> Agent
+where
+    S: AgentStream + Send + Unpin + 'static,
+{
+    client.dynamic()
+}
+
+fn agent_unavailable(detail: impl Into<String>) -> AppError {
+    AppError::new(
+        ErrorCode::AuthFailed,
+        "No SSH agent was found. Start one or choose a private key file.",
+    )
+    .with_detail(detail)
+}
+
+#[cfg(unix)]
+async fn connect_agent() -> Result<Agent, AppError> {
+    let env_error = match AgentClient::connect_env().await {
+        Ok(client) => return Ok(dynamic_agent(client)),
+        Err(error) => error,
+    };
+
+    // GUI apps on macOS do not always inherit the shell's SSH_AUTH_SOCK. The
+    // login session may still expose it through launchd.
+    #[cfg(target_os = "macos")]
+    if let Some(socket) = launchctl_agent_socket().await
+        && let Ok(client) = AgentClient::connect_uds(socket).await
+    {
+        return Ok(dynamic_agent(client));
+    }
+
+    Err(agent_unavailable(format!("SSH_AUTH_SOCK: {env_error}")))
+}
+
+#[cfg(target_os = "macos")]
+async fn launchctl_agent_socket() -> Option<String> {
+    let output = tokio::task::spawn_blocking(|| {
+        std::process::Command::new("/bin/launchctl")
+            .args(["getenv", "SSH_AUTH_SOCK"])
+            .output()
+            .ok()
+    })
+    .await
+    .ok()??;
+
+    if !output.status.success() {
+        return None;
+    }
+    let socket = String::from_utf8(output.stdout).ok()?.trim().to_string();
+    (!socket.is_empty()).then_some(socket)
+}
+
+#[cfg(windows)]
+async fn connect_agent() -> Result<Agent, AppError> {
+    const OPENSSH_AGENT_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
+
+    match AgentClient::connect_named_pipe(OPENSSH_AGENT_PIPE).await {
+        Ok(client) => Ok(dynamic_agent(client)),
+        Err(pipe_error) => match AgentClient::connect_pageant().await {
+            Ok(client) => Ok(dynamic_agent(client)),
+            Err(pageant_error) => Err(agent_unavailable(format!(
+                "OpenSSH agent: {pipe_error}; Pageant: {pageant_error}"
+            ))),
+        },
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+async fn connect_agent() -> Result<Agent, AppError> {
+    Err(agent_unavailable("unsupported platform"))
+}
+
+/// Try every identity loaded in the agent. OpenSSH clients do the same: the
+/// server only accepts the keys it knows, and trying all of them avoids asking
+/// the user to choose when the agent holds more than one.
+async fn authenticate_with_agent(
+    session: &mut Handle<HostKeyHandler>,
+    profile: &ConnectionProfile,
+) -> Result<(), AppError> {
+    let mut agent = connect_agent().await?;
+    let identities = agent.request_identities().await.map_err(|error| {
+        AppError::new(
+            ErrorCode::AuthFailed,
+            "The SSH agent could not list its identities.",
+        )
+        .with_detail(error.to_string())
+    })?;
+
+    if identities.is_empty() {
+        return Err(AppError::new(
+            ErrorCode::AuthFailed,
+            "The SSH agent has no identities loaded. Add a key with ssh-add and try again.",
+        ));
+    }
+
+    let hash = session
+        .best_supported_rsa_hash()
+        .await
+        .ok()
+        .flatten()
+        .flatten();
+
+    for identity in &identities {
+        let outcome = match identity {
+            AgentIdentity::PublicKey { key, .. } => {
+                session
+                    .authenticate_publickey_with(
+                        profile.username.as_str(),
+                        key.clone(),
+                        hash,
+                        &mut agent,
+                    )
+                    .await
+            }
+            AgentIdentity::Certificate { certificate, .. } => {
+                session
+                    .authenticate_certificate_with(
+                        profile.username.as_str(),
+                        certificate.clone(),
+                        hash,
+                        &mut agent,
+                    )
+                    .await
+            }
+        };
+        let result = outcome.map_err(|error| {
+            AppError::new(
+                ErrorCode::AuthFailed,
+                "The SSH agent could not sign the authentication request.",
+            )
+            .with_detail(error.to_string())
+        })?;
+        if result.success() {
+            return Ok(());
+        }
+    }
+
+    Err(AppError::new(
+        ErrorCode::AuthFailed,
+        "The server rejected every key from the SSH agent.",
+    ))
 }
 
 #[async_trait]
@@ -790,10 +941,7 @@ mod integration {
     }
 
     fn credentials() -> SftpCredentials {
-        SftpCredentials {
-            password: Some(PASSWORD.into()),
-            passphrase: None,
-        }
+        SftpCredentials::Password(PASSWORD.into())
     }
 
     async fn trusted_host(profile: &ConnectionProfile) -> KnownHost {

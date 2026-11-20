@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog"
 import {
+  FingerprintIcon,
   FolderOpenIcon,
   KeyRoundIcon,
   LockKeyholeIcon,
@@ -80,7 +81,7 @@ export function QuickConnectDialog() {
     if (!currentPort || Number(currentPort) === defaultPort(protocol)) {
       form.setValue("port", String(defaultPort(next)))
     }
-    if (next !== "sftp" && form.getValues("authKind") === "key") {
+    if (next !== "sftp" && ["key", "agent"].includes(form.getValues("authKind"))) {
       form.setValue("authKind", "password")
     }
     onChange(next)
@@ -258,6 +259,10 @@ export function QuickConnectDialog() {
                           <KeyRoundIcon />
                           SSH key
                         </SelectItem>
+                        <SelectItem value="agent" disabled={protocol !== "sftp"}>
+                          <FingerprintIcon />
+                          SSH agent
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -310,25 +315,37 @@ export function QuickConnectDialog() {
                 </div>
               ) : null}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="quick-connect-secret">
-                  {authKind === "key" ? "Passphrase" : "Password"}
-                </Label>
-                <Input
-                  id="quick-connect-secret"
-                  type="password"
-                  {...form.register("secret")}
-                  autoComplete="off"
-                  placeholder={
-                    authKind === "key" && !form.watch("passphraseProtected")
-                      ? "Optional"
-                      : save
-                        ? "Stored in your keychain"
-                        : "Used for this session only"
-                  }
-                />
-                <FieldMessage message={form.formState.errors.secret?.message} />
-              </div>
+              {authKind === "agent" ? (
+                <div className="space-y-1 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <p className="text-xs font-medium">System SSH agent</p>
+                  <p className="text-2xs leading-relaxed text-muted-foreground">
+                    sftply asks your running SSH agent to sign. No private key or passphrase is read
+                    or stored. Unlock the agent in its own app if it asks.
+                  </p>
+                </div>
+              ) : null}
+
+              {authKind !== "agent" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-connect-secret">
+                    {authKind === "key" ? "Passphrase" : "Password"}
+                  </Label>
+                  <Input
+                    id="quick-connect-secret"
+                    type="password"
+                    {...form.register("secret")}
+                    autoComplete="off"
+                    placeholder={
+                      authKind === "key" && !form.watch("passphraseProtected")
+                        ? "Optional"
+                        : save
+                          ? "Stored in your keychain"
+                          : "Used for this session only"
+                    }
+                  />
+                  <FieldMessage message={form.formState.errors.secret?.message} />
+                </div>
+              ) : null}
 
               <div className="space-y-1.5">
                 <Label htmlFor="quick-connect-path">Start folder</Label>

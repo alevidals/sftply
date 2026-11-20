@@ -90,6 +90,30 @@ describe("QuickConnectDialog", () => {
     expect(actions.quickConnect).not.toHaveBeenCalled()
   })
 
+  it("uses the SSH agent without asking for a secret", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    renderDialog()
+
+    await user.type(screen.getByLabelText("Host"), "sftp.example.com")
+    await user.type(screen.getByLabelText("Username"), "ada")
+    await user.click(screen.getByRole("combobox", { name: "Authentication" }))
+    await user.click(await screen.findByRole("option", { name: "SSH agent" }))
+
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Connect" }))
+
+    await waitFor(() => expect(actions.quickConnect).toHaveBeenCalledTimes(1))
+    expect(actions.quickConnect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: "sftp.example.com",
+        username: "ada",
+        auth: { kind: "agent" },
+      }),
+      "",
+      false,
+    )
+  })
+
   it("shows TLS and data-channel options for FTPS", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     renderDialog()

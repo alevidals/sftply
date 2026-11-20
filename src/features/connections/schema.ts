@@ -62,7 +62,7 @@ const portSchema = z
 
 const usernameSchema = z.string().trim().max(128, "The username is too long.")
 
-const authKindSchema = z.enum(["password", "key"])
+const authKindSchema = z.enum(["password", "key", "agent"])
 
 const ftpDataModeSchema = z.enum(["passive", "extendedPassive", "active"])
 
@@ -93,7 +93,7 @@ export function normalizeCertificatePin(value: string): string | null {
 interface SharedFields {
   protocol: ConnectionProtocol
   username: string
-  authKind: "password" | "key"
+  authKind: "password" | "key" | "agent"
   keyPath: string
   initialPath: string
 }
@@ -114,13 +114,16 @@ function refineSharedFields(values: SharedFields, ctx: z.RefinementCtx) {
         message: "Choose a private key file.",
       })
     }
-    if (values.protocol !== "sftp") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["authKind"],
-        message: "SSH keys can only be used with SFTP connections.",
-      })
-    }
+  }
+  if (values.authKind !== "password" && values.protocol !== "sftp") {
+    ctx.addIssue({
+      code: "custom",
+      path: ["authKind"],
+      message:
+        values.authKind === "agent"
+          ? "The SSH agent can only be used with SFTP connections."
+          : "SSH keys can only be used with SFTP connections.",
+    })
   }
   if (values.initialPath.trim() && !values.initialPath.trim().startsWith("/")) {
     ctx.addIssue({
@@ -269,6 +272,19 @@ export function valuesFromProfile(profile: ConnectionProfile_Serialize): Connect
   }
 }
 
+function connectionAuth(
+  values: Pick<ConnectionFormValues, "authKind" | "keyPath" | "passphraseProtected">,
+): ConnectionInput_Deserialize["auth"] {
+  if (values.authKind === "key") {
+    return {
+      kind: "key",
+      keyPath: values.keyPath.trim(),
+      passphraseProtected: values.passphraseProtected,
+    }
+  }
+  return values.authKind === "agent" ? { kind: "agent" } : { kind: "password" }
+}
+
 export function toConnectionInput(values: ConnectionFormValues): ConnectionInput_Deserialize {
   return {
     name: values.name.trim(),
@@ -276,14 +292,7 @@ export function toConnectionInput(values: ConnectionFormValues): ConnectionInput
     host: values.host.trim(),
     port: Number(values.port),
     username: values.username.trim(),
-    auth:
-      values.authKind === "key"
-        ? {
-            kind: "key",
-            keyPath: values.keyPath.trim(),
-            passphraseProtected: values.passphraseProtected,
-          }
-        : { kind: "password" },
+    auth: connectionAuth(values),
     initialPath: values.initialPath.trim() || "/",
     favorite: values.favorite,
     group: values.group.trim() || null,
@@ -304,14 +313,7 @@ export function toQuickConnectInput(values: QuickConnectValues): ConnectionInput
     host: values.host.trim(),
     port: Number(values.port),
     username,
-    auth:
-      values.authKind === "key"
-        ? {
-            kind: "key",
-            keyPath: values.keyPath.trim(),
-            passphraseProtected: values.passphraseProtected,
-          }
-        : { kind: "password" },
+    auth: connectionAuth(values),
     initialPath: values.initialPath.trim() || "/",
     favorite: false,
     group: values.group.trim() || null,
@@ -324,6 +326,8 @@ export function toQuickConnectInput(values: QuickConnectValues): ConnectionInput
   }
 }
 
-export function secretKindFor(values: Pick<ConnectionFormValues, "authKind">): SecretKind {
-  return values.authKind === "key" ? "passphrase" : "password"
+export function secretKindFor(values: Pick<ConnectionFormValues, "authKind">): SecretKind | null {
+  if (values.authKind === "key") return "passphrase"
+  if (values.authKind === "password") return "password"
+  return null
 }
