@@ -157,7 +157,11 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
                 value={dark ? "dark" : "light"}
                 onValueChange={(value) => setDark(value === "dark")}
               >
-                <SelectTrigger id="theme-variant" className="w-full">
+                <SelectTrigger
+                  id="theme-variant"
+                  className="w-full"
+                  aria-describedby="theme-variant-help"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -167,6 +171,11 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
               </Select>
             </div>
           </div>
+
+          <p id="theme-variant-help" className="text-xs text-muted-foreground">
+            Variant sets native control colors, like scrollbars and menus, and dark-mode component
+            tweaks. Match it to the palette's overall lightness.
+          </p>
 
           {GROUPS.map((group) => (
             <section key={group.label} className="space-y-2">

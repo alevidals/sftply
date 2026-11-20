@@ -49,6 +49,9 @@ describe("ThemeEditorDialog", () => {
     const onSaved = vi.fn()
     render(<ThemeEditorDialog open theme={null} onOpenChange={vi.fn()} onSaved={onSaved} />)
 
+    expect(screen.getByLabelText("Variant")).toHaveAccessibleDescription(
+      /Match it to the palette's overall lightness/i,
+    )
     const name = screen.getByLabelText("Name")
     await user.clear(name)
     await user.type(name, "Test")
