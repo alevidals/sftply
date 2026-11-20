@@ -21,6 +21,37 @@ const ipcState = vi.hoisted(() => ({
   openLogs: vi.fn(),
 }))
 
+const editorState = vi.hoisted(() => ({
+  newTheme: {
+    id: "custom:new",
+    name: "New theme",
+    dark: true,
+    colors: { background: "#202020", foreground: "#f0f0f0", primary: "#4488ff" },
+  },
+}))
+
+vi.mock("@/features/settings/theme-editor-dialog", () => ({
+  ThemeEditorDialog: ({
+    open,
+    onOpenChange,
+    onSaved,
+  }: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    onSaved: (theme: typeof editorState.newTheme) => void | Promise<void>
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() => {
+          void Promise.resolve(onSaved(editorState.newTheme)).then(() => onOpenChange(false))
+        }}
+      >
+        Fake save theme
+      </button>
+    ) : null,
+}))
+
 vi.mock("@/lib/ipc/client", () => ({
   ipc: {
     openLogs: ipcState.openLogs,
@@ -213,6 +244,27 @@ describe("SettingsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Open logs" }))
 
     expect(ipcState.openLogs).toHaveBeenCalledTimes(1)
+  })
+
+  it("applies a newly saved theme after closing the editor", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    state.themes = [
+      {
+        id: "custom:two",
+        name: "Theme two",
+        dark: true,
+        colors: { background: "#303030", foreground: "#f0f0f0", primary: "#ff8844" },
+      },
+      editorState.newTheme,
+    ]
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByText("Theme two"))
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await user.click(screen.getByRole("button", { name: "Fake save theme" }))
+
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("custom"))
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe("#202020")
   })
 
   it("previews a theme and restores the saved one on cancel", async () => {

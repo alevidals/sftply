@@ -847,7 +847,7 @@ export function SettingsDialog() {
           theme={editingTheme}
           onOpenChange={(next) => {
             setEditorOpen(next)
-            if (!next) applyThemePreview(selectedTheme)
+            if (!next) applyThemePreview(form.getValues("theme"))
           }}
           onSaved={async (saved) => {
             await reloadThemes()
