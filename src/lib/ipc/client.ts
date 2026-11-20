@@ -8,6 +8,7 @@ import {
   type ConnectionInput_Deserialize,
   type ConnectionProfile_Serialize,
   type ConnectionTestResult,
+  type CustomTheme,
   commands,
   type FsEntry,
   type FsScope,
@@ -23,6 +24,7 @@ import {
   type SyncPlan_Serialize,
   type SyncValidationIssue,
   type TextFile,
+  type ThemeList,
   type TransferConflict,
   type TransferHistoryEntry_Serialize,
   type TransferItem,
@@ -72,6 +74,32 @@ export const ipc = {
 
   settingsUpdate(settings: AppSettings_Serialize): Promise<AppSettings_Serialize> {
     return invoke(commands.settingsUpdate(settings)).then((result) => unwrap(result))
+  },
+
+  themesList(): Promise<ThemeList> {
+    return invoke(commands.themesList())
+  },
+
+  themeImport(path: string): Promise<CustomTheme> {
+    return invoke(commands.themeImport(path)).then((result) => unwrap(result))
+  },
+
+  themeDelete(id: string): Promise<void> {
+    return invoke(commands.themeDelete(id)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  themeExport(path: string, content: string): Promise<void> {
+    return invoke(commands.themeExport(path, content)).then((result) => {
+      unwrap(result)
+    })
+  },
+
+  themesOpenFolder(): Promise<void> {
+    return invoke(commands.themesOpenFolder()).then((result) => {
+      unwrap(result)
+    })
   },
 
   fsList(scope: FsScope, path: string, showHidden: boolean): Promise<Listing> {

@@ -12,8 +12,6 @@ import {
   SunMediumIcon,
   TerminalIcon,
 } from "lucide-react"
-import type { ThemeMode } from "@/lib/ipc/bindings"
-
 /** Theme ids in the order they are offered in the UI. */
 export const THEME_VALUES = [
   "system",
@@ -36,7 +34,7 @@ export interface ThemePreview {
 }
 
 export interface ThemeOption {
-  value: ThemeMode
+  value: string
   label: string
   description: string
   icon: LucideIcon
@@ -136,16 +134,59 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   },
 ]
 
+/** CSS custom-property names (without `--`) used by every theme. */
+export const THEME_TOKEN_KEYS = [
+  "background",
+  "foreground",
+  "card",
+  "card-foreground",
+  "popover",
+  "popover-foreground",
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "muted",
+  "muted-foreground",
+  "accent",
+  "accent-foreground",
+  "destructive",
+  "border",
+  "input",
+  "ring",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+  "sidebar",
+  "sidebar-foreground",
+  "sidebar-primary",
+  "sidebar-primary-foreground",
+  "sidebar-accent",
+  "sidebar-accent-foreground",
+  "sidebar-border",
+  "sidebar-ring",
+  "chrome",
+  "chrome-foreground",
+  "panel-header",
+  "row-hover",
+  "row-selected",
+  "success",
+  "warning",
+  "info",
+] as const
+
 export const THEME_LABELS = Object.fromEntries(
   THEME_OPTIONS.map((option) => [option.value, option.label]),
-) as Record<ThemeMode, string>
+) as Record<string, string>
 
-const THEME_BY_ID = new Map<ThemeMode, ThemeOption>(
+const THEME_BY_ID = new Map<string, ThemeOption>(
   THEME_OPTIONS.map((option) => [option.value, option]),
 )
 
 /** Metadata for a theme id, falling back to the default dark palette. */
-export function themeOption(mode: ThemeMode): ThemeOption {
+export function themeOption(mode: string): ThemeOption {
   const option = THEME_BY_ID.get(mode)
   if (option) return option
   const fallback = THEME_OPTIONS.find((candidate) => candidate.value === "dark")
@@ -154,6 +195,6 @@ export function themeOption(mode: ThemeMode): ThemeOption {
 }
 
 /** Whether a theme id uses a dark palette. */
-export function themeIsDark(mode: ThemeMode): boolean {
+export function themeIsDark(mode: string): boolean {
   return themeOption(mode).dark
 }

@@ -9,6 +9,12 @@ const state = vi.hoisted(() => ({
   settings: {} as AppSettings_Serialize,
   updateSettings: vi.fn(),
   saving: false,
+  themes: [] as Array<{
+    id: string
+    name: string
+    dark: boolean
+    colors: Record<string, string>
+  }>,
 }))
 
 const ipcState = vi.hoisted(() => ({
@@ -26,6 +32,9 @@ vi.mock("@/features/settings/settings-context", () => ({
     settings: state.settings,
     updateSettings: state.updateSettings,
     saving: state.saving,
+    themes: state.themes,
+    themeWarnings: [],
+    reloadThemes: vi.fn(),
   }),
 }))
 
@@ -66,6 +75,7 @@ const settings: AppSettings_Serialize = {
 beforeEach(() => {
   state.settings = settings
   state.saving = false
+  state.themes = []
   state.updateSettings.mockReset()
   state.updateSettings.mockImplementation(async (patch: Partial<AppSettings_Serialize>) => ({
     ...settings,
@@ -196,6 +206,28 @@ describe("SettingsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Open logs" }))
 
     expect(ipcState.openLogs).toHaveBeenCalledTimes(1)
+  })
+
+  it("selects and saves an imported custom theme", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    state.themes = [
+      {
+        id: "custom:mine",
+        name: "Mine",
+        dark: true,
+        colors: { background: "#101010", foreground: "#f0f0f0" },
+      },
+    ]
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByText("Mine"))
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() =>
+      expect(state.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ theme: "custom:mine" }),
+      ),
+    )
   })
 
   it("saves a named palette from the theme gallery", async () => {

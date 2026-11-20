@@ -19,38 +19,64 @@ afterEach(() => {
 
 describe("resolveTheme", () => {
   it("returns explicit modes unchanged", () => {
-    expect(resolveTheme("dark", false)).toEqual({ id: "dark", dark: true })
-    expect(resolveTheme("light", true)).toEqual({ id: "light", dark: false })
+    expect(resolveTheme("dark", false)).toEqual({ id: "dark", themeId: "dark", dark: true })
+    expect(resolveTheme("light", true)).toEqual({ id: "light", themeId: "light", dark: false })
   })
 
   it("resolves named palettes with their own lightness", () => {
-    expect(resolveTheme("oneDark", false)).toEqual({ id: "oneDark", dark: true })
-    expect(resolveTheme("gruvboxLight", true)).toEqual({ id: "gruvboxLight", dark: false })
+    expect(resolveTheme("oneDark", false)).toEqual({
+      id: "oneDark",
+      themeId: "oneDark",
+      dark: true,
+    })
+    expect(resolveTheme("gruvboxLight", true)).toEqual({
+      id: "gruvboxLight",
+      themeId: "gruvboxLight",
+      dark: false,
+    })
   })
 
   it("follows the system preference in system mode", () => {
-    expect(resolveTheme("system", true)).toEqual({ id: "dark", dark: true })
-    expect(resolveTheme("system", false)).toEqual({ id: "light", dark: false })
+    expect(resolveTheme("system", true)).toEqual({ id: "dark", themeId: "system", dark: true })
+    expect(resolveTheme("system", false)).toEqual({ id: "light", themeId: "system", dark: false })
   })
 })
 
 describe("applyDocumentTheme", () => {
   it("toggles the dark class, palette id and color scheme", () => {
-    applyDocumentTheme({ id: "dark", dark: true })
+    applyDocumentTheme({ id: "dark", themeId: "dark", dark: true })
     expect(document.documentElement.classList.contains("dark")).toBe(true)
     expect(document.documentElement.dataset.theme).toBe("dark")
     expect(document.documentElement.style.colorScheme).toBe("dark")
 
-    applyDocumentTheme({ id: "solarizedLight", dark: false })
+    applyDocumentTheme({ id: "solarizedLight", themeId: "solarizedLight", dark: false })
     expect(document.documentElement.classList.contains("dark")).toBe(false)
     expect(document.documentElement.dataset.theme).toBe("solarizedLight")
     expect(document.documentElement.style.colorScheme).toBe("light")
   })
 
   it("keeps the dark class for dark named palettes", () => {
-    applyDocumentTheme({ id: "nord", dark: true })
+    applyDocumentTheme({ id: "nord", themeId: "nord", dark: true })
     expect(document.documentElement.classList.contains("dark")).toBe(true)
     expect(document.documentElement.dataset.theme).toBe("nord")
+  })
+
+  it("applies custom variables and removes them when switching back", () => {
+    const custom = {
+      id: "custom:mine",
+      name: "Mine",
+      dark: true,
+      colors: { background: "#101010", foreground: "#f0f0f0", primary: "#4488ff" },
+    }
+    applyDocumentTheme(resolveTheme("custom:mine", false, [custom]))
+    expect(document.documentElement.dataset.theme).toBe("custom")
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe("#101010")
+    expect(localStorage.getItem("sftply.custom-theme")).toContain("custom:mine")
+
+    applyDocumentTheme({ id: "dark", themeId: "dark", dark: true })
+    expect(document.documentElement.dataset.theme).toBe("dark")
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe("")
+    expect(localStorage.getItem("sftply.custom-theme")).toBeNull()
   })
 })
 
@@ -66,6 +92,24 @@ describe("rememberAppearance", () => {
     rememberAppearance("system", "compact")
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("system")
     expect(localStorage.getItem(DENSITY_STORAGE_KEY)).toBe("compact")
+  })
+})
+
+describe("custom themes", () => {
+  it("resolves a custom theme and fills missing tokens", () => {
+    const theme = {
+      id: "custom:mine",
+      name: "Mine",
+      dark: true,
+      colors: { background: "#101010", foreground: "#f0f0f0", "palette.4": "#4488ff" },
+    }
+    const resolved = resolveTheme("custom:mine", false, [theme])
+    expect(resolved.id).toBe("custom")
+    expect(resolved.themeId).toBe("custom:mine")
+    expect(resolved.dark).toBe(true)
+    expect(resolved.colors?.background).toBe("#101010")
+    expect(resolved.colors?.primary).toBe("#4488ff")
+    expect(resolved.colors?.card).toContain("color-mix")
   })
 })
 

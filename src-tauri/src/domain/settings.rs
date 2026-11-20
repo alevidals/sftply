@@ -12,23 +12,6 @@ pub const MAX_BOOKMARKS_PER_CONNECTION: usize = 100;
 pub const MAX_RECENT_PATHS_PER_CONNECTION: usize = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
-#[serde(rename_all = "camelCase")]
-pub enum ThemeMode {
-    System,
-    #[default]
-    Dark,
-    Light,
-    OneDark,
-    GruvboxDark,
-    GruvboxLight,
-    Nord,
-    Dracula,
-    SolarizedLight,
-    TokyoNight,
-    CatppuccinMocha,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Density {
     #[default]
@@ -59,7 +42,7 @@ pub enum DateFormat {
 #[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
     pub schema_version: u32,
-    pub theme: ThemeMode,
+    pub theme: String,
     pub density: Density,
     pub size_format: SizeFormat,
     pub date_format: DateFormat,
@@ -90,7 +73,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             schema_version: SETTINGS_SCHEMA_VERSION,
-            theme: ThemeMode::Dark,
+            theme: "dark".to_string(),
             density: Density::Compact,
             size_format: SizeFormat::Binary,
             date_format: DateFormat::Friendly,
@@ -116,6 +99,18 @@ impl AppSettings {
     /// Clamp values that are safe to clamp and reject values that indicate a
     /// bug or a corrupted/tampered payload.
     pub fn normalized(mut self) -> Result<Self, String> {
+        if self.theme.is_empty()
+            || self.theme.len() > 100
+            || self.theme.chars().any(|character| {
+                character.is_control()
+                    || !(character.is_ascii_alphanumeric()
+                        || character == '-'
+                        || character == '_'
+                        || character == ':')
+            })
+        {
+            return Err("The theme id is invalid.".into());
+        }
         if self.schema_version > SETTINGS_SCHEMA_VERSION {
             return Err(format!(
                 "Settings were written by a newer version of sftply (schema {}).",
@@ -233,27 +228,6 @@ mod tests {
             ..AppSettings::default()
         };
         assert!(too_long.normalized().is_err());
-    }
-
-    #[test]
-    fn theme_ids_round_trip() {
-        for (id, theme) in [
-            ("system", ThemeMode::System),
-            ("dark", ThemeMode::Dark),
-            ("light", ThemeMode::Light),
-            ("oneDark", ThemeMode::OneDark),
-            ("gruvboxDark", ThemeMode::GruvboxDark),
-            ("gruvboxLight", ThemeMode::GruvboxLight),
-            ("nord", ThemeMode::Nord),
-            ("dracula", ThemeMode::Dracula),
-            ("solarizedLight", ThemeMode::SolarizedLight),
-            ("tokyoNight", ThemeMode::TokyoNight),
-            ("catppuccinMocha", ThemeMode::CatppuccinMocha),
-        ] {
-            let json = format!("\"{id}\"");
-            assert_eq!(serde_json::from_str::<ThemeMode>(&json).unwrap(), theme);
-            assert_eq!(serde_json::to_string(&theme).unwrap(), json);
-        }
     }
 
     #[test]

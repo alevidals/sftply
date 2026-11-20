@@ -1,11 +1,30 @@
 import { zodResolver } from "@hookform/resolvers/zod"
+import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plugin-dialog"
 import { cn } from "cn"
-import { CheckIcon, FolderOpenIcon } from "lucide-react"
-import { useEffect, useRef } from "react"
+import {
+  CheckIcon,
+  DownloadIcon,
+  FolderOpenIcon,
+  PaletteIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { BrandMark } from "@/components/brand"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -26,18 +45,20 @@ import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
 import { UpdateCheck } from "@/features/settings/update-check"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { useDelayedFlag } from "@/hooks/use-delayed-flag"
+import { currentThemeExport, customThemeOption, themeExportText } from "@/lib/custom-theme"
 import { errorMessage } from "@/lib/errors"
-import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
+import type { AppSettings_Serialize, CustomTheme } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 import { isMacPlatform } from "@/lib/shortcuts"
-import { THEME_OPTIONS, THEME_VALUES } from "@/lib/themes"
+import { applyDocumentTheme, resolveTheme } from "@/lib/theme"
+import { THEME_OPTIONS } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
 const MIN_BANDWIDTH_KBPS = 16
 const MAX_BANDWIDTH_KBPS = 10_000_000
 
 const settingsSchema = z.object({
-  theme: z.enum(THEME_VALUES),
+  theme: z.string().min(1).max(100),
   density: z.enum(["compact", "comfortable"]),
   sizeFormat: z.enum(["binary", "decimal"]),
   dateFormat: z.enum(["friendly", "iso"]),
@@ -80,7 +101,7 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
 export function SettingsDialog() {
   const open = useUiStore((state) => state.settingsOpen)
   const setOpen = useUiStore((state) => state.setSettingsOpen)
-  const { settings, updateSettings, saving } = useSettings()
+  const { settings, updateSettings, saving, themes, themeWarnings, reloadThemes } = useSettings()
   const appInfo = useAppInfo()
   const tab = useUiStore((state) => state.settingsTab)
   const setTab = useUiStore((state) => state.setSettingsTab)
@@ -94,6 +115,8 @@ export function SettingsDialog() {
   })
 
   const { reset, handleSubmit, control, register, formState } = form
+  const [deletingTheme, setDeletingTheme] = useState<CustomTheme | null>(null)
+  const selectedTheme = form.watch("theme")
 
   useEffect(() => {
     if (open && !wasOpen.current) reset(toFormValues(settings))
@@ -113,6 +136,62 @@ export function SettingsDialog() {
       toast.error("Could not save settings", { description: errorMessage(error) })
     }
   })
+
+  const importTheme = async () => {
+    const selected = await openFileDialog({
+      multiple: false,
+      directory: false,
+      title: "Choose a theme file",
+      filters: [{ name: "sftply theme", extensions: ["theme", "toml", "conf"] }],
+    })
+    if (typeof selected !== "string") return
+    try {
+      const imported = await ipc.themeImport(selected)
+      await reloadThemes()
+      form.setValue("theme", imported.id, { shouldDirty: true, shouldValidate: true })
+      toast.success(`Imported “${imported.name}”`)
+    } catch (error) {
+      toast.error("Could not import the theme", { description: errorMessage(error) })
+    }
+  }
+
+  const exportTheme = async () => {
+    const themeId = form.getValues("theme")
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    const previous = resolveTheme(settings.theme, media.matches, themes)
+    const restore = themeId !== settings.theme
+    if (restore) applyDocumentTheme(resolveTheme(themeId, media.matches, themes))
+    const exported = currentThemeExport(themeId, themes)
+    if (restore) applyDocumentTheme(previous)
+    const target = await saveFileDialog({
+      title: "Export theme",
+      defaultPath: `${exported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "theme"}.theme`,
+      filters: [{ name: "sftply theme", extensions: ["theme"] }],
+    })
+    if (typeof target !== "string") return
+    try {
+      await ipc.themeExport(target, themeExportText(exported.name, exported.dark, exported.colors))
+      toast.success("Theme exported")
+    } catch (error) {
+      toast.error("Could not export the theme", { description: errorMessage(error) })
+    }
+  }
+
+  const removeTheme = async () => {
+    if (!deletingTheme) return
+    try {
+      await ipc.themeDelete(deletingTheme.id)
+      if (settings.theme === deletingTheme.id) {
+        form.setValue("theme", "dark", { shouldDirty: true, shouldValidate: true })
+        await updateSettings({ theme: "dark" })
+      }
+      await reloadThemes()
+      toast.success(`Removed “${deletingTheme.name}”`)
+      setDeletingTheme(null)
+    } catch (error) {
+      toast.error("Could not remove the theme", { description: errorMessage(error) })
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -230,6 +309,144 @@ export function SettingsDialog() {
                       </div>
                     )}
                   />
+                </section>
+
+                <section className="space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">Custom themes</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Import a theme file or drop one in the themes folder.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void importTheme()}
+                      >
+                        <UploadIcon />
+                        Import
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void exportTheme()}
+                      >
+                        <DownloadIcon />
+                        Export
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void reloadThemes()}
+                      >
+                        <RefreshCwIcon />
+                        Reload
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          void ipc.themesOpenFolder().catch((error) =>
+                            toast.error("Could not open the themes folder", {
+                              description: errorMessage(error),
+                            }),
+                          )
+                        }
+                      >
+                        <FolderOpenIcon />
+                        Folder
+                      </Button>
+                    </div>
+                  </div>
+
+                  {themeWarnings.length > 0 ? (
+                    <div className="space-y-1 rounded-lg border border-warning/30 bg-warning/5 p-2.5 text-2xs text-warning">
+                      {themeWarnings.map((warning) => (
+                        <p key={warning}>{warning}</p>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {themes.length === 0 ? (
+                    <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+                      No custom themes yet. Import a `.theme` file or add one to the themes folder.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {themes.map((theme) => {
+                        const option = customThemeOption(theme)
+                        const selected = selectedTheme === option.value
+                        return (
+                          <div key={theme.id} className="relative">
+                            <label
+                              title={option.description}
+                              className={cn(
+                                "group relative flex cursor-pointer flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors focus-within:ring-2 focus-within:ring-ring/50",
+                                selected
+                                  ? "border-primary/40 bg-primary/5"
+                                  : "border-border hover:border-border hover:bg-muted/40",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name="theme"
+                                value={option.value}
+                                checked={selected}
+                                onChange={() =>
+                                  form.setValue("theme", option.value, { shouldDirty: true })
+                                }
+                                className="sr-only"
+                              />
+                              <span
+                                aria-hidden
+                                className="flex h-7 w-full items-center gap-1.5 rounded-md border border-black/10 px-2 dark:border-white/10"
+                                style={{ backgroundColor: option.preview.background }}
+                              >
+                                <span
+                                  className="size-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: option.preview.accent }}
+                                />
+                                <span
+                                  className="h-1.5 flex-1 rounded-full opacity-70"
+                                  style={{ backgroundColor: option.preview.foreground }}
+                                />
+                              </span>
+                              <span className="flex w-full items-center gap-1.5">
+                                <PaletteIcon
+                                  className={cn(
+                                    "size-3.5 shrink-0",
+                                    selected ? "text-primary" : "text-muted-foreground",
+                                  )}
+                                />
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                                  {option.label}
+                                </span>
+                                {selected ? (
+                                  <CheckIcon className="size-3.5 shrink-0 text-primary" />
+                                ) : null}
+                              </span>
+                            </label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="absolute top-1 right-1"
+                              aria-label={`Delete ${option.label}`}
+                              onClick={() => setDeletingTheme(theme)}
+                            >
+                              <Trash2Icon />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </section>
 
                 <section className="space-y-3">
@@ -530,6 +747,27 @@ export function SettingsDialog() {
             </Button>
           </DialogFooter>
         </form>
+
+        <AlertDialog
+          open={Boolean(deletingTheme)}
+          onOpenChange={(next) => !next && setDeletingTheme(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete “{deletingTheme?.name}”?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the custom theme file. If it is selected, sftply falls back to the
+                default dark theme.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => void removeTheme()}>
+                Delete theme
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   )

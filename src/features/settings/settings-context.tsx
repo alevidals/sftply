@@ -14,7 +14,7 @@ import { BrandMark } from "@/components/brand"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { normalizeError } from "@/lib/errors"
-import type { AppSettings_Serialize, DateFormat, SizeFormat } from "@/lib/ipc/bindings"
+import type { AppSettings_Serialize, CustomTheme, DateFormat, SizeFormat } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 import {
   applyDocumentDensity,
@@ -25,12 +25,16 @@ import {
 } from "@/lib/theme"
 
 const SETTINGS_QUERY_KEY = ["settings"] as const
+const THEMES_QUERY_KEY = ["custom-themes"] as const
 
 interface SettingsContextValue {
   settings: AppSettings_Serialize
   updateSettings: (patch: Partial<AppSettings_Serialize>) => Promise<AppSettings_Serialize>
   saving: boolean
   effectiveTheme: EffectiveTheme
+  themes: CustomTheme[]
+  themeWarnings: string[]
+  reloadThemes: () => Promise<unknown>
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -43,6 +47,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     staleTime: Number.POSITIVE_INFINITY,
     retry: 1,
   })
+  const themesQuery = useQuery({
+    queryKey: THEMES_QUERY_KEY,
+    queryFn: ipc.themesList,
+    staleTime: 5_000,
+    retry: 1,
+  })
+  const customThemes = themesQuery.data?.themes ?? []
 
   const currentRef = useRef<AppSettings_Serialize | null>(null)
   const persistedRef = useRef<AppSettings_Serialize | null>(null)
@@ -62,9 +73,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!themeMode) return
+    // A selected custom theme needs its file before the first paint. Loading
+    // the built-in fallback first would flash the wrong palette.
+    if (themeMode.startsWith("custom:") && themesQuery.isPending) return
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     const sync = () => {
-      const next = resolveTheme(themeMode, media.matches)
+      const next = resolveTheme(themeMode, media.matches, customThemes)
       setEffectiveTheme(next.dark ? "dark" : "light")
       applyDocumentTheme(next)
     }
@@ -73,7 +87,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (themeMode !== "system") return
     media.addEventListener("change", sync)
     return () => media.removeEventListener("change", sync)
-  }, [themeMode])
+  }, [customThemes, themeMode, themesQuery.isPending])
 
   useEffect(() => {
     if (!density || !themeMode) return
@@ -131,8 +145,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateSettings,
       saving,
       effectiveTheme,
+      themes: customThemes,
+      themeWarnings: themesQuery.data?.warnings ?? [],
+      reloadThemes: () => queryClient.invalidateQueries({ queryKey: THEMES_QUERY_KEY }),
     }
-  }, [query.data, updateSettings, saving, effectiveTheme])
+  }, [
+    customThemes,
+    effectiveTheme,
+    query.data,
+    queryClient,
+    saving,
+    themesQuery.data?.warnings,
+    updateSettings,
+  ])
 
   if (query.isPending) return <BootScreen />
   if (query.isError || !value) {

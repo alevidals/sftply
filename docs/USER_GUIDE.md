@@ -207,6 +207,41 @@ a single request to the public GitHub releases page, compares versions and
 offers a link. sftply never downloads or installs updates by itself, and it does
 not check in the background.
 
+## Themes
+
+Settings → Appearance offers the built-in palettes and any custom themes you add.
+Custom themes live in the `themes` folder inside the app configuration directory:
+
+```text
+macOS:   ~/Library/Application Support/com.alevidals.sftply/themes/
+Windows: %APPDATA%\com.alevidals.sftply\themes\
+Linux:   ~/.config/com.alevidals.sftply/themes/
+```
+
+Use **Import** to copy a valid theme file into that folder, **Export** to save the
+current theme, **Reload** after adding files manually, and **Folder** to open the
+directory. Deleting a custom theme removes its file.
+
+A theme is a text file with `key = value` lines:
+
+```text
+name = Mine
+variant = dark
+background = 1e1e2e
+foreground = cdd6f4
+primary = 89b4fa
+palette.4 = 89b4fa
+selection-background = 353749
+```
+
+`background` and `foreground` are required. The ANSI palette keys, `cursor-color`,
+`cursor-text`, `selection-background`, `selection-foreground` and
+`split-divider-color` are optional. Missing semantic tokens are derived from the
+background and foreground. Custom themes are not contrast-tested like the
+built-in palettes, so check readability before sharing one.
+
+Theme files never contain credentials.
+
 ## Data on disk
 
 Settings → About lists the configuration and log directories. **Open logs**
@@ -215,6 +250,7 @@ opens the log folder in the system file manager.
 - `connections.json` holds connection metadata, never secrets.
 - `known_hosts.json` holds trusted SSH host keys for sftply only. It is separate from your system `~/.ssh/known_hosts`.
 - `settings.json` holds appearance and behaviour preferences.
+- `themes/*.theme` holds optional custom theme files.
 - Logs are redacted. If you plan to share a log, skim it first.
 - Logs rotate daily. The seven most recent daily files are kept; older ones are
   deleted automatically.

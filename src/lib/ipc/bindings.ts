@@ -15,6 +15,12 @@ export const commands = {
 	appCheckUpdate: () => typedError<UpdateStatus, AppError_Serialize>(__TAURI_INVOKE("app_check_update")),
 	settingsGet: () => __TAURI_INVOKE<AppSettings_Serialize>("settings_get"),
 	settingsUpdate: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
+	themesList: () => __TAURI_INVOKE<ThemeList>("themes_list"),
+	themeImport: (path: string) => typedError<CustomTheme, AppError_Serialize>(__TAURI_INVOKE("theme_import", { path })),
+	themeDelete: (id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("theme_delete", { id })),
+	themeExport: (path: string, content: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("theme_export", { path, content })),
+	/**  Open the folder where custom theme files live. */
+	themesOpenFolder: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("themes_open_folder")),
 	fsList: (scope: FsScope, path: string, showHidden: boolean) => typedError<Listing_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_list", { scope, path, showHidden })),
 	fsStat: (scope: FsScope, path: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_stat", { scope, path })),
 	fsMkdir: (scope: FsScope, parent: string, name: string) => typedError<FsEntry_Serialize, AppError_Serialize>(__TAURI_INVOKE("fs_mkdir", { scope, parent, name })),
@@ -166,7 +172,7 @@ export type AppSettings = AppSettings_Serialize | AppSettings_Deserialize;
 /**  Persisted user settings. Secrets must never be added to this struct. */
 export type AppSettings_Deserialize = {
 	schemaVersion?: number,
-	theme?: ThemeMode,
+	theme?: string,
 	density?: Density,
 	sizeFormat?: SizeFormat,
 	dateFormat?: DateFormat,
@@ -198,7 +204,7 @@ export type AppSettings_Deserialize = {
 /**  Persisted user settings. Secrets must never be added to this struct. */
 export type AppSettings_Serialize = {
 	schemaVersion: number,
-	theme: ThemeMode,
+	theme: string,
 	density: Density,
 	sizeFormat: SizeFormat,
 	dateFormat: DateFormat,
@@ -348,6 +354,17 @@ export type ConnectionTestResult = {
 	entryCount: number,
 	/**  Path that was listed, already normalized by the server adapter. */
 	path: string,
+};
+
+/**
+ *  A theme loaded from a `.theme` file. `colors` contains the CSS custom
+ *  properties without the leading `--`; unknown values are ignored by the UI.
+ */
+export type CustomTheme = {
+	id: string,
+	name: string,
+	dark: boolean,
+	colors: { [key in string]: string },
 };
 
 /**  How file modification timestamps are displayed. */
@@ -801,7 +818,10 @@ export type TextFile_Serialize = {
 	version: string,
 };
 
-export type ThemeMode = "system" | "dark" | "light" | "oneDark" | "gruvboxDark" | "gruvboxLight" | "nord" | "dracula" | "solarizedLight" | "tokyoNight" | "catppuccinMocha";
+export type ThemeList = {
+	themes: CustomTheme[],
+	warnings: string[],
+};
 
 /**  TLS verification settings for FTPS. These are not secrets. */
 export type TlsOptions = TlsOptions_Serialize | TlsOptions_Deserialize;

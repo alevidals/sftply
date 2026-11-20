@@ -15,6 +15,7 @@ pub struct AppPaths {
     pub connections_file: PathBuf,
     pub known_hosts_file: PathBuf,
     pub transfer_history_file: PathBuf,
+    pub themes_dir: PathBuf,
 }
 
 impl AppPaths {
@@ -32,7 +33,8 @@ impl AppPaths {
             .app_log_dir()
             .map_err(|e| Self::path_error("log", e.to_string()))?;
 
-        for dir in [&config_dir, &data_dir, &log_dir] {
+        let themes_dir = config_dir.join("themes");
+        for dir in [&config_dir, &data_dir, &log_dir, &themes_dir] {
             ensure_dir(dir)?;
         }
 
@@ -41,6 +43,7 @@ impl AppPaths {
             connections_file: config_dir.join("connections.json"),
             known_hosts_file: config_dir.join("known_hosts.json"),
             transfer_history_file: config_dir.join("transfer-history.jsonl"),
+            themes_dir,
             config_dir,
             data_dir,
             log_dir,

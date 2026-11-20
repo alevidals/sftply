@@ -32,16 +32,15 @@ import { useSettings } from "@/features/settings/settings-context"
 import { transfersApi } from "@/features/transfers/api"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { copyText } from "@/lib/clipboard"
+import { allThemeOptions } from "@/lib/custom-theme"
 import { errorMessage } from "@/lib/errors"
-import type { ThemeMode } from "@/lib/ipc/bindings"
 import { shortcutLabel } from "@/lib/shortcuts"
-import { THEME_OPTIONS } from "@/lib/themes"
 import { useSessionStore } from "@/stores/session-store"
 import { useTransferStore } from "@/stores/transfer-store"
 import { useUiStore } from "@/stores/ui-store"
 
 export function CommandPalette() {
-  const { settings, updateSettings } = useSettings()
+  const { settings, updateSettings, themes } = useSettings()
   const appInfo = useAppInfo()
   const open = useUiStore((state) => state.paletteOpen)
   const setOpen = useUiStore((state) => state.setPaletteOpen)
@@ -148,7 +147,7 @@ export function CommandPalette() {
     })
   }
 
-  const changeTheme = (mode: ThemeMode) => {
+  const changeTheme = (mode: string) => {
     run(() => {
       updateSettings({ theme: mode }).catch((error) => {
         toast.error("Could not change the theme", { description: errorMessage(error) })
@@ -198,7 +197,7 @@ export function CommandPalette() {
         <CommandEmpty>No matching commands.</CommandEmpty>
 
         <CommandGroup heading="Appearance">
-          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+          {allThemeOptions(themes).map(({ value, label, icon: Icon }) => (
             <CommandItem
               key={value}
               value={`${label} theme`}

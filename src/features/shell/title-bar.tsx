@@ -17,24 +17,27 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSettings } from "@/features/settings/settings-context"
 import { useAppInfo } from "@/hooks/use-app-info"
+import { allThemeOptions } from "@/lib/custom-theme"
 import { errorMessage } from "@/lib/errors"
-import type { ThemeMode } from "@/lib/ipc/bindings"
 import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts"
 import { THEME_OPTIONS, themeOption } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
 
 function TitleBarImpl() {
-  const { settings, updateSettings } = useSettings()
+  const { settings, updateSettings, themes } = useSettings()
   const appInfo = useAppInfo()
   // macOS draws its traffic lights over the window; the padding keeps the
   // brand clear of them. Windows and Linux have native controls elsewhere.
   const isMac = isMacPlatform(appInfo.data?.platform)
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen)
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen)
-  const ThemeIcon = themeOption(settings.theme).icon
+  const themeOptions = allThemeOptions(themes)
+  const ThemeIcon =
+    themeOptions.find((option) => option.value === settings.theme)?.icon ??
+    themeOption(settings.theme).icon
 
   const changeTheme = (theme: string) => {
-    updateSettings({ theme: theme as ThemeMode }).catch((error) => {
+    updateSettings({ theme }).catch((error) => {
       toast.error("Could not change the theme", { description: errorMessage(error) })
     })
   }
@@ -85,11 +88,13 @@ function TitleBarImpl() {
             <DropdownMenuLabel>Appearance</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup value={settings.theme} onValueChange={changeTheme}>
-              {THEME_OPTIONS.map((option, index) => {
+              {themeOptions.map((option, index) => {
                 const Icon = option.icon
                 return (
                   <Fragment key={option.value}>
-                    {index === 3 ? <DropdownMenuSeparator /> : null}
+                    {index === THEME_OPTIONS.length && themes.length > 0 ? (
+                      <DropdownMenuSeparator />
+                    ) : null}
                     <DropdownMenuRadioItem value={option.value}>
                       <Icon className="size-3.5 text-muted-foreground" />
                       {option.label}

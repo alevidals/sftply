@@ -9,6 +9,7 @@ pub mod session;
 pub mod settings;
 pub mod sync;
 pub mod text;
+pub mod theme;
 pub mod transfer;
 
 use serde::{Deserialize, Serialize};

@@ -6,7 +6,12 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Custom themes can be loaded from `.theme` files in the app's `themes` folder,
+  imported from Settings → Appearance, and exported for sharing. Missing
+  semantic tokens are derived from the background, foreground and optional ANSI
+  palette.
 
 ## [1.3.0] - 2026-11-20
 

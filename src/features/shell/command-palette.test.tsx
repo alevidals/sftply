@@ -23,6 +23,9 @@ vi.mock("@/features/settings/settings-context", () => ({
     updateSettings: state.updateSettings,
     saving: false,
     effectiveTheme: "dark",
+    themes: [],
+    themeWarnings: [],
+    reloadThemes: vi.fn(),
   }),
 }))
 
