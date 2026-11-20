@@ -213,7 +213,7 @@ Settings → About lists the configuration and log directories. **Open logs**
 opens the log folder in the system file manager.
 
 - `connections.json` holds connection metadata, never secrets.
-- `known_hosts.json` holds trusted SSH host keys.
+- `known_hosts.json` holds trusted SSH host keys for sftply only. It is separate from your system `~/.ssh/known_hosts`.
 - `settings.json` holds appearance and behaviour preferences.
 - Logs are redacted. If you plan to share a log, skim it first.
 - Logs rotate daily. The seven most recent daily files are kept; older ones are

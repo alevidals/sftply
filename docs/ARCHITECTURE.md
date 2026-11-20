@@ -392,7 +392,7 @@ Ready → Reconnecting → … → Ready | Failed
 4. **Changed key:** hard fail. Emit a distinct `HostKeyMismatch` event with old/new fingerprints. The user must resolve it in Security settings (explicit removal/replacement), not by clicking through the normal connect flow.
 5. Known and matching: continue to authentication and `Ready`.
 
-Known hosts are stored under the app config directory in an OpenSSH-compatible `known_hosts` file. Hosts with non-default ports use `[host]:port`. The store is managed by our own module (strict matching, hashed-host support optional) because it is a small, security-critical component that must be auditable and testable.
+Known hosts are stored under the app config directory in an app-managed `known_hosts.json` trust store, separate from the system OpenSSH `~/.ssh/known_hosts`. It records the host, port, key type and SHA-256 fingerprint; sftply never reads or writes the system file. The store is managed by our own module (strict matching, explicit removal) because it is a small, security-critical component that must be auditable and testable.
 
 ### Connection lifecycle and secrets
 
