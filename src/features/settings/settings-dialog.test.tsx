@@ -255,7 +255,6 @@ describe("SettingsDialog", () => {
         dark: true,
         colors: { background: "#303030", foreground: "#f0f0f0", primary: "#ff8844" },
       },
-      editorState.newTheme,
     ]
     render(<SettingsDialog />)
 
