@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
 import { copyText } from "@/lib/clipboard"
 import { normalizeError } from "@/lib/errors"
+import { formatFingerprint } from "@/lib/format"
 import { ipc } from "@/lib/ipc/client"
 import { recordActivity } from "@/stores/activity-store"
 import { useHostKeyStore } from "@/stores/host-key-store"
@@ -118,15 +119,15 @@ export function HostKeyDialog() {
                   <CopyIcon />
                 </Button>
               </div>
-              <p className="font-mono text-2xs break-all text-foreground">
-                {challenge.fingerprint}
+              <p className="whitespace-pre-wrap font-mono text-2xs break-all text-foreground">
+                {formatFingerprint(challenge.fingerprint)}
               </p>
             </div>
             {changed && challenge.previousFingerprint ? (
               <div className="space-y-1">
                 <span className="text-muted-foreground">Previously trusted</span>
-                <p className="font-mono text-2xs break-all text-destructive">
-                  {challenge.previousFingerprint}
+                <p className="whitespace-pre-wrap font-mono text-2xs break-all text-destructive">
+                  {formatFingerprint(challenge.previousFingerprint)}
                 </p>
               </div>
             ) : null}

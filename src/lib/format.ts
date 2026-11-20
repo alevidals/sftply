@@ -80,6 +80,19 @@ export function formatModified(
     : fileDateFormatter.format(date)
 }
 
+/**
+ * Split a long SHA-256 fingerprint into two balanced lines. The value has no
+ * spaces, so letting CSS wrap it can leave a single orphan character.
+ */
+export function formatFingerprint(value: string): string {
+  const separator = value.indexOf(":")
+  const prefix = separator >= 0 ? value.slice(0, separator + 1) : ""
+  const body = separator >= 0 ? value.slice(separator + 1) : value
+  if (body.length < 36) return value
+  const split = Math.floor(body.length / 2)
+  return `${prefix}${body.slice(0, split)}\n${body.slice(split)}`
+}
+
 /** Format Unix permission bits as a four-digit octal string. */
 export function formatMode(mode: number | null | undefined): string {
   if (mode == null || !Number.isFinite(mode)) return "—"
