@@ -181,6 +181,10 @@ export function SettingsDialog() {
     try {
       const imported = await ipc.themeImport(path, overwrite)
       await reloadThemes()
+      themesRef.current = [
+        imported,
+        ...themesRef.current.filter((theme) => theme.id !== imported.id),
+      ]
       form.setValue("theme", imported.id, { shouldDirty: true, shouldValidate: true })
       setPendingImport(null)
       toast.success(`Imported “${imported.name}”`)
@@ -856,6 +860,10 @@ export function SettingsDialog() {
           }}
           onSaved={async (saved) => {
             await reloadThemes()
+            themesRef.current = [
+              saved,
+              ...themesRef.current.filter((theme) => theme.id !== saved.id),
+            ]
             form.setValue("theme", saved.id, { shouldDirty: true, shouldValidate: true })
           }}
         />
