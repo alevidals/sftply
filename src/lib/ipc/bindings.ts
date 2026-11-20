@@ -357,7 +357,7 @@ export type ConnectionTestResult = {
 };
 
 /**
- *  A theme loaded from a `.theme` file. `colors` contains the CSS custom
+ *  A theme loaded from a `.toml` file. `colors` contains the CSS custom
  *  properties without the leading `--`. Every token is required.
  */
 export type CustomTheme = {

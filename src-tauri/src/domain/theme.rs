@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// A theme loaded from a `.theme` file. `colors` contains the CSS custom
+/// A theme loaded from a `.toml` file. `colors` contains the CSS custom
 /// properties without the leading `--`. Every token is required.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -44,8 +44,8 @@ pub const THEME_TOKEN_KEYS: &[&str] = &[
     "border",
     "input",
     "ring",
-    "chart-4",
-    "chart-5",
+    "file-video",
+    "file-audio",
     "sidebar",
     "sidebar-foreground",
     "sidebar-accent",
@@ -146,6 +146,7 @@ pub fn parse_theme(file_name: &str, contents: &str) -> Result<CustomTheme, Strin
             continue;
         }
         if key.eq_ignore_ascii_case("variant") {
+            let value = value.trim_matches('"').trim_matches('\'').trim();
             dark = match value.to_ascii_lowercase().as_str() {
                 "dark" => true,
                 "light" => false,
@@ -154,6 +155,7 @@ pub fn parse_theme(file_name: &str, contents: &str) -> Result<CustomTheme, Strin
             continue;
         }
         if key.eq_ignore_ascii_case("dark") {
+            let value = value.trim_matches('"').trim_matches('\'').trim();
             dark = match value.to_ascii_lowercase().as_str() {
                 "true" | "yes" | "1" => true,
                 "false" | "no" | "0" => false,
@@ -213,10 +215,10 @@ mod tests {
     fn full_theme() -> String {
         let mut lines = vec!["name = Mine".to_string(), "variant = dark".to_string()];
         for key in THEME_TOKEN_KEYS {
-            lines.push(format!("{key} = #123456"));
+            lines.push(format!("{key} = \"#123456\""));
         }
-        lines.push("background = 101010".into());
-        lines.push("foreground = f0f0f0".into());
+        lines.push("background = \"#101010\"".into());
+        lines.push("foreground = \"#f0f0f0\"".into());
         lines.join("\n")
     }
 
@@ -233,7 +235,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_colors() {
-        let contents = full_theme().replace("sidebar-ring = #123456\n", "");
+        let contents = full_theme().replace("sidebar-ring = \"#123456\"\n", "");
         let error = parse_theme("bad.theme", &contents).unwrap_err();
         assert!(error.contains("sidebar-ring"));
     }
@@ -246,7 +248,7 @@ mod tests {
 
     #[test]
     fn rejects_css_injection() {
-        let contents = full_theme().replace("primary = #123456", "primary = #fff;}");
+        let contents = full_theme().replace("primary = \"#123456\"", "primary = \"#fff;}\"");
         assert!(parse_theme("bad.theme", &contents).is_err());
     }
 

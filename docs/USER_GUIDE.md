@@ -218,51 +218,51 @@ Windows: %APPDATA%\com.alevidals.sftply\themes\
 Linux:   ~/.config/com.alevidals.sftply/themes/
 ```
 
-Use **Import** to copy a valid theme file into that folder, **Export** to save the
+Use **Import** to copy a valid TOML theme into that folder, **Export** to save the
 current theme, **Reload** after adding files manually, and **Folder** to open the
 directory. Deleting a custom theme removes its file.
 
-A theme is a text file with `key = value` lines. It must define every color
+A theme is a TOML file with `key = "value"` lines. It must define every color
 token the app uses; there are no defaults, derived colors or ANSI palette
 shortcuts:
 
 ```text
-name = Mine
-variant = dark
-background = #1e1e2e
-foreground = #cdd6f4
-card = #252536
-card-foreground = #cdd6f4
-popover = #292a3a
-popover-foreground = #cdd6f4
-primary = #89b4fa
-primary-foreground = #1e1e2e
-secondary = #303143
-secondary-foreground = #cdd6f4
-muted = #2a2b3c
-muted-foreground = #a6adc8
-accent = #353749
-accent-foreground = #cdd6f4
-destructive = #f38ba8
-border = #3b3c50
-input = #414258
-ring = #89b4fa
-chart-4 = #f9e2af
-chart-5 = #f38ba8
-sidebar = #181825
-sidebar-foreground = #cdd6f4
-sidebar-accent = #313244
-sidebar-accent-foreground = #cdd6f4
-sidebar-border = #3b3c50
-sidebar-ring = #89b4fa
-chrome = #181825
-chrome-foreground = #a6adc8
-panel-header = #1e1e2e
-row-hover = #ffffff0a
-row-selected = #89b4fa29
-success = #a6e3a1
-warning = #f9e2af
-info = #89dceb
+name = "Mine"
+variant = "dark"
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+card = "#252536"
+card-foreground = "#cdd6f4"
+popover = "#292a3a"
+popover-foreground = "#cdd6f4"
+primary = "#89b4fa"
+primary-foreground = "#1e1e2e"
+secondary = "#303143"
+secondary-foreground = "#cdd6f4"
+muted = "#2a2b3c"
+muted-foreground = "#a6adc8"
+accent = "#353749"
+accent-foreground = "#cdd6f4"
+destructive = "#f38ba8"
+border = "#3b3c50"
+input = "#414258"
+ring = "#89b4fa"
+file-video = "#f9e2af"
+file-audio = "#f38ba8"
+sidebar = "#181825"
+sidebar-foreground = "#cdd6f4"
+sidebar-accent = "#313244"
+sidebar-accent-foreground = "#cdd6f4"
+sidebar-border = "#3b3c50"
+sidebar-ring = "#89b4fa"
+chrome = "#181825"
+chrome-foreground = "#a6adc8"
+panel-header = "#1e1e2e"
+row-hover = "#ffffff0a"
+row-selected = "#89b4fa29"
+success = "#a6e3a1"
+warning = "#f9e2af"
+info = "#89dceb"
 ```
 
 The fastest way to get a valid template is to select a built-in theme and use
@@ -280,7 +280,7 @@ opens the log folder in the system file manager.
 - `connections.json` holds connection metadata, never secrets.
 - `known_hosts.json` holds trusted SSH host keys for sftply only. It is separate from your system `~/.ssh/known_hosts`.
 - `settings.json` holds appearance and behaviour preferences.
-- `themes/*.theme` holds optional custom theme files.
+- `themes/*.toml` holds optional custom theme files.
 - Logs are redacted. If you plan to share a log, skim it first.
 - Logs rotate daily. The seven most recent daily files are kept; older ones are
   deleted automatically.

@@ -27,9 +27,9 @@ describe("customThemeOption", () => {
 describe("themeExportText", () => {
   it("exports semantic tokens and terminal aliases", () => {
     const text = themeExportText("Mine", true, theme.colors)
-    expect(text).toContain("name = Mine")
-    expect(text).toContain("variant = dark")
-    expect(text).toContain("background = #101010")
-    expect(text).toContain("primary = #4488ff")
+    expect(text).toContain('name = "Mine"')
+    expect(text).toContain('variant = "dark"')
+    expect(text).toContain('background = "#101010"')
+    expect(text).toContain('primary = "#4488ff"')
   })
 })

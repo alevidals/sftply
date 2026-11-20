@@ -142,7 +142,7 @@ export function SettingsDialog() {
       multiple: false,
       directory: false,
       title: "Choose a theme file",
-      filters: [{ name: "sftply theme", extensions: ["theme", "toml", "conf"] }],
+      filters: [{ name: "sftply theme", extensions: ["toml"] }],
     })
     if (typeof selected !== "string") return
     try {
@@ -165,8 +165,8 @@ export function SettingsDialog() {
     if (restore) applyDocumentTheme(previous)
     const target = await saveFileDialog({
       title: "Export theme",
-      defaultPath: `${exported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "theme"}.theme`,
-      filters: [{ name: "sftply theme", extensions: ["theme"] }],
+      defaultPath: `${exported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "theme"}.toml`,
+      filters: [{ name: "sftply theme", extensions: ["toml"] }],
     })
     if (typeof target !== "string") return
     try {
@@ -316,7 +316,7 @@ export function SettingsDialog() {
                     <div>
                       <h3 className="text-sm font-medium">Custom themes</h3>
                       <p className="text-xs text-muted-foreground">
-                        Import a theme file or drop one in the themes folder.
+                        Import a TOML theme or drop one in the themes folder.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -375,7 +375,7 @@ export function SettingsDialog() {
 
                   {themes.length === 0 ? (
                     <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
-                      No custom themes yet. Import a `.theme` file or add one to the themes folder.
+                      No custom themes yet. Import a `.toml` theme or add one to the themes folder.
                     </p>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">

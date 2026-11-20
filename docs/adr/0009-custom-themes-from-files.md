@@ -21,7 +21,7 @@ token explicit.
    themes use `custom:<file-stem>`.
 2. Built-in themes remain compiled CSS. Custom themes are loaded from the app
    config `themes/` directory by the Rust side and returned to the frontend.
-3. Theme files use flat `key = value` lines and contain only the app's semantic
+3. Theme files are TOML with flat `key = "value"` lines and contain only the app's semantic
    tokens. ANSI palettes, terminal aliases and inheritance are not supported.
    Every token is required; an unknown key, a missing token or an invalid color
    rejects the file with a warning.

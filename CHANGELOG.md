@@ -8,7 +8,7 @@ All notable changes to sftply. The format follows
 
 ### Added
 
-- Custom themes can be loaded from `.theme` files in the app's `themes` folder,
+- Custom themes can be loaded from `.toml` files in the app's `themes` folder,
   imported from Settings → Appearance, and exported for sharing. Every semantic
   token is explicit; files with missing or unknown colors are rejected.
 

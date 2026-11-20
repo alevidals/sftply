@@ -23,12 +23,12 @@ const GROUPS: Array<{ icon: LucideIcon; className: string; extensions: string[] 
   },
   {
     icon: FileVideoIcon,
-    className: "text-chart-4",
+    className: "text-file-video",
     extensions: ["mp4", "mov", "mkv", "avi", "webm", "m4v"],
   },
   {
     icon: FileAudioIcon,
-    className: "text-chart-5",
+    className: "text-file-audio",
     extensions: ["mp3", "wav", "flac", "aac", "ogg", "m4a"],
   },
   {

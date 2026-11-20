@@ -31,10 +31,11 @@ export function themeExportText(
   colors: Record<string, string>,
 ): string {
   const safeName = name.replace(/[\r\n"=]/g, "").trim() || "Custom theme"
-  const lines = [`name = ${safeName}`, `variant = ${dark ? "dark" : "light"}`]
+  const quoted = (value: string) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+  const lines = [`name = ${quoted(safeName)}`, `variant = ${quoted(dark ? "dark" : "light")}`]
   for (const key of THEME_TOKEN_KEYS) {
     const value = colors[key]
-    if (value) lines.push(`${key} = ${value}`)
+    if (value) lines.push(`${key} = ${quoted(value)}`)
   }
   return `${lines.join("\n")}\n`
 }

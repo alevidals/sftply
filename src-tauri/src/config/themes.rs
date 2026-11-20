@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::theme::{CustomTheme, THEME_FILE_MAX_BYTES, ThemeList, parse_theme};
 
-const THEME_EXTENSIONS: &[&str] = &["theme", "toml", "conf"];
+const THEME_EXTENSIONS: &[&str] = &["toml"];
 
 /// Load every valid custom theme in `dir`. Invalid files are skipped with a
 /// warning instead of preventing the rest of the gallery from loading.
@@ -64,7 +64,7 @@ pub fn import(dir: &Path, source: &Path) -> Result<CustomTheme, String> {
     let stem = theme.id.strip_prefix("custom:").unwrap_or("theme");
     std::fs::create_dir_all(dir)
         .map_err(|error| format!("Could not create the themes folder: {error}"))?;
-    std::fs::write(dir.join(format!("{stem}.theme")), contents)
+    std::fs::write(dir.join(format!("{stem}.toml")), contents)
         .map_err(|error| format!("The theme file could not be saved: {error}"))?;
     Ok(theme)
 }
@@ -144,10 +144,10 @@ mod tests {
     fn theme_file(name: &str, background: &str, foreground: &str) -> String {
         let mut lines = vec![format!("name = {name}"), "variant = dark".to_string()];
         for key in THEME_TOKEN_KEYS {
-            lines.push(format!("{key} = #123456"));
+            lines.push(format!("{key} = \"#123456\""));
         }
-        lines.push(format!("background = {background}"));
-        lines.push(format!("foreground = {foreground}"));
+        lines.push(format!("background = \"{background}\""));
+        lines.push(format!("foreground = \"{foreground}\""));
         lines.join("\n")
     }
 
@@ -155,24 +155,24 @@ mod tests {
     fn lists_valid_files_and_reports_invalid_ones() {
         let dir = tempfile::tempdir().expect("temp dir");
         std::fs::write(
-            dir.path().join("good.theme"),
+            dir.path().join("good.toml"),
             theme_file("Good", "#111111", "#eeeeee"),
         )
         .unwrap();
-        std::fs::write(dir.path().join("bad.theme"), "name = Bad\n").unwrap();
+        std::fs::write(dir.path().join("bad.toml"), "name = Bad\n").unwrap();
 
         let list = list(dir.path());
         assert_eq!(list.themes.len(), 1);
         assert_eq!(list.themes[0].id, "custom:good");
         assert_eq!(list.warnings.len(), 1);
-        assert!(list.warnings[0].contains("bad.theme"));
+        assert!(list.warnings[0].contains("bad.toml"));
     }
 
     #[test]
     fn imports_and_deletes_a_theme() {
         let dir = tempfile::tempdir().expect("temp dir");
         let source_dir = tempfile::tempdir().expect("source dir");
-        let source = source_dir.path().join("My Theme.theme");
+        let source = source_dir.path().join("My Theme.toml");
         std::fs::write(&source, theme_file("My Theme", "101010", "f0f0f0")).unwrap();
 
         let imported = import(dir.path(), &source).expect("import");
