@@ -139,13 +139,24 @@ fn find_theme_file(dir: &Path, id: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::theme::THEME_TOKEN_KEYS;
+
+    fn theme_file(name: &str, background: &str, foreground: &str) -> String {
+        let mut lines = vec![format!("name = {name}"), "variant = dark".to_string()];
+        for key in THEME_TOKEN_KEYS {
+            lines.push(format!("{key} = #123456"));
+        }
+        lines.push(format!("background = {background}"));
+        lines.push(format!("foreground = {foreground}"));
+        lines.join("\n")
+    }
 
     #[test]
     fn lists_valid_files_and_reports_invalid_ones() {
         let dir = tempfile::tempdir().expect("temp dir");
         std::fs::write(
             dir.path().join("good.theme"),
-            "name = Good\nbackground = #111111\nforeground = #eeeeee\n",
+            theme_file("Good", "#111111", "#eeeeee"),
         )
         .unwrap();
         std::fs::write(dir.path().join("bad.theme"), "name = Bad\n").unwrap();
@@ -162,11 +173,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let source_dir = tempfile::tempdir().expect("source dir");
         let source = source_dir.path().join("My Theme.theme");
-        std::fs::write(
-            &source,
-            "name = My Theme\nbackground = 101010\nforeground = f0f0f0\n",
-        )
-        .unwrap();
+        std::fs::write(&source, theme_file("My Theme", "101010", "f0f0f0")).unwrap();
 
         let imported = import(dir.path(), &source).expect("import");
         assert_eq!(imported.id, "custom:my-theme");

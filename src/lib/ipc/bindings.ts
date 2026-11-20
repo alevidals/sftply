@@ -358,7 +358,7 @@ export type ConnectionTestResult = {
 
 /**
  *  A theme loaded from a `.theme` file. `colors` contains the CSS custom
- *  properties without the leading `--`; unknown values are ignored by the UI.
+ *  properties without the leading `--`. Every token is required.
  */
 export type CustomTheme = {
 	id: string,

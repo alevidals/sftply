@@ -1,11 +1,11 @@
 import { PaletteIcon } from "lucide-react"
 import type { CustomTheme } from "@/lib/ipc/bindings"
-import { readAppliedThemeTokens, resolveCustomThemeColors } from "@/lib/theme"
+import { readAppliedThemeTokens } from "@/lib/theme"
 import { THEME_OPTIONS, THEME_TOKEN_KEYS, type ThemeOption, themeOption } from "@/lib/themes"
 
 /** Turn a loaded theme file into a gallery card. */
 export function customThemeOption(theme: CustomTheme): ThemeOption {
-  const colors = resolveCustomThemeColors(theme)
+  const colors = theme.colors
   return {
     value: theme.id,
     label: theme.name,
@@ -30,24 +30,11 @@ export function themeExportText(
   dark: boolean,
   colors: Record<string, string>,
 ): string {
-  const safeName = name.replace(/[\r\n"]/g, "").trim() || "Custom theme"
+  const safeName = name.replace(/[\r\n"=]/g, "").trim() || "Custom theme"
   const lines = [`name = ${safeName}`, `variant = ${dark ? "dark" : "light"}`]
   for (const key of THEME_TOKEN_KEYS) {
     const value = colors[key]
     if (value) lines.push(`${key} = ${value}`)
-  }
-  for (const key of [
-    "cursor-color",
-    "cursor-text",
-    "selection-background",
-    "selection-foreground",
-    "split-divider-color",
-  ]) {
-    const value = colors[key]
-    if (value) lines.push(`${key} = ${value}`)
-  }
-  for (const [key, value] of Object.entries(colors)) {
-    if (key.startsWith("palette.")) lines.push(`${key} = ${value}`)
   }
   return `${lines.join("\n")}\n`
 }
@@ -62,7 +49,7 @@ export function currentThemeExport(
     return {
       name: custom.name,
       dark: custom.dark,
-      colors: resolveCustomThemeColors(custom),
+      colors: { ...custom.colors },
     }
   }
   const effective =

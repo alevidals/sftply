@@ -573,7 +573,7 @@ Before enqueuing a file whose target exists, the backend returns a conflict desc
 
 ### Visual language
 
-- **Dark default, first-class light theme.** Tokens are defined in OKLCH CSS variables and mapped through Tailwind v4's `@theme`. Built-in palettes stay compiled; custom themes are loaded from app-config `.theme` files, normalized to the same tokens and applied as inline CSS variables. Theme switch is instant and persisted; it follows the OS only when set to "System".
+- **Dark default, first-class light theme.** Tokens are defined in OKLCH CSS variables and mapped through Tailwind v4's `@theme`. Built-in palettes stay compiled; custom themes are loaded from app-config `.theme` files, validated against the complete token set and applied exactly as inline CSS variables. Theme switch is instant and persisted; it follows the OS only when set to "System".
 - **Surfaces:** near-black neutral base, 3 elevation levels separated by luminance, not shadows. Popovers/dialogs are the only elements with a shadow.
 - **Accent:** a single iris/indigo accent. Local pane is neutral; remote pane gets a subtle accent-tinted header chip and a distinct protocol badge. Status colors are reserved for status, never decoration.
 - **Typography:** self-hosted Inter Variable for UI; JetBrains Mono Variable for sizes, permissions, paths, and ETA. Base 13px, metadata 11.5–12px, row height 28px (compact) / 32px (comfortable).

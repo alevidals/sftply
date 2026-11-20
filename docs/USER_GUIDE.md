@@ -222,23 +222,58 @@ Use **Import** to copy a valid theme file into that folder, **Export** to save t
 current theme, **Reload** after adding files manually, and **Folder** to open the
 directory. Deleting a custom theme removes its file.
 
-A theme is a text file with `key = value` lines:
+A theme is a text file with `key = value` lines. It must define every color
+token the app uses; there are no defaults, derived colors or ANSI palette
+shortcuts:
 
 ```text
 name = Mine
 variant = dark
-background = 1e1e2e
-foreground = cdd6f4
-primary = 89b4fa
-palette.4 = 89b4fa
-selection-background = 353749
+background = #1e1e2e
+foreground = #cdd6f4
+card = #252536
+card-foreground = #cdd6f4
+popover = #292a3a
+popover-foreground = #cdd6f4
+primary = #89b4fa
+primary-foreground = #1e1e2e
+secondary = #303143
+secondary-foreground = #cdd6f4
+muted = #2a2b3c
+muted-foreground = #a6adc8
+accent = #353749
+accent-foreground = #cdd6f4
+destructive = #f38ba8
+border = #3b3c50
+input = #414258
+ring = #89b4fa
+chart-1 = #89b4fa
+chart-2 = #89dceb
+chart-3 = #a6e3a1
+chart-4 = #f9e2af
+chart-5 = #f38ba8
+sidebar = #181825
+sidebar-foreground = #cdd6f4
+sidebar-primary = #89b4fa
+sidebar-primary-foreground = #1e1e2e
+sidebar-accent = #313244
+sidebar-accent-foreground = #cdd6f4
+sidebar-border = #3b3c50
+sidebar-ring = #89b4fa
+chrome = #181825
+chrome-foreground = #a6adc8
+panel-header = #1e1e2e
+row-hover = #ffffff0a
+row-selected = #89b4fa29
+success = #a6e3a1
+warning = #f9e2af
+info = #89dceb
 ```
 
-`background` and `foreground` are required. The ANSI palette keys, `cursor-color`,
-`cursor-text`, `selection-background`, `selection-foreground` and
-`split-divider-color` are optional. Missing semantic tokens are derived from the
-background and foreground. Custom themes are not contrast-tested like the
-built-in palettes, so check readability before sharing one.
+The fastest way to get a valid template is to select a built-in theme and use
+**Export**. Every color is explicit; a missing token, an unknown key or an invalid
+color makes sftply reject the file with a warning instead of loading a partial
+theme.
 
 Theme files never contain credentials.
 

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 /// A theme loaded from a `.theme` file. `colors` contains the CSS custom
-/// properties without the leading `--`; unknown values are ignored by the UI.
+/// properties without the leading `--`. Every token is required.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomTheme {
@@ -23,7 +23,8 @@ pub struct ThemeList {
 
 pub const THEME_FILE_MAX_BYTES: u64 = 128 * 1024;
 
-/// Color tokens the UI understands. `palette.N` keys are accepted separately.
+/// Every color token used by the UI. A custom theme must define all of them;
+/// this keeps files explicit instead of inheriting values from another theme.
 pub const THEME_TOKEN_KEYS: &[&str] = &[
     "background",
     "foreground",
@@ -65,26 +66,6 @@ pub const THEME_TOKEN_KEYS: &[&str] = &[
     "warning",
     "info",
 ];
-
-/// Familiar aliases from terminal themes. They are kept in the map and mapped
-/// to the app's semantic tokens by the frontend.
-pub const THEME_ALIAS_KEYS: &[&str] = &[
-    "cursor-color",
-    "cursor-text",
-    "selection-background",
-    "selection-foreground",
-    "split-divider-color",
-];
-
-pub fn is_theme_token(key: &str) -> bool {
-    THEME_TOKEN_KEYS.contains(&key) || THEME_ALIAS_KEYS.contains(&key)
-}
-
-pub fn is_palette_key(key: &str) -> bool {
-    key.strip_prefix("palette.")
-        .and_then(|index| index.parse::<u8>().ok())
-        .is_some_and(|index| index < 16)
-}
 
 /// Normalize a CSS color. Accepts the common 3/4/6/8 digit hex forms without a
 /// leading `#`, plus the color functions used by the built-in palettes.
@@ -186,32 +167,25 @@ pub fn parse_theme(file_name: &str, contents: &str) -> Result<CustomTheme, Strin
             continue;
         }
 
-        // Accept the terminal-style "palette = 0=#..." form as well as
-        // "palette.0 = #...".
-        let (key, value) = if key.eq_ignore_ascii_case("palette") {
-            let Some((index, color)) = value.split_once('=') else {
-                return Err(format!(
-                    "Line {} must use palette = N=#color.",
-                    line_number + 1
-                ));
-            };
-            (format!("palette.{}", index.trim()), color.trim())
-        } else {
-            (key.to_string(), value)
-        };
-
-        if !is_theme_token(&key) && !is_palette_key(&key) {
-            // Unknown keys are ignored so themes can carry extra metadata.
-            continue;
+        if !THEME_TOKEN_KEYS.contains(&key) {
+            return Err(format!(
+                "Line {} has an unknown theme key: {key}.",
+                line_number + 1
+            ));
         }
         let Some(color) = normalize_color(value) else {
             return Err(format!("Line {} has an invalid color.", line_number + 1));
         };
-        colors.insert(key, color);
+        colors.insert(key.to_string(), color);
     }
 
-    if !colors.contains_key("background") || !colors.contains_key("foreground") {
-        return Err("A theme needs background and foreground colors.".into());
+    let missing: Vec<&str> = THEME_TOKEN_KEYS
+        .iter()
+        .copied()
+        .filter(|key| !colors.contains_key(*key))
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!("Missing theme colors: {}.", missing.join(", ")));
     }
 
     Ok(CustomTheme {
@@ -241,45 +215,44 @@ fn sanitize_id(value: &str) -> String {
 mod tests {
     use super::*;
 
+    fn full_theme() -> String {
+        let mut lines = vec!["name = Mine".to_string(), "variant = dark".to_string()];
+        for key in THEME_TOKEN_KEYS {
+            lines.push(format!("{key} = #123456"));
+        }
+        lines.push("background = 101010".into());
+        lines.push("foreground = f0f0f0".into());
+        lines.join("\n")
+    }
+
     #[test]
-    fn parses_a_minimal_theme() {
-        let theme = parse_theme(
-            "my-theme.theme",
-            "name = My Theme\nvariant = dark\nbackground = 1e1e2e\nforeground = cdd6f4\nprimary = #89b4fa\n",
-        )
-        .unwrap();
+    fn parses_a_complete_theme() {
+        let theme = parse_theme("my-theme.theme", &full_theme()).unwrap();
         assert_eq!(theme.id, "custom:my-theme");
-        assert_eq!(theme.name, "My Theme");
+        assert_eq!(theme.name, "Mine");
         assert!(theme.dark);
-        assert_eq!(theme.colors.get("background").unwrap(), "#1e1e2e");
-        assert_eq!(theme.colors.get("primary").unwrap(), "#89b4fa");
+        assert_eq!(theme.colors.get("background").unwrap(), "#101010");
+        assert_eq!(theme.colors.get("foreground").unwrap(), "#f0f0f0");
+        assert!(theme.colors.contains_key("sidebar-ring"));
     }
 
     #[test]
-    fn accepts_terminal_palette_lines() {
-        let theme = parse_theme(
-            "terminal.theme",
-            "background = #111111\nforeground = #eeeeee\npalette = 0=#222222\npalette.1 = #ff0000\n",
-        )
-        .unwrap();
-        assert_eq!(theme.colors.get("palette.0").unwrap(), "#222222");
-        assert_eq!(theme.colors.get("palette.1").unwrap(), "#ff0000");
+    fn rejects_missing_colors() {
+        let contents = full_theme().replace("sidebar-ring = #123456\n", "");
+        let error = parse_theme("bad.theme", &contents).unwrap_err();
+        assert!(error.contains("sidebar-ring"));
     }
 
     #[test]
-    fn rejects_missing_base_colors() {
-        assert!(parse_theme("bad.theme", "name = Bad\n").is_err());
+    fn rejects_unknown_keys() {
+        let contents = format!("{}\nnot-a-token = #ffffff\n", full_theme());
+        assert!(parse_theme("bad.theme", &contents).is_err());
     }
 
     #[test]
     fn rejects_css_injection() {
-        assert!(
-            parse_theme(
-                "bad.theme",
-                "background = #111\nforeground = #eee\nprimary = #fff;}\n"
-            )
-            .is_err()
-        );
+        let contents = full_theme().replace("primary = #123456", "primary = #fff;}");
+        assert!(parse_theme("bad.theme", &contents).is_err());
     }
 
     #[test]

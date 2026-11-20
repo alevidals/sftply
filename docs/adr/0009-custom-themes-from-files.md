@@ -11,8 +11,9 @@ does not allow users to add or share themes. The requested flow is file-based:
 import/export from Settings, or drop a theme into a folder.
 
 The app uses semantic tokens such as `card`, `sidebar`, `muted` and `destructive`,
-not just the 16 ANSI colors used by terminal themes. A custom file may therefore
-contain a full palette or only a background, foreground and ANSI palette.
+not just the 16 ANSI colors used by terminal themes. Deriving missing values
+would silently invent colors the user did not choose, so the format keeps every
+token explicit.
 
 ## Decision
 
@@ -20,13 +21,12 @@ contain a full palette or only a background, foreground and ANSI palette.
    themes use `custom:<file-stem>`.
 2. Built-in themes remain compiled CSS. Custom themes are loaded from the app
    config `themes/` directory by the Rust side and returned to the frontend.
-3. Theme files use flat `key = value` lines. `background` and `foreground` are
-   required. Known semantic tokens, ANSI `palette.N` entries and terminal aliases
-   (`cursor-*`, `selection-*`, `split-divider-color`) are accepted. Unknown keys
-   are ignored, and invalid colors or files are skipped with a warning.
-4. The frontend fills missing semantic tokens from the background, foreground and
-   palette, then applies the complete set as inline CSS variables. Built-in
-   themes remove those inline variables and use their CSS block.
+3. Theme files use flat `key = value` lines and contain only the app's semantic
+   tokens. ANSI palettes, terminal aliases and inheritance are not supported.
+   Every token is required; an unknown key, a missing token or an invalid color
+   rejects the file with a warning.
+4. The frontend applies the file's colors exactly as inline CSS variables.
+   Built-in themes remove those inline variables and use their CSS block.
 5. Settings → Appearance lists custom themes next to built-ins and offers Import,
    Export, Reload and open-folder actions. The selected custom theme is cached in
    local storage so the bootstrap script can paint it before React starts.
@@ -37,12 +37,14 @@ contain a full palette or only a background, foreground and ANSI palette.
 **Positive**
 
 - Users can add, share and version themes without rebuilding the app.
-- Full-token exports round-trip; minimal files get usable defaults.
+- A file renders exactly what it declares; nothing is filled in behind their back.
+- Full-token exports round-trip, and exported built-ins are valid templates.
 - Built-in themes keep their current startup performance and contrast tests.
 
 **Negative / accepted**
 
 - Two application paths exist: compiled built-ins and inline custom variables.
+- Theme files are longer because every token is explicit.
 - Custom themes are not covered by the built-in WCAG contrast audit.
 - A deleted or invalid custom theme falls back to the dark palette.
 - Moving all built-ins to the file model remains possible later without changing

@@ -101,7 +101,7 @@ describe("custom themes", () => {
       id: "custom:mine",
       name: "Mine",
       dark: true,
-      colors: { background: "#101010", foreground: "#f0f0f0", "palette.4": "#4488ff" },
+      colors: { background: "#101010", foreground: "#f0f0f0", primary: "#4488ff" },
     }
     const resolved = resolveTheme("custom:mine", false, [theme])
     expect(resolved.id).toBe("custom")
@@ -109,7 +109,7 @@ describe("custom themes", () => {
     expect(resolved.dark).toBe(true)
     expect(resolved.colors?.background).toBe("#101010")
     expect(resolved.colors?.primary).toBe("#4488ff")
-    expect(resolved.colors?.card).toContain("color-mix")
+    expect(resolved.colors?.card).toBeUndefined()
   })
 })
 

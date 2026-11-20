@@ -9,8 +9,7 @@ const theme: CustomTheme = {
   colors: {
     background: "#101010",
     foreground: "#f0f0f0",
-    "palette.4": "#4488ff",
-    "cursor-color": "#ff88aa",
+    primary: "#4488ff",
   },
 }
 
@@ -31,7 +30,6 @@ describe("themeExportText", () => {
     expect(text).toContain("name = Mine")
     expect(text).toContain("variant = dark")
     expect(text).toContain("background = #101010")
-    expect(text).toContain("palette.4 = #4488ff")
-    expect(text).toContain("cursor-color = #ff88aa")
+    expect(text).toContain("primary = #4488ff")
   })
 })

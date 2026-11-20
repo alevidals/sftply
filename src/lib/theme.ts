@@ -31,7 +31,7 @@ export function resolveTheme(
       id: "custom",
       themeId: custom.id,
       dark: custom.dark,
-      colors: resolveCustomThemeColors(custom),
+      colors: { ...custom.colors },
     }
   }
   return { id: mode, themeId: mode, dark: themeIsDark(mode) }
@@ -107,76 +107,4 @@ export function readAppliedThemeTokens(): Record<string, string> {
     if (value) colors[key] = value
   }
   return colors
-}
-
-/**
- * Fill a custom theme's missing semantic tokens from its background, foreground
- * and optional ANSI palette. Explicit tokens always win.
- */
-export function resolveCustomThemeColors(theme: CustomTheme): Record<string, string> {
-  const source = theme.colors
-  const background = source.background ?? "#1f2125"
-  const foreground = source.foreground ?? "#f0f2f5"
-  const palette = (index: number) => source[`palette.${index}`]
-  const mix = (color: string, percent: number) =>
-    `color-mix(in oklab, ${color} ${percent}%, ${background})`
-  const alpha = (color: string, percent: number) =>
-    `color-mix(in oklab, ${color} ${percent}%, transparent)`
-  const primary = source.primary ?? palette(4) ?? source["cursor-color"] ?? foreground
-  const border = source.border ?? mix(foreground, 18)
-  const derived: Record<string, string> = {
-    background,
-    foreground,
-    card: mix(foreground, 5),
-    "card-foreground": foreground,
-    popover: mix(foreground, 7),
-    "popover-foreground": foreground,
-    primary,
-    "primary-foreground": background,
-    secondary: mix(foreground, 10),
-    "secondary-foreground": foreground,
-    muted: mix(foreground, 8),
-    "muted-foreground": mix(foreground, 55),
-    accent: mix(foreground, 14),
-    "accent-foreground": foreground,
-    destructive: source.destructive ?? palette(1) ?? "#e06c75",
-    border,
-    input: source.input ?? mix(foreground, 22),
-    ring: primary,
-    "chart-1": palette(4) ?? primary,
-    "chart-2": palette(6) ?? source.info ?? "#56b6c2",
-    "chart-3": palette(2) ?? source.success ?? "#98c379",
-    "chart-4": palette(3) ?? source.warning ?? "#e5c07b",
-    "chart-5": palette(1) ?? source.destructive ?? "#e06c75",
-    sidebar: mix(foreground, 2),
-    "sidebar-foreground": foreground,
-    "sidebar-primary": primary,
-    "sidebar-primary-foreground": background,
-    "sidebar-accent": mix(foreground, 10),
-    "sidebar-accent-foreground": foreground,
-    "sidebar-border": border,
-    "sidebar-ring": primary,
-    chrome: mix(foreground, 1),
-    "chrome-foreground": foreground,
-    "panel-header": mix(foreground, 3),
-    "row-hover": alpha(foreground, 5),
-    "row-selected": alpha(primary, 16),
-    success: source.success ?? palette(2) ?? "#98c379",
-    warning: source.warning ?? palette(3) ?? "#e5c07b",
-    info: source.info ?? palette(6) ?? "#56b6c2",
-  }
-
-  // Terminal-friendly aliases.
-  if (!source.border && source["split-divider-color"]) {
-    derived.border = source["split-divider-color"]
-    derived["sidebar-border"] = source["split-divider-color"]
-  }
-  if (source["selection-background"]) {
-    derived["row-selected"] = source["selection-background"]
-  }
-  if (source["cursor-text"]) {
-    derived["primary-foreground"] = source["cursor-text"]
-  }
-
-  return { ...derived, ...source }
 }
