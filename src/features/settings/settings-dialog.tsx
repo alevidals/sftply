@@ -152,19 +152,20 @@ export function SettingsDialog() {
       const media = window.matchMedia("(prefers-color-scheme: dark)")
       applyDocumentTheme(resolveTheme(settings.theme, media.matches, themes))
     }
-    savedRef.current = false
     setOpen(next)
   }
 
   const onSubmit = handleSubmit(async (values) => {
     const { bandwidthLimit, ...rest } = values
     try {
-      await updateSettings({
+      const saved = await updateSettings({
         ...rest,
         bandwidthLimitKbps: bandwidthLimit.trim() === "" ? null : Number(bandwidthLimit),
       })
       toast.success("Settings saved")
       savedRef.current = true
+      const media = window.matchMedia("(prefers-color-scheme: dark)")
+      applyDocumentTheme(resolveTheme(saved.theme, media.matches, themes))
       setOpen(false)
     } catch (error) {
       toast.error("Could not save settings", { description: errorMessage(error) })

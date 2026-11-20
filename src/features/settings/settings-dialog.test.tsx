@@ -226,6 +226,21 @@ describe("SettingsDialog", () => {
     expect(document.documentElement.dataset.theme).toBe("dark")
   })
 
+  it("keeps the selected theme applied after saving", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("radio", { name: "One Dark" }))
+    await user.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() =>
+      expect(state.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ theme: "oneDark" }),
+      ),
+    )
+    expect(document.documentElement.dataset.theme).toBe("oneDark")
+  })
+
   it("selects and saves an imported custom theme", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     state.themes = [
