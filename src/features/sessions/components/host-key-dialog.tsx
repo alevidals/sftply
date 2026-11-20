@@ -74,7 +74,7 @@ export function HostKeyDialog() {
         if (!open && !busy) clear()
       }}
     >
-      <AlertDialogContent className="sm:max-w-md">
+      <AlertDialogContent className="min-w-0 sm:max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {changed ? (
@@ -92,7 +92,7 @@ export function HostKeyDialog() {
         </AlertDialogHeader>
 
         {challenge ? (
-          <div className="selectable space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs">
+          <div className="selectable min-w-0 space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs">
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Server</span>
               <span className="font-mono text-foreground">
@@ -105,8 +105,8 @@ export function HostKeyDialog() {
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground">Fingerprint</span>
-              <div className="flex min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/40 pr-1">
-                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-md border border-border/60 bg-background/40 pr-1">
+                <div className="min-w-0 overflow-x-auto overscroll-x-contain">
                   <code className="block w-max whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-foreground">
                     {challenge.fingerprint}
                   </code>
@@ -115,6 +115,7 @@ export function HostKeyDialog() {
                   type="button"
                   variant="ghost"
                   size="icon-xs"
+                  className="shrink-0"
                   aria-label="Copy fingerprint"
                   onClick={() =>
                     void copyText(challenge.fingerprint, "Fingerprint copied to the clipboard")

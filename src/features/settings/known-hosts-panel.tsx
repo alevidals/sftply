@@ -46,7 +46,7 @@ export function KnownHostsPanel() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div>
         <h3 className="text-sm font-medium">Known SSH hosts</h3>
         <p className="text-xs text-muted-foreground">
@@ -72,9 +72,9 @@ export function KnownHostsPanel() {
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
+        <div className="min-w-0 divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
           {hosts.data.map((host) => (
-            <div key={`${host.host}:${host.port}`} className="space-y-2 p-3">
+            <div key={`${host.host}:${host.port}`} className="min-w-0 space-y-2 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-mono text-xs">
@@ -96,8 +96,8 @@ export function KnownHostsPanel() {
                   Remove
                 </Button>
               </div>
-              <div className="flex min-w-0 items-center gap-1 rounded-md border border-border/60 bg-muted/30 pr-1">
-                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-md border border-border/60 bg-muted/30 pr-1">
+                <div className="min-w-0 overflow-x-auto overscroll-x-contain">
                   <code className="block w-max whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-muted-foreground">
                     {host.fingerprint}
                   </code>
@@ -106,6 +106,7 @@ export function KnownHostsPanel() {
                   type="button"
                   variant="ghost"
                   size="icon-xs"
+                  className="shrink-0"
                   aria-label={`Copy the fingerprint for ${host.host}:${host.port}`}
                   onClick={() =>
                     void copyText(host.fingerprint, "Fingerprint copied to the clipboard")
