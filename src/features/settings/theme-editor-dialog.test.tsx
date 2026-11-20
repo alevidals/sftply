@@ -63,7 +63,7 @@ describe("ThemeEditorDialog", () => {
     expect(onSaved).toHaveBeenCalledWith(saved)
   })
 
-  it("shows save errors in the dialog header, outside the scroll area", async () => {
+  it("shows save errors outside the scroll area, next to the actions", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     state.save.mockRejectedValue(
       new IpcError({
@@ -78,7 +78,8 @@ describe("ThemeEditorDialog", () => {
 
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent("A theme with this name already exists.")
-    expect(alert.closest('[data-slot="dialog-header"]')).not.toBeNull()
+    expect(alert.closest('[data-slot="dialog-header"]')).toBeNull()
     expect(alert.closest(".overflow-y-auto")).toBeNull()
+    expect(alert.nextElementSibling).toHaveAttribute("data-slot", "dialog-footer")
   })
 })

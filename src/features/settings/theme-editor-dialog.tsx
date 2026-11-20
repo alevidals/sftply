@@ -131,21 +131,13 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
 
   return (
     <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{theme ? `Edit “${theme.name}”` : "New theme"}</DialogTitle>
           <DialogDescription>
             New themes start from the currently selected theme. Changes are previewed live and saved
             to a TOML file.
           </DialogDescription>
-          {error ? (
-            <p
-              className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
         </DialogHeader>
 
         <div className="min-h-0 space-y-5 overflow-y-auto px-1">
@@ -192,6 +184,15 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
             </section>
           ))}
         </div>
+
+        {error ? (
+          <p
+            className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
+            role="alert"
+          >
+            {error}
+          </p>
+        ) : null}
 
         <DialogFooter>
           {theme ? (
