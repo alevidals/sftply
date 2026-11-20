@@ -6,6 +6,10 @@ All notable changes to sftply. The format follows
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.3.0] - 2026-11-20
+
 ### Added
 
 - SFTP connections can authenticate with the system SSH agent. sftply tries the
@@ -13,6 +17,18 @@ All notable changes to sftply. The format follows
   key or passphrase.
 - Settings → Security lists trusted SSH host keys and lets you remove them, so a
   key rotation or rebuilt server can be reviewed again.
+- Host key fingerprints can be copied from the trust dialog and from Security
+  settings.
+
+### Changed
+
+- Test connection now opens the host-key review dialog for an unknown server and
+  retries the probe after the key is trusted.
+
+### Fixed
+
+- The passphrase field is hidden when a key is not marked as passphrase
+  protected, including in Quick connect.
 
 ## [1.2.1] - 2026-11-20
 
