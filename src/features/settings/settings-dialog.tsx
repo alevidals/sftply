@@ -105,6 +105,7 @@ function toFormValues(settings: AppSettings_Serialize): SettingsFormValues {
 export function SettingsDialog() {
   const open = useUiStore((state) => state.settingsOpen)
   const setOpen = useUiStore((state) => state.setSettingsOpen)
+  const setThemePreviewActive = useUiStore((state) => state.setThemePreviewActive)
   const { settings, updateSettings, saving, themes, themeWarnings, reloadThemes } = useSettings()
   const appInfo = useAppInfo()
   const tab = useUiStore((state) => state.settingsTab)
@@ -135,6 +136,11 @@ export function SettingsDialog() {
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     applyDocumentTheme(resolveTheme(themeId, media.matches, themesRef.current), { cache: false })
   }, [])
+
+  useEffect(() => {
+    setThemePreviewActive(open)
+    return () => setThemePreviewActive(false)
+  }, [open, setThemePreviewActive])
 
   useEffect(() => {
     if (open && !wasOpen.current) {

@@ -22,6 +22,8 @@ interface UiState {
   settingsTab: SettingsTab
   quickConnectOpen: boolean
   syncCompareOpen: boolean
+  /** A Settings theme preview is currently controlling the document. */
+  themePreviewActive: boolean
   activePane: PaneId
   bottomTab: BottomTab
   localSummary: PaneSummary
@@ -32,6 +34,7 @@ interface UiState {
   setSettingsTab: (tab: SettingsTab) => void
   setQuickConnectOpen: (open: boolean) => void
   setSyncCompareOpen: (open: boolean) => void
+  setThemePreviewActive: (active: boolean) => void
   setActivePane: (pane: PaneId) => void
   setBottomTab: (tab: BottomTab) => void
   setLocalSummary: (summary: PaneSummary) => void
@@ -46,6 +49,7 @@ export const useUiStore = create<UiState>((set) => ({
   settingsTab: "appearance",
   quickConnectOpen: false,
   syncCompareOpen: false,
+  themePreviewActive: false,
   activePane: "local",
   bottomTab: "activity",
   localSummary: EMPTY_SUMMARY,
@@ -56,6 +60,7 @@ export const useUiStore = create<UiState>((set) => ({
   setSettingsTab: (settingsTab) => set({ settingsTab }),
   setQuickConnectOpen: (quickConnectOpen) => set({ quickConnectOpen }),
   setSyncCompareOpen: (syncCompareOpen) => set({ syncCompareOpen }),
+  setThemePreviewActive: (themePreviewActive) => set({ themePreviewActive }),
   setActivePane: (activePane) => set({ activePane }),
   setBottomTab: (bottomTab) => set({ bottomTab }),
   setLocalSummary: (localSummary) => set({ localSummary }),

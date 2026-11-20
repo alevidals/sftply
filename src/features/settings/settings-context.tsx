@@ -23,6 +23,7 @@ import {
   rememberAppearance,
   resolveTheme,
 } from "@/lib/theme"
+import { useUiStore } from "@/stores/ui-store"
 
 const SETTINGS_QUERY_KEY = ["settings"] as const
 const THEMES_QUERY_KEY = ["custom-themes"] as const
@@ -61,6 +62,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const persistedRef = useRef<AppSettings_Serialize | null>(null)
   const queueRef = useRef<Promise<unknown>>(Promise.resolve())
   const [saving, setSaving] = useState(false)
+  const themePreviewActive = useUiStore((state) => state.themePreviewActive)
   const [effectiveTheme, setEffectiveTheme] = useState<EffectiveTheme>(() =>
     document.documentElement.classList.contains("dark") ? "dark" : "light",
   )
@@ -74,7 +76,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const density = query.data?.density
 
   useEffect(() => {
-    if (!themeMode) return
+    if (!themeMode || themePreviewActive) return
     // A selected custom theme needs its file before the first paint. Loading
     // the built-in fallback first would flash the wrong palette.
     if (themeMode.startsWith("custom:") && themesQuery.isPending) return
@@ -89,7 +91,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (themeMode !== "system") return
     media.addEventListener("change", sync)
     return () => media.removeEventListener("change", sync)
-  }, [customThemes, themeMode, themesQuery.isPending])
+  }, [customThemes, themeMode, themesQuery.isPending, themePreviewActive])
 
   useEffect(() => {
     if (!density || !themeMode) return
