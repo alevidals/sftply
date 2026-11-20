@@ -138,6 +138,14 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
             New themes start from the currently selected theme. Changes are previewed live and saved
             to a TOML file.
           </DialogDescription>
+          {error ? (
+            <p
+              className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
         </DialogHeader>
 
         <div className="min-h-0 space-y-5 overflow-y-auto px-1">
@@ -183,15 +191,6 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
               </div>
             </section>
           ))}
-
-          {error ? (
-            <p
-              className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
         </div>
 
         <DialogFooter>

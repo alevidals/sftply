@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ThemeEditorDialog } from "@/features/settings/theme-editor-dialog"
+import { IpcError } from "@/lib/errors"
 import type { CustomTheme } from "@/lib/ipc/bindings"
 
 const state = vi.hoisted(() => ({
@@ -60,5 +61,24 @@ describe("ThemeEditorDialog", () => {
     expect(dark).toBe(true)
     expect(Object.keys(colors)).toHaveLength(34)
     expect(onSaved).toHaveBeenCalledWith(saved)
+  })
+
+  it("shows save errors in the dialog header, outside the scroll area", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    state.save.mockRejectedValue(
+      new IpcError({
+        code: "ALREADY_EXISTS",
+        message: "A theme with this name already exists.",
+        retryable: false,
+      }),
+    )
+    render(<ThemeEditorDialog open theme={null} onOpenChange={vi.fn()} onSaved={vi.fn()} />)
+
+    await user.click(screen.getByRole("button", { name: "Save theme" }))
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("A theme with this name already exists.")
+    expect(alert.closest('[data-slot="dialog-header"]')).not.toBeNull()
+    expect(alert.closest(".overflow-y-auto")).toBeNull()
   })
 })
