@@ -60,6 +60,12 @@ export const ipc = {
     return invoke(commands.startupReport())
   },
 
+  openLogs(): Promise<void> {
+    return invoke(commands.openLogs()).then((result) => {
+      unwrap(result)
+    })
+  },
+
   settingsGet(): Promise<AppSettings_Serialize> {
     return invoke(commands.settingsGet())
   },

@@ -11,6 +11,16 @@ const state = vi.hoisted(() => ({
   saving: false,
 }))
 
+const ipcState = vi.hoisted(() => ({
+  openLogs: vi.fn(),
+}))
+
+vi.mock("@/lib/ipc/client", () => ({
+  ipc: {
+    openLogs: ipcState.openLogs,
+  },
+}))
+
 vi.mock("@/features/settings/settings-context", () => ({
   useSettings: () => ({
     settings: state.settings,
@@ -61,6 +71,8 @@ beforeEach(() => {
     ...settings,
     ...patch,
   }))
+  ipcState.openLogs.mockReset()
+  ipcState.openLogs.mockResolvedValue(undefined)
   useUiStore.setState({ settingsOpen: true, settingsTab: "appearance" })
 })
 
@@ -174,6 +186,16 @@ describe("SettingsDialog", () => {
       ),
     )
     await waitFor(() => expect(useUiStore.getState().settingsOpen).toBe(false))
+  })
+
+  it("opens the log folder from About", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("tab", { name: "About" }))
+    await user.click(screen.getByRole("button", { name: "Open logs" }))
+
+    expect(ipcState.openLogs).toHaveBeenCalledTimes(1)
   })
 
   it("saves a named palette from the theme gallery", async () => {

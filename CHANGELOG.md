@@ -8,6 +8,17 @@ All notable changes to sftply. The format follows
 
 Nothing yet.
 
+## [1.2.1] - 2026-11-20
+
+### Added
+
+- Settings → About can open the log folder in the system file manager.
+
+### Changed
+
+- Log files rotate daily and retention is capped at the seven most recent
+  daily files. Older logs are pruned at startup and at daily rotation.
+
 ## [1.2.0] - 2026-11-19
 
 ### Added

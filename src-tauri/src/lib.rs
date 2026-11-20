@@ -31,6 +31,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             commands::app::app_info,
             commands::app::startup_report,
+            commands::app::open_logs,
             commands::app::app_check_update,
             commands::settings::settings_get,
             commands::settings::settings_update,

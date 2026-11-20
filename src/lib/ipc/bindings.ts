@@ -10,6 +10,8 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
 	startupReport: () => __TAURI_INVOKE<StartupReport>("startup_report"),
+	/**  Opens the platform log directory in the system file manager. */
+	openLogs: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("open_logs")),
 	appCheckUpdate: () => typedError<UpdateStatus, AppError_Serialize>(__TAURI_INVOKE("app_check_update")),
 	settingsGet: () => __TAURI_INVOKE<AppSettings_Serialize>("settings_get"),
 	settingsUpdate: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),

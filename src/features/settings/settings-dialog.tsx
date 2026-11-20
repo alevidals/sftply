@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "cn"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon, FolderOpenIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -27,6 +27,7 @@ import { useAppInfo } from "@/hooks/use-app-info"
 import { useDelayedFlag } from "@/hooks/use-delayed-flag"
 import { errorMessage } from "@/lib/errors"
 import type { AppSettings_Serialize } from "@/lib/ipc/bindings"
+import { ipc } from "@/lib/ipc/client"
 import { isMacPlatform } from "@/lib/shortcuts"
 import { THEME_OPTIONS, THEME_VALUES } from "@/lib/themes"
 import { useUiStore } from "@/stores/ui-store"
@@ -481,6 +482,21 @@ export function SettingsDialog() {
                   Credentials are stored in the operating system keychain and never written to
                   configuration files or logs.
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void ipc.openLogs().catch((cause) =>
+                      toast.error("Could not open the log folder", {
+                        description: errorMessage(cause),
+                      }),
+                    )
+                  }
+                >
+                  <FolderOpenIcon />
+                  Open logs
+                </Button>
                 <UpdateCheck />
               </TabsContent>
             </div>

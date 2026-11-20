@@ -1,8 +1,13 @@
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::paths::AppPaths;
 use crate::error::AppError;
+
+/// Keep a week of daily log files. Older files are pruned when the appender
+/// starts or rolls over to a new day.
+const LOG_RETENTION_DAYS: usize = 7;
 
 /// Initialize logging to stderr and a daily rolling file in the app log dir.
 /// The returned guard must be kept alive for the lifetime of the app.
@@ -14,7 +19,17 @@ pub fn init(paths: &AppPaths) -> Result<WorkerGuard, AppError> {
         )
     })?;
 
-    let file_appender = tracing_appender::rolling::daily(&paths.log_dir, "sftply.log");
+    let file_appender = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix("sftply.log")
+        .max_log_files(LOG_RETENTION_DAYS)
+        .build(&paths.log_dir)
+        .map_err(|error| {
+            AppError::internal(
+                "Could not create the log file.",
+                format!("{}: {error}", paths.log_dir.display()),
+            )
+        })?;
     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     // Protocol crates log protocol traffic at trace level; suppaftp logs the
