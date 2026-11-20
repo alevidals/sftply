@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { useSettings } from "@/features/settings/settings-context"
+import { parseColor } from "@/lib/contrast"
 import { errorMessage } from "@/lib/errors"
 import type { CustomTheme } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
@@ -245,18 +246,23 @@ function ColorField({
   value: string
   onChange: (value: string) => void
 }) {
-  const pickerValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000"
   return (
     <div className="min-w-0 space-y-1">
       <Label className="font-mono text-2xs text-muted-foreground">{label}</Label>
       <div className="flex min-w-0 items-center gap-1.5">
-        <input
-          type="color"
-          aria-label={`${label} color picker`}
-          value={pickerValue}
-          onChange={(event) => onChange(event.target.value)}
-          className="size-8 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-        />
+        <label
+          className="relative size-8 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border"
+          style={{ backgroundColor: value }}
+          title={value}
+        >
+          <input
+            type="color"
+            aria-label={`${label} color picker`}
+            value={hexFromColor(value)}
+            onChange={(event) => onChange(event.target.value)}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+          />
+        </label>
         <Input
           aria-label={label}
           value={value}
@@ -267,4 +273,18 @@ function ColorField({
       </div>
     </div>
   )
+}
+
+/** Native color inputs only accept hex; parse oklch/rgb for their initial value. */
+function hexFromColor(value: string): string {
+  try {
+    const { r, g, b } = parseColor(value)
+    const channel = (number: number) =>
+      Math.round(Math.max(0, Math.min(1, number)) * 255)
+        .toString(16)
+        .padStart(2, "0")
+    return `#${channel(r)}${channel(g)}${channel(b)}`
+  } catch {
+    return "#000000"
+  }
 }
