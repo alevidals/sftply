@@ -145,7 +145,7 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
         <DialogHeader>
           <DialogTitle>{theme ? `Edit “${theme.name}”` : "New theme"}</DialogTitle>
           <DialogDescription>
-            New themes start from the currently applied colors. Changes are previewed live and saved
+            New themes start from the currently selected theme. Changes are previewed live and saved
             to a TOML file.
           </DialogDescription>
         </DialogHeader>

@@ -13,7 +13,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -110,6 +110,7 @@ export function SettingsDialog() {
   const tab = useUiStore((state) => state.settingsTab)
   const setTab = useUiStore((state) => state.setSettingsTab)
   const wasOpen = useRef(false)
+  const savedRef = useRef(false)
   const showSaving = useDelayedFlag(saving)
   const isMac = isMacPlatform(appInfo.data?.platform)
 
@@ -125,10 +126,35 @@ export function SettingsDialog() {
   const [editingTheme, setEditingTheme] = useState<CustomTheme | null>(null)
   const selectedTheme = form.watch("theme")
 
+  const applyThemePreview = useCallback(
+    (themeId: string) => {
+      const media = window.matchMedia("(prefers-color-scheme: dark)")
+      applyDocumentTheme(resolveTheme(themeId, media.matches, themes), { cache: false })
+    },
+    [themes],
+  )
+
   useEffect(() => {
-    if (open && !wasOpen.current) reset(toFormValues(settings))
+    if (open && !wasOpen.current) {
+      reset(toFormValues(settings))
+      savedRef.current = false
+    }
     wasOpen.current = open
   }, [open, settings, reset])
+
+  useEffect(() => {
+    if (!open) return
+    applyThemePreview(selectedTheme)
+  }, [applyThemePreview, open, selectedTheme])
+
+  const closeSettings = (next: boolean) => {
+    if (!next && !savedRef.current) {
+      const media = window.matchMedia("(prefers-color-scheme: dark)")
+      applyDocumentTheme(resolveTheme(settings.theme, media.matches, themes))
+    }
+    savedRef.current = false
+    setOpen(next)
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     const { bandwidthLimit, ...rest } = values
@@ -138,6 +164,7 @@ export function SettingsDialog() {
         bandwidthLimitKbps: bandwidthLimit.trim() === "" ? null : Number(bandwidthLimit),
       })
       toast.success("Settings saved")
+      savedRef.current = true
       setOpen(false)
     } catch (error) {
       toast.error("Could not save settings", { description: errorMessage(error) })
@@ -172,13 +199,7 @@ export function SettingsDialog() {
   }
 
   const exportTheme = async () => {
-    const themeId = form.getValues("theme")
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const previous = resolveTheme(settings.theme, media.matches, themes)
-    const restore = themeId !== settings.theme
-    if (restore) applyDocumentTheme(resolveTheme(themeId, media.matches, themes))
-    const exported = currentThemeExport(themeId, themes)
-    if (restore) applyDocumentTheme(previous)
+    const exported = currentThemeExport(form.getValues("theme"), themes)
     const target = await saveFileDialog({
       title: "Export theme",
       defaultPath: `${exported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "theme"}.toml`,
@@ -210,7 +231,7 @@ export function SettingsDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={closeSettings}>
       <DialogContent className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <form onSubmit={onSubmit} className="flex h-[min(600px,calc(100vh-3rem))] min-h-0 flex-col">
           <DialogHeader className="border-b border-border/70 px-5 py-4">
@@ -438,15 +459,18 @@ export function SettingsDialog() {
                         const option = customThemeOption(theme)
                         const selected = selectedTheme === option.value
                         return (
-                          <div key={theme.id} className="relative">
+                          <div
+                            key={theme.id}
+                            className={cn(
+                              "rounded-lg border p-2 transition-colors focus-within:ring-2 focus-within:ring-ring/50",
+                              selected
+                                ? "border-primary/40 bg-primary/5"
+                                : "border-border hover:border-border hover:bg-muted/40",
+                            )}
+                          >
                             <label
                               title={option.description}
-                              className={cn(
-                                "group relative flex cursor-pointer flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors focus-within:ring-2 focus-within:ring-ring/50",
-                                selected
-                                  ? "border-primary/40 bg-primary/5"
-                                  : "border-border hover:border-border hover:bg-muted/40",
-                              )}
+                              className="group flex cursor-pointer flex-col gap-1.5 text-left"
                             >
                               <input
                                 type="radio"
@@ -487,27 +511,28 @@ export function SettingsDialog() {
                                 ) : null}
                               </span>
                             </label>
-                            <div className="absolute top-1 right-1 flex gap-0.5">
+                            <div className="mt-1 flex justify-end gap-1">
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon-xs"
-                                aria-label={`Edit ${option.label}`}
+                                size="xs"
                                 onClick={() => {
                                   setEditingTheme(theme)
                                   setEditorOpen(true)
                                 }}
                               >
                                 <PencilIcon />
+                                Edit
                               </Button>
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon-xs"
-                                aria-label={`Delete ${option.label}`}
+                                size="xs"
+                                className="text-muted-foreground hover:text-destructive"
                                 onClick={() => setDeletingTheme(theme)}
                               >
                                 <Trash2Icon />
+                                Delete
                               </Button>
                             </div>
                           </div>
@@ -796,7 +821,7 @@ export function SettingsDialog() {
           </Tabs>
 
           <DialogFooter className="mx-0 mb-0 shrink-0 rounded-b-xl border-t border-border/70 bg-muted/20 px-5 py-3">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => closeSettings(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving} aria-busy={saving} className="relative">
@@ -819,7 +844,10 @@ export function SettingsDialog() {
         <ThemeEditorDialog
           open={editorOpen}
           theme={editingTheme}
-          onOpenChange={setEditorOpen}
+          onOpenChange={(next) => {
+            setEditorOpen(next)
+            if (!next) applyThemePreview(selectedTheme)
+          }}
           onSaved={(saved) => {
             void reloadThemes()
             form.setValue("theme", saved.id, { shouldDirty: true, shouldValidate: true })

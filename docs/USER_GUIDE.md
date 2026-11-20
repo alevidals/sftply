@@ -219,9 +219,10 @@ Linux:   ~/.config/com.alevidals.sftply/themes/
 ```
 
 Use **New** to create a theme in the built-in editor; it starts from the colors
-of the currently applied theme. **Import** copies a valid TOML theme into that
-folder, **Export** saves the current theme, **Edit** opens a custom theme in the
-editor, and **Folder** opens the directory. Theme
+of the currently selected theme. Selecting a theme previews it immediately;
+closing Settings without saving restores the applied theme. **Import** copies a
+valid TOML theme into that folder, **Export** saves the selected theme, **Edit**
+opens a custom theme in the editor, and **Folder** opens the directory. Theme
 files changed outside the app are picked up automatically; **Reload** forces a
 refresh. Importing a theme with an existing file name asks before replacing it.
 Deleting a custom theme removes its file.
