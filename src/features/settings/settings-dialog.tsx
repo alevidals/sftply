@@ -125,14 +125,16 @@ export function SettingsDialog() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingTheme, setEditingTheme] = useState<CustomTheme | null>(null)
   const selectedTheme = form.watch("theme")
+  const themesRef = useRef(themes)
 
-  const applyThemePreview = useCallback(
-    (themeId: string) => {
-      const media = window.matchMedia("(prefers-color-scheme: dark)")
-      applyDocumentTheme(resolveTheme(themeId, media.matches, themes), { cache: false })
-    },
-    [themes],
-  )
+  useEffect(() => {
+    themesRef.current = themes
+  }, [themes])
+
+  const applyThemePreview = useCallback((themeId: string) => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    applyDocumentTheme(resolveTheme(themeId, media.matches, themesRef.current), { cache: false })
+  }, [])
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -142,15 +144,18 @@ export function SettingsDialog() {
     wasOpen.current = open
   }, [open, settings, reset])
 
+  // A refreshed theme list must re-run the preview even though the callback
+  // itself only reads themesRef.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: themes updates themesRef
   useEffect(() => {
     if (!open) return
     applyThemePreview(selectedTheme)
-  }, [applyThemePreview, open, selectedTheme])
+  }, [applyThemePreview, open, selectedTheme, themes])
 
   const closeSettings = (next: boolean) => {
     if (!next && !savedRef.current) {
       const media = window.matchMedia("(prefers-color-scheme: dark)")
-      applyDocumentTheme(resolveTheme(settings.theme, media.matches, themes))
+      applyDocumentTheme(resolveTheme(settings.theme, media.matches, themesRef.current))
     }
     setOpen(next)
   }
@@ -200,7 +205,7 @@ export function SettingsDialog() {
   }
 
   const exportTheme = async () => {
-    const exported = currentThemeExport(form.getValues("theme"), themes)
+    const exported = currentThemeExport(form.getValues("theme"), themesRef.current)
     const target = await saveFileDialog({
       title: "Export theme",
       defaultPath: `${exported.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "theme"}.toml`,
