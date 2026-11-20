@@ -4,6 +4,13 @@ All notable changes to sftply. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-11-20
+
+### Changed
+
+- The theme editor now explains that **Variant** controls native control colors
+  and dark-mode component tweaks, and does not change the palette.
+
 ## [1.4.0] - 2026-11-20
 
 ### Added
