@@ -75,7 +75,8 @@ failure with an explicit warning, because it can mean the server was replaced or
 intercepted.
 
 Known hosts are listed in Settings → Security, where you can remove an entry
-after a legitimate key rotation.
+after a legitimate key rotation or a server rebuild. Removing an entry makes the
+next connection present the host key for review again.
 
 For FTPS, TLS is verified against the system trust store. Two escape hatches
 exist for private infrastructure:

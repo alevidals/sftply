@@ -11,6 +11,8 @@ All notable changes to sftply. The format follows
 - SFTP connections can authenticate with the system SSH agent. sftply tries the
   identities already loaded in the agent and never reads or stores the private
   key or passphrase.
+- Settings → Security lists trusted SSH host keys and lets you remove them, so a
+  key rotation or rebuilt server can be reviewed again.
 
 ## [1.2.1] - 2026-11-20
 

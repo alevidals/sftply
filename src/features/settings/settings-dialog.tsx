@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { KnownHostsPanel } from "@/features/settings/known-hosts-panel"
 import { useSettings } from "@/features/settings/settings-context"
 import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
 import { UpdateCheck } from "@/features/settings/update-check"
@@ -139,6 +140,9 @@ export function SettingsDialog() {
               </TabsTrigger>
               <TabsTrigger value="connections" className="h-8 justify-start px-2.5 text-xs">
                 Connections
+              </TabsTrigger>
+              <TabsTrigger value="security" className="h-8 justify-start px-2.5 text-xs">
+                Security
               </TabsTrigger>
               <TabsTrigger value="transfers" className="h-8 justify-start px-2.5 text-xs">
                 Transfers
@@ -405,6 +409,10 @@ export function SettingsDialog() {
                   A cancelled or timed-out remote operation may leave the protocol stream out of
                   sync. sftply asks you to reconnect rather than guessing the stream state.
                 </p>
+              </TabsContent>
+
+              <TabsContent value="security">
+                <KnownHostsPanel />
               </TabsContent>
 
               <TabsContent value="transfers" className="space-y-4">
