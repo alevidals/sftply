@@ -1,4 +1,4 @@
-import { KeyRoundIcon, ShieldAlertIcon } from "lucide-react"
+import { CopyIcon, KeyRoundIcon, ShieldAlertIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import {
@@ -11,7 +11,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
+import { copyText } from "@/lib/clipboard"
 import { normalizeError } from "@/lib/errors"
 import { ipc } from "@/lib/ipc/client"
 import { recordActivity } from "@/stores/activity-store"
@@ -72,7 +74,7 @@ export function HostKeyDialog() {
         if (!open && !busy) clear()
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {changed ? (
@@ -82,7 +84,7 @@ export function HostKeyDialog() {
             )}
             {changed ? "Server key changed" : "New server key"}
           </AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription className="text-pretty">
             {changed
               ? "The key presented by this server does not match the one you trusted before. This can indicate a server rebuild or a man-in-the-middle attack."
               : "This server has not been trusted yet. Verify the fingerprint with the server administrator before connecting."}
@@ -102,7 +104,20 @@ export function HostKeyDialog() {
               <span className="font-mono text-foreground">{challenge.keyType}</span>
             </div>
             <div className="space-y-1">
-              <span className="text-muted-foreground">Fingerprint</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Fingerprint</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Copy fingerprint"
+                  onClick={() =>
+                    void copyText(challenge.fingerprint, "Fingerprint copied to the clipboard")
+                  }
+                >
+                  <CopyIcon />
+                </Button>
+              </div>
               <p className="font-mono text-2xs break-all text-foreground">
                 {challenge.fingerprint}
               </p>

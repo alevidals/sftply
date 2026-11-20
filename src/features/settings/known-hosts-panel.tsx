@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ShieldCheckIcon, Trash2Icon } from "lucide-react"
+import { CopyIcon, ShieldCheckIcon, Trash2Icon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { useFormatPreferences } from "@/features/settings/settings-context"
+import { copyText } from "@/lib/clipboard"
 import { errorMessage } from "@/lib/errors"
 import { formatModified } from "@/lib/format"
 import type { KnownHost } from "@/lib/ipc/bindings"
@@ -73,32 +74,44 @@ export function KnownHostsPanel() {
       ) : (
         <div className="divide-y divide-border/70 overflow-hidden rounded-lg border border-border/70">
           {hosts.data.map((host) => (
-            <div
-              key={`${host.host}:${host.port}`}
-              className="flex items-start justify-between gap-3 p-3"
-            >
-              <div className="min-w-0 space-y-0.5">
-                <p className="font-mono text-xs">
-                  {host.host}:{host.port}
-                </p>
-                <p className="text-2xs text-muted-foreground">
-                  {host.keyType} · trusted {formatModified(host.addedAt, dateFormat)}
-                </p>
-                <p className="font-mono text-2xs break-all text-muted-foreground">
+            <div key={`${host.host}:${host.port}`} className="space-y-2 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs">
+                    {host.host}:{host.port}
+                  </p>
+                  <p className="text-2xs text-muted-foreground">
+                    {host.keyType} · trusted {formatModified(host.addedAt, dateFormat)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Remove the host key for ${host.host}:${host.port}`}
+                  disabled={remove.isPending}
+                  onClick={() => setRemoving(host)}
+                >
+                  <Trash2Icon />
+                  Remove
+                </Button>
+              </div>
+              <div className="flex items-start gap-1">
+                <p className="min-w-0 flex-1 font-mono text-2xs break-all text-muted-foreground">
                   {host.fingerprint}
                 </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Copy the fingerprint for ${host.host}:${host.port}`}
+                  onClick={() =>
+                    void copyText(host.fingerprint, "Fingerprint copied to the clipboard")
+                  }
+                >
+                  <CopyIcon />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={`Remove the host key for ${host.host}:${host.port}`}
-                disabled={remove.isPending}
-                onClick={() => setRemoving(host)}
-              >
-                <Trash2Icon />
-                Remove
-              </Button>
             </div>
           ))}
         </div>
