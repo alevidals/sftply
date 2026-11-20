@@ -154,9 +154,9 @@ export function SettingsDialog() {
   // itself only reads themesRef.
   // biome-ignore lint/correctness/useExhaustiveDependencies: themes updates themesRef
   useEffect(() => {
-    if (!open) return
+    if (!open || editorOpen) return
     applyThemePreview(selectedTheme)
-  }, [applyThemePreview, open, selectedTheme, themes])
+  }, [applyThemePreview, editorOpen, open, selectedTheme, themes])
 
   const closeSettings = (next: boolean) => {
     if (!next && !savedRef.current) {
