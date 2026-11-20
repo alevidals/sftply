@@ -849,8 +849,8 @@ export function SettingsDialog() {
             setEditorOpen(next)
             if (!next) applyThemePreview(selectedTheme)
           }}
-          onSaved={(saved) => {
-            void reloadThemes()
+          onSaved={async (saved) => {
+            await reloadThemes()
             form.setValue("theme", saved.id, { shouldDirty: true, shouldValidate: true })
           }}
         />

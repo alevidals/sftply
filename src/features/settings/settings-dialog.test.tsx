@@ -261,6 +261,7 @@ describe("SettingsDialog", () => {
         expect.objectContaining({ theme: "custom:mine" }),
       ),
     )
+    expect(document.documentElement.dataset.theme).toBe("custom")
   })
 
   it("saves a named palette from the theme gallery", async () => {

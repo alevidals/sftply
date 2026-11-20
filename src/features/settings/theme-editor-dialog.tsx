@@ -79,7 +79,7 @@ interface ThemeEditorDialogProps {
   open: boolean
   theme: CustomTheme | null
   onOpenChange: (open: boolean) => void
-  onSaved: (theme: CustomTheme) => void
+  onSaved: (theme: CustomTheme) => void | Promise<void>
 }
 
 function initialColors(theme: CustomTheme | null): Record<string, string> {
@@ -116,7 +116,7 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
     setError(null)
     try {
       const saved = await ipc.themeSave(theme?.id ?? null, name, dark, colors)
-      onSaved(saved)
+      await onSaved(saved)
       toast.success(`Saved “${saved.name}”`)
       onOpenChange(false)
     } catch (cause) {
