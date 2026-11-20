@@ -230,7 +230,9 @@ Deleting a custom theme removes its file.
 A theme is a TOML file with `key = "value"` lines. It must define every color
 token the app uses; there are no defaults, derived colors or ANSI palette
 shortcuts. `variant` is `dark` or `light` and controls whether the app uses its
-dark-mode component tweaks and dark native controls:
+dark-mode component tweaks and dark native controls such as scrollbars and
+menus. It does not change the palette; match it to the palette's overall
+lightness:
 
 ```text
 name = "Mine"
