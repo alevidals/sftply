@@ -73,6 +73,13 @@ const settings: AppSettings_Serialize = {
 }
 
 beforeEach(() => {
+  document.documentElement.classList.add("dark")
+  document.documentElement.dataset.theme = "dark"
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: true,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }) as unknown as typeof window.matchMedia
   state.settings = settings
   state.saving = false
   state.themes = []
@@ -206,6 +213,17 @@ describe("SettingsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Open logs" }))
 
     expect(ipcState.openLogs).toHaveBeenCalledTimes(1)
+  })
+
+  it("previews a theme and restores the saved one on cancel", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    render(<SettingsDialog />)
+
+    await user.click(screen.getByRole("radio", { name: "One Dark" }))
+    expect(document.documentElement.dataset.theme).toBe("oneDark")
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }))
+    expect(document.documentElement.dataset.theme).toBe("dark")
   })
 
   it("selects and saves an imported custom theme", async () => {
