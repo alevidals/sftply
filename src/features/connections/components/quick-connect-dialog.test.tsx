@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { QuickConnectDialog } from "@/features/connections/components/quick-connect-dialog"
 import { IpcError } from "@/lib/errors"
+import { useHostKeyStore } from "@/stores/host-key-store"
 import { useUiStore } from "@/stores/ui-store"
 
 const actions = vi.hoisted(() => ({
@@ -29,6 +30,7 @@ beforeEach(() => {
   actions.quickConnect.mockReset()
   api.test.mockReset()
   actions.quickConnect.mockResolvedValue(undefined)
+  useHostKeyStore.getState().clear()
   useUiStore.setState({ quickConnectOpen: true })
 })
 
@@ -125,6 +127,39 @@ describe("QuickConnectDialog", () => {
     expect(screen.getByLabelText("Certificate pin (optional)")).toBeInTheDocument()
     expect(screen.getByLabelText("Data channel")).toBeInTheDocument()
     expect(screen.getByLabelText("Port")).toHaveValue("21")
+  })
+
+  it("opens the host key review when the test reaches an unknown key", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    api.test.mockRejectedValue(
+      new IpcError({
+        code: "HOST_KEY_UNKNOWN",
+        message: "This server's host key is not trusted yet.",
+        detail: null,
+        retryable: false,
+        hostKey: {
+          host: "sftp.example.com",
+          port: 22,
+          keyType: "ssh-ed25519",
+          fingerprint: "SHA256:abc123",
+          previousFingerprint: null,
+        },
+      }),
+    )
+    renderDialog()
+
+    await user.type(screen.getByLabelText("Host"), "sftp.example.com")
+    await user.type(screen.getByLabelText("Username"), "ada")
+    await user.click(screen.getByRole("button", { name: "Test connection" }))
+
+    await waitFor(() =>
+      expect(useHostKeyStore.getState().challenge).toMatchObject({
+        host: "sftp.example.com",
+        port: 22,
+      }),
+    )
+    expect(await screen.findByText(/host key is not trusted yet/i)).toBeInTheDocument()
+    expect(api.test).toHaveBeenCalledTimes(1)
   })
 
   it("surfaces a connection error without closing the dialog", async () => {

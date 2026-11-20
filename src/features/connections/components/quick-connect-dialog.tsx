@@ -43,9 +43,10 @@ import {
   toQuickConnectInput,
 } from "@/features/connections/schema"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
-import { errorMessage } from "@/lib/errors"
+import { errorMessage, normalizeError } from "@/lib/errors"
 import type { ConnectionProtocol } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
+import { useHostKeyStore } from "@/stores/host-key-store"
 import { useUiStore } from "@/stores/ui-store"
 
 /**
@@ -63,6 +64,7 @@ export function QuickConnectDialog() {
   const [connecting, setConnecting] = useState(false)
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestHostKey = useHostKeyStore((state) => state.request)
   const authKind = form.watch("authKind")
   const protocol = form.watch("protocol")
   const save = form.watch("save")
@@ -109,9 +111,10 @@ export function QuickConnectDialog() {
     }
   }
 
-  const runTest = async () => {
-    if (!(await form.trigger())) return
-    const values = form.getValues()
+  const testConnection = async (
+    values: QuickConnectValues,
+    allowHostKeyPrompt: boolean,
+  ): Promise<void> => {
     setTesting(true)
     setError(null)
     try {
@@ -128,10 +131,21 @@ export function QuickConnectDialog() {
         `Tested ${values.host.trim() || "the server"} (${Math.round(result.latencyMs)} ms)`,
       )
     } catch (cause) {
-      setError(errorMessage(cause))
+      const normalized = normalizeError(cause)
+      if (normalized.hostKey && allowHostKeyPrompt) {
+        setError("This server's host key is not trusted yet. Review it to continue.")
+        requestHostKey(null, normalized.hostKey, () => testConnection(values, false))
+      } else {
+        setError(normalized.message)
+      }
     } finally {
       setTesting(false)
     }
+  }
+
+  const runTest = async () => {
+    if (!(await form.trigger())) return
+    await testConnection(form.getValues(), true)
   }
 
   const submit = form.handleSubmit(async (values) => {

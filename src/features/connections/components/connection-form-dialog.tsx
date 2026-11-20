@@ -50,9 +50,10 @@ import {
   valuesFromProfile,
 } from "@/features/connections/schema"
 import { useDelayedFlag } from "@/hooks/use-delayed-flag"
-import { errorMessage } from "@/lib/errors"
+import { errorMessage, normalizeError } from "@/lib/errors"
 import type { ConnectionProfile_Serialize, ConnectionProtocol } from "@/lib/ipc/bindings"
 import { recordActivity } from "@/stores/activity-store"
+import { useHostKeyStore } from "@/stores/host-key-store"
 
 interface ConnectionDialogProps {
   open: boolean
@@ -71,6 +72,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   const showSaving = useDelayedFlag(saving)
   const [error, setError] = useState<string | null>(null)
   const secretStatus = useSecretStatus(connection?.id ?? null, open)
+  const requestHostKey = useHostKeyStore((state) => state.request)
   const authKind = form.watch("authKind")
   const protocol = form.watch("protocol")
   const tlsAllowInvalid = form.watch("tlsAllowInvalid")
@@ -154,9 +156,10 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
     }
   })
 
-  const runTest = async () => {
-    if (!(await form.trigger())) return
-    const values = form.getValues()
+  const testConnection = async (
+    values: ConnectionFormValues,
+    allowHostKeyPrompt: boolean,
+  ): Promise<void> => {
     setTesting(true)
     setError(null)
     try {
@@ -173,10 +176,23 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
         `Tested ${values.host.trim() || "the server"} (${Math.round(result.latencyMs)} ms)`,
       )
     } catch (cause) {
-      setError(errorMessage(cause))
+      const normalized = normalizeError(cause)
+      if (normalized.hostKey && allowHostKeyPrompt) {
+        setError("This server's host key is not trusted yet. Review it to continue.")
+        requestHostKey(connection?.id ?? null, normalized.hostKey, () =>
+          testConnection(values, false),
+        )
+      } else {
+        setError(normalized.message)
+      }
     } finally {
       setTesting(false)
     }
+  }
+
+  const runTest = async () => {
+    if (!(await form.trigger())) return
+    await testConnection(form.getValues(), true)
   }
 
   const removeSecret = async () => {
