@@ -13,6 +13,8 @@ All notable changes to sftply. The format follows
   token is explicit; files with missing or unknown colors are rejected. Themes
   can be created and edited inside Settings → Appearance, changes to files are
   detected automatically, and importing over an existing file asks first.
+- Selecting a theme previews it immediately; cancelling Settings restores the
+  saved theme. New and Export use the selected theme.
 
 ## [1.3.0] - 2026-11-20
 

@@ -19,12 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
-import { useSettings } from "@/features/settings/settings-context"
 import { parseColor } from "@/lib/contrast"
 import { errorMessage } from "@/lib/errors"
 import type { CustomTheme } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
-import { applyDocumentTheme, readAppliedThemeTokens, resolveTheme } from "@/lib/theme"
+import { applyDocumentTheme, readAppliedThemeTokens } from "@/lib/theme"
 import { THEME_TOKEN_KEYS } from "@/lib/themes"
 
 const GROUPS: Array<{ label: string; keys: string[] }> = [
@@ -90,7 +89,6 @@ function initialColors(theme: CustomTheme | null): Record<string, string> {
 
 /** In-app editor for the explicit custom theme token set. */
 export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeEditorDialogProps) {
-  const { settings, themes } = useSettings()
   const [name, setName] = useState("Custom theme")
   const [dark, setDark] = useState(true)
   const [colors, setColors] = useState<Record<string, string>>(() => initialColors(theme))
@@ -112,14 +110,6 @@ export function ThemeEditorDialog({ open, theme, onOpenChange, onSaved }: ThemeE
       { cache: false },
     )
   }, [colors, dark, open, theme?.id])
-
-  useEffect(() => {
-    if (!open) return
-    return () => {
-      const media = window.matchMedia("(prefers-color-scheme: dark)")
-      applyDocumentTheme(resolveTheme(settings.theme, media.matches, themes))
-    }
-  }, [open, settings.theme, themes])
 
   const save = async () => {
     setSaving(true)
