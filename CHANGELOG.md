@@ -4,7 +4,7 @@ All notable changes to sftply. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-11-20
 
 ### Added
 
@@ -12,7 +12,9 @@ All notable changes to sftply. The format follows
   imported from Settings → Appearance, and exported for sharing. Every semantic
   token is explicit; files with missing or unknown colors are rejected. Themes
   can be created and edited inside Settings → Appearance, changes to files are
-  detected automatically, and importing over an existing file asks first.
+  detected automatically, and importing over an existing file asks first. Theme
+  names must be unique and cannot reuse a built-in name; existing duplicates are
+  reported and hidden from the theme menus.
 - Selecting a theme previews it immediately; cancelling Settings restores the
   saved theme. New and Export use the selected theme.
 

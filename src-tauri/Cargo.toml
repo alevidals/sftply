@@ -1,6 +1,6 @@
 [package]
 name = "sftply"
-version = "1.3.0"
+version = "1.4.0"
 description = "A modern FTP, FTPS and SFTP desktop client"
 authors = ["sftply"]
 license = "MIT"
