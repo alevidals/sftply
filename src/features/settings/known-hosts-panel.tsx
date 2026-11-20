@@ -96,10 +96,12 @@ export function KnownHostsPanel() {
                   Remove
                 </Button>
               </div>
-              <div className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/30 pr-1">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-muted-foreground">
-                  {host.fingerprint}
-                </code>
+              <div className="flex min-w-0 items-center gap-1 rounded-md border border-border/60 bg-muted/30 pr-1">
+                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+                  <code className="block w-max whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-muted-foreground">
+                    {host.fingerprint}
+                  </code>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"

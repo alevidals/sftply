@@ -105,10 +105,12 @@ export function HostKeyDialog() {
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground">Fingerprint</span>
-              <div className="flex items-center gap-1 rounded-md border border-border/60 bg-background/40 pr-1">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-foreground">
-                  {challenge.fingerprint}
-                </code>
+              <div className="flex min-w-0 items-center gap-1 rounded-md border border-border/60 bg-background/40 pr-1">
+                <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+                  <code className="block w-max whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-foreground">
+                    {challenge.fingerprint}
+                  </code>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -125,9 +127,11 @@ export function HostKeyDialog() {
             {changed && challenge.previousFingerprint ? (
               <div className="space-y-1">
                 <span className="text-muted-foreground">Previously trusted</span>
-                <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 font-mono text-2xs text-destructive">
-                  {challenge.previousFingerprint}
-                </code>
+                <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-md border border-destructive/30 bg-destructive/5">
+                  <code className="block w-max whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-destructive">
+                    {challenge.previousFingerprint}
+                  </code>
+                </div>
               </div>
             ) : null}
           </div>
