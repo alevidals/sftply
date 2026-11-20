@@ -27,6 +27,26 @@ pub fn theme_delete(state: State<'_, AppState>, id: String) -> Result<(), AppErr
 
 #[tauri::command]
 #[specta::specta]
+pub fn theme_open_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), AppError> {
+    let path = themes::path_for(&state.paths.themes_dir, &id)
+        .ok_or_else(|| AppError::not_found("That theme file no longer exists."))?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|error| {
+            AppError::internal(
+                "Could not open the theme file.",
+                format!("{}: {error}", path.display()),
+            )
+        })?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn theme_export(path: String, content: String) -> Result<(), AppError> {
     themes::write_export(std::path::Path::new(&path), &content).map_err(AppError::invalid_input)
 }

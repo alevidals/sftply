@@ -117,6 +117,10 @@ fn has_theme_extension(path: &Path) -> bool {
         })
 }
 
+pub fn path_for(dir: &Path, id: &str) -> Option<PathBuf> {
+    find_theme_file(dir, id)
+}
+
 fn find_theme_file(dir: &Path, id: &str) -> Option<PathBuf> {
     let entries = std::fs::read_dir(dir).ok()?;
     for entry in entries.flatten() {

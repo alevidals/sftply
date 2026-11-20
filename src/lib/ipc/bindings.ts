@@ -17,6 +17,7 @@ export const commands = {
 	settingsUpdate: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
 	themesList: () => __TAURI_INVOKE<ThemeList>("themes_list"),
 	themeImport: (path: string) => typedError<CustomTheme, AppError_Serialize>(__TAURI_INVOKE("theme_import", { path })),
+	themeOpenFile: (id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("theme_open_file", { id })),
 	themeDelete: (id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("theme_delete", { id })),
 	themeExport: (path: string, content: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("theme_export", { path, content })),
 	/**  Open the folder where custom theme files live. */

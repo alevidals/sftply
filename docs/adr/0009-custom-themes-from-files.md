@@ -28,8 +28,9 @@ token explicit.
 4. The frontend applies the file's colors exactly as inline CSS variables.
    Built-in themes remove those inline variables and use their CSS block.
 5. Settings → Appearance lists custom themes next to built-ins and offers Import,
-   Export, Reload and open-folder actions. The selected custom theme is cached in
-   local storage so the bootstrap script can paint it before React starts.
+   Export, Edit, Reload and open-folder actions. Edit opens the file in the
+   system editor. The selected custom theme is cached in local storage so the
+   bootstrap script can paint it before React starts.
 6. There is no file watcher and no in-app theme editor in this iteration.
 
 ## Consequences

@@ -219,12 +219,14 @@ Linux:   ~/.config/com.alevidals.sftply/themes/
 ```
 
 Use **Import** to copy a valid TOML theme into that folder, **Export** to save the
-current theme, **Reload** after adding files manually, and **Folder** to open the
-directory. Deleting a custom theme removes its file.
+current theme, **Edit** to open a custom theme in your editor, **Reload** after
+saving it, and **Folder** to open the directory. Deleting a custom theme removes
+its file.
 
 A theme is a TOML file with `key = "value"` lines. It must define every color
 token the app uses; there are no defaults, derived colors or ANSI palette
-shortcuts:
+shortcuts. `variant` is `dark` or `light` and controls whether the app uses its
+dark-mode component tweaks and dark native controls:
 
 ```text
 name = "Mine"

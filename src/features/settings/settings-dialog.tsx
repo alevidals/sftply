@@ -1,11 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plugin-dialog"
+import { openUrl } from "@tauri-apps/plugin-opener"
 import { cn } from "cn"
 import {
+  BookOpenIcon,
   CheckIcon,
   DownloadIcon,
   FolderOpenIcon,
   PaletteIcon,
+  PencilIcon,
   RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
@@ -365,6 +368,31 @@ export function SettingsDialog() {
                     </div>
                   </div>
 
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <p className="text-xs font-medium">How custom themes work</p>
+                    <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+                      A <span className="font-mono">.toml</span> theme must define every color
+                      token; nothing is derived. Export a built-in theme for a complete template,
+                      use <span className="font-medium text-foreground">Edit</span> to open a custom
+                      theme in your editor, then press{" "}
+                      <span className="font-medium text-foreground">Reload</span>.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      className="mt-1 -ml-2"
+                      onClick={() =>
+                        void openUrl(
+                          "https://github.com/alevidals/sftply/blob/main/docs/USER_GUIDE.md#themes",
+                        )
+                      }
+                    >
+                      <BookOpenIcon />
+                      Read the theme guide
+                    </Button>
+                  </div>
+
                   {themeWarnings.length > 0 ? (
                     <div className="space-y-1 rounded-lg border border-warning/30 bg-warning/5 p-2.5 text-2xs text-warning">
                       {themeWarnings.map((warning) => (
@@ -432,16 +460,32 @@ export function SettingsDialog() {
                                 ) : null}
                               </span>
                             </label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              className="absolute top-1 right-1"
-                              aria-label={`Delete ${option.label}`}
-                              onClick={() => setDeletingTheme(theme)}
-                            >
-                              <Trash2Icon />
-                            </Button>
+                            <div className="absolute top-1 right-1 flex gap-0.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={`Edit ${option.label}`}
+                                onClick={() =>
+                                  void ipc.themeOpenFile(theme.id).catch((error) =>
+                                    toast.error("Could not open the theme file", {
+                                      description: errorMessage(error),
+                                    }),
+                                  )
+                                }
+                              >
+                                <PencilIcon />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={`Delete ${option.label}`}
+                                onClick={() => setDeletingTheme(theme)}
+                              >
+                                <Trash2Icon />
+                              </Button>
+                            </div>
                           </div>
                         )
                       })}

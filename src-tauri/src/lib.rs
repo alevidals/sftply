@@ -37,6 +37,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::settings::settings_update,
             commands::themes::themes_list,
             commands::themes::theme_import,
+            commands::themes::theme_open_file,
             commands::themes::theme_delete,
             commands::themes::theme_export,
             commands::themes::themes_open_folder,

@@ -84,6 +84,12 @@ export const ipc = {
     return invoke(commands.themeImport(path)).then((result) => unwrap(result))
   },
 
+  themeOpenFile(id: string): Promise<void> {
+    return invoke(commands.themeOpenFile(id)).then((result) => {
+      unwrap(result)
+    })
+  },
+
   themeDelete(id: string): Promise<void> {
     return invoke(commands.themeDelete(id)).then((result) => {
       unwrap(result)
