@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button"
 import { useSessionActions } from "@/features/sessions/hooks/use-session-actions"
 import { copyText } from "@/lib/clipboard"
 import { normalizeError } from "@/lib/errors"
-import { formatFingerprint } from "@/lib/format"
 import { ipc } from "@/lib/ipc/client"
 import { recordActivity } from "@/stores/activity-store"
 import { useHostKeyStore } from "@/stores/host-key-store"
@@ -105,8 +104,11 @@ export function HostKeyDialog() {
               <span className="font-mono text-foreground">{challenge.keyType}</span>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">Fingerprint</span>
+              <span className="text-muted-foreground">Fingerprint</span>
+              <div className="flex items-center gap-1 rounded-md border border-border/60 bg-background/40 pr-1">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-foreground">
+                  {challenge.fingerprint}
+                </code>
                 <Button
                   type="button"
                   variant="ghost"
@@ -119,16 +121,13 @@ export function HostKeyDialog() {
                   <CopyIcon />
                 </Button>
               </div>
-              <p className="whitespace-pre-wrap font-mono text-2xs break-all text-foreground">
-                {formatFingerprint(challenge.fingerprint)}
-              </p>
             </div>
             {changed && challenge.previousFingerprint ? (
               <div className="space-y-1">
                 <span className="text-muted-foreground">Previously trusted</span>
-                <p className="whitespace-pre-wrap font-mono text-2xs break-all text-destructive">
-                  {formatFingerprint(challenge.previousFingerprint)}
-                </p>
+                <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 font-mono text-2xs text-destructive">
+                  {challenge.previousFingerprint}
+                </code>
               </div>
             ) : null}
           </div>

@@ -17,7 +17,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { useFormatPreferences } from "@/features/settings/settings-context"
 import { copyText } from "@/lib/clipboard"
 import { errorMessage } from "@/lib/errors"
-import { formatFingerprint, formatModified } from "@/lib/format"
+import { formatModified } from "@/lib/format"
 import type { KnownHost } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 
@@ -96,10 +96,10 @@ export function KnownHostsPanel() {
                   Remove
                 </Button>
               </div>
-              <div className="flex items-start gap-1">
-                <p className="min-w-0 flex-1 whitespace-pre-wrap font-mono text-2xs break-all text-muted-foreground">
-                  {formatFingerprint(host.fingerprint)}
-                </p>
+              <div className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/30 pr-1">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-2 py-1.5 font-mono text-2xs text-muted-foreground">
+                  {host.fingerprint}
+                </code>
                 <Button
                   type="button"
                   variant="ghost"

@@ -3,7 +3,6 @@ import {
   formatBytes,
   formatClock,
   formatCount,
-  formatFingerprint,
   formatMode,
   formatModeSymbolic,
   formatModified,
@@ -81,22 +80,6 @@ describe("formatMode", () => {
     expect(formatModeSymbolic(0o4644)).toBe("-rwSr--r--")
     expect(formatModeSymbolic(0o1777, true)).toBe("drwxrwxrwt")
     expect(formatModeSymbolic(null)).toBe("—")
-  })
-})
-
-describe("formatFingerprint", () => {
-  it("splits a long fingerprint into two balanced lines without changing it", () => {
-    const body = "UFb+unA4c+6hgrYRo8iXOF5YxEhBs7VsZaWIJKmSv4E"
-    const formatted = formatFingerprint(`SHA256:${body}`)
-    const lines = formatted.split("\n")
-    const [first = "", second = ""] = lines
-    expect(lines).toHaveLength(2)
-    expect(formatted.replace("\n", "")).toBe(`SHA256:${body}`)
-    expect(Math.abs(first.length - second.length)).toBeLessThanOrEqual(9)
-  })
-
-  it("leaves short values untouched", () => {
-    expect(formatFingerprint("SHA256:abc")).toBe("SHA256:abc")
   })
 })
 
