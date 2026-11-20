@@ -74,6 +74,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   const secretStatus = useSecretStatus(connection?.id ?? null, open)
   const requestHostKey = useHostKeyStore((state) => state.request)
   const authKind = form.watch("authKind")
+  const passphraseProtected = form.watch("passphraseProtected")
   const protocol = form.watch("protocol")
   const tlsAllowInvalid = form.watch("tlsAllowInvalid")
 
@@ -85,11 +86,11 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
   }, [open, connection, form])
 
   const existingSecret =
-    authKind === "agent"
-      ? undefined
-      : authKind === "key"
+    authKind === "password"
+      ? secretStatus.data?.password
+      : authKind === "key" && passphraseProtected
         ? secretStatus.data?.passphrase
-        : secretStatus.data?.password
+        : undefined
 
   const changeProtocol = (value: string, onChange: (next: ConnectionProtocol) => void) => {
     const next = value as ConnectionProtocol
@@ -135,7 +136,8 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
         : await connectionsApi.create(input)
 
       const secretKind = secretKindFor(values)
-      if (values.secret && secretKind) {
+      const needsSecret = values.authKind === "password" || values.passphraseProtected
+      if (values.secret && secretKind && needsSecret) {
         await connectionsApi.setSecret(saved.id, secretKind, values.secret)
       }
 
@@ -375,7 +377,10 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                         <Switch
                           id="connection-passphrase"
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked)
+                            if (!checked) form.setValue("secret", "")
+                          }}
                         />
                       )}
                     />
@@ -393,7 +398,7 @@ export function ConnectionDialog({ open, connection, onOpenChange }: ConnectionD
                 </div>
               ) : null}
 
-              {authKind !== "agent" ? (
+              {authKind === "password" || (authKind === "key" && passphraseProtected) ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="connection-secret">
                     {authKind === "key" ? "Passphrase" : "Password"}

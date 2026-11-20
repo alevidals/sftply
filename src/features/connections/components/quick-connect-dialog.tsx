@@ -66,6 +66,7 @@ export function QuickConnectDialog() {
   const [error, setError] = useState<string | null>(null)
   const requestHostKey = useHostKeyStore((state) => state.request)
   const authKind = form.watch("authKind")
+  const passphraseProtected = form.watch("passphraseProtected")
   const protocol = form.watch("protocol")
   const save = form.watch("save")
   const tlsAllowInvalid = form.watch("tlsAllowInvalid")
@@ -321,7 +322,10 @@ export function QuickConnectDialog() {
                         <Switch
                           id="quick-connect-passphrase"
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked)
+                            if (!checked) form.setValue("secret", "")
+                          }}
                         />
                       )}
                     />
@@ -339,7 +343,7 @@ export function QuickConnectDialog() {
                 </div>
               ) : null}
 
-              {authKind !== "agent" ? (
+              {authKind === "password" || (authKind === "key" && passphraseProtected) ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="quick-connect-secret">
                     {authKind === "key" ? "Passphrase" : "Password"}

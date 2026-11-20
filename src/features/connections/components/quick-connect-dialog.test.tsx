@@ -92,6 +92,21 @@ describe("QuickConnectDialog", () => {
     expect(actions.quickConnect).not.toHaveBeenCalled()
   })
 
+  it("hides the passphrase field for unprotected keys", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    renderDialog()
+
+    await user.type(screen.getByLabelText("Host"), "sftp.example.com")
+    await user.type(screen.getByLabelText("Username"), "ada")
+    await user.click(screen.getByRole("combobox", { name: "Authentication" }))
+    await user.click(await screen.findByRole("option", { name: "SSH key" }))
+    await user.type(screen.getByLabelText("Private key"), "/home/ada/.ssh/id_ed25519")
+
+    expect(screen.queryByLabelText("Passphrase")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("switch", { name: "Key needs a passphrase" }))
+    expect(screen.getByLabelText("Passphrase")).toBeInTheDocument()
+  })
+
   it("uses the SSH agent without asking for a secret", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     renderDialog()
