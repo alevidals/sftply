@@ -10,9 +10,9 @@ All notable changes to sftply. The format follows
 
 - Custom themes can be loaded from `.toml` files in the app's `themes` folder,
   imported from Settings → Appearance, and exported for sharing. Every semantic
-  token is explicit; files with missing or unknown colors are rejected. Custom
-  themes can be opened in the system editor from the gallery and reloaded after
-  editing.
+  token is explicit; files with missing or unknown colors are rejected. Themes
+  can be created and edited inside Settings → Appearance, changes to files are
+  detected automatically, and importing over an existing file asks first.
 
 ## [1.3.0] - 2026-11-20
 

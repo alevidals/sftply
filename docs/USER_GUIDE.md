@@ -218,10 +218,12 @@ Windows: %APPDATA%\com.alevidals.sftply\themes\
 Linux:   ~/.config/com.alevidals.sftply/themes/
 ```
 
-Use **Import** to copy a valid TOML theme into that folder, **Export** to save the
-current theme, **Edit** to open a custom theme in your editor, **Reload** after
-saving it, and **Folder** to open the directory. Deleting a custom theme removes
-its file.
+Use **New** to create a theme in the built-in editor, **Import** to copy a valid
+TOML theme into that folder, **Export** to save the current theme, **Edit** to
+open a custom theme in the editor, and **Folder** to open the directory. Theme
+files changed outside the app are picked up automatically; **Reload** forces a
+refresh. Importing a theme with an existing file name asks before replacing it.
+Deleting a custom theme removes its file.
 
 A theme is a TOML file with `key = "value"` lines. It must define every color
 token the app uses; there are no defaults, derived colors or ANSI palette

@@ -45,11 +45,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { KnownHostsPanel } from "@/features/settings/known-hosts-panel"
 import { useSettings } from "@/features/settings/settings-context"
 import { ShortcutsPanel } from "@/features/settings/shortcuts-panel"
+import { ThemeEditorDialog } from "@/features/settings/theme-editor-dialog"
 import { UpdateCheck } from "@/features/settings/update-check"
 import { useAppInfo } from "@/hooks/use-app-info"
 import { useDelayedFlag } from "@/hooks/use-delayed-flag"
 import { currentThemeExport, customThemeOption, themeExportText } from "@/lib/custom-theme"
-import { errorMessage } from "@/lib/errors"
+import { errorMessage, normalizeError } from "@/lib/errors"
 import type { AppSettings_Serialize, CustomTheme } from "@/lib/ipc/bindings"
 import { ipc } from "@/lib/ipc/client"
 import { isMacPlatform } from "@/lib/shortcuts"
@@ -119,6 +120,9 @@ export function SettingsDialog() {
 
   const { reset, handleSubmit, control, register, formState } = form
   const [deletingTheme, setDeletingTheme] = useState<CustomTheme | null>(null)
+  const [pendingImport, setPendingImport] = useState<string | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editingTheme, setEditingTheme] = useState<CustomTheme | null>(null)
   const selectedTheme = form.watch("theme")
 
   useEffect(() => {
@@ -140,6 +144,23 @@ export function SettingsDialog() {
     }
   })
 
+  const performImport = async (path: string, overwrite: boolean) => {
+    try {
+      const imported = await ipc.themeImport(path, overwrite)
+      await reloadThemes()
+      form.setValue("theme", imported.id, { shouldDirty: true, shouldValidate: true })
+      setPendingImport(null)
+      toast.success(`Imported “${imported.name}”`)
+    } catch (error) {
+      const normalized = normalizeError(error)
+      if (!overwrite && normalized.code === "CONFLICT") {
+        setPendingImport(path)
+        return
+      }
+      toast.error("Could not import the theme", { description: normalized.message })
+    }
+  }
+
   const importTheme = async () => {
     const selected = await openFileDialog({
       multiple: false,
@@ -147,15 +168,7 @@ export function SettingsDialog() {
       title: "Choose a theme file",
       filters: [{ name: "sftply theme", extensions: ["toml"] }],
     })
-    if (typeof selected !== "string") return
-    try {
-      const imported = await ipc.themeImport(selected)
-      await reloadThemes()
-      form.setValue("theme", imported.id, { shouldDirty: true, shouldValidate: true })
-      toast.success(`Imported “${imported.name}”`)
-    } catch (error) {
-      toast.error("Could not import the theme", { description: errorMessage(error) })
-    }
+    if (typeof selected === "string") await performImport(selected, false)
   }
 
   const exportTheme = async () => {
@@ -327,6 +340,18 @@ export function SettingsDialog() {
                         type="button"
                         variant="outline"
                         size="sm"
+                        onClick={() => {
+                          setEditingTheme(null)
+                          setEditorOpen(true)
+                        }}
+                      >
+                        <PaletteIcon />
+                        New
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => void importTheme()}
                       >
                         <UploadIcon />
@@ -466,13 +491,10 @@ export function SettingsDialog() {
                                 variant="ghost"
                                 size="icon-xs"
                                 aria-label={`Edit ${option.label}`}
-                                onClick={() =>
-                                  void ipc.themeOpenFile(theme.id).catch((error) =>
-                                    toast.error("Could not open the theme file", {
-                                      description: errorMessage(error),
-                                    }),
-                                  )
-                                }
+                                onClick={() => {
+                                  setEditingTheme(theme)
+                                  setEditorOpen(true)
+                                }}
                               >
                                 <PencilIcon />
                               </Button>
@@ -791,6 +813,40 @@ export function SettingsDialog() {
             </Button>
           </DialogFooter>
         </form>
+
+        <ThemeEditorDialog
+          open={editorOpen}
+          theme={editingTheme}
+          onOpenChange={setEditorOpen}
+          onSaved={(saved) => {
+            void reloadThemes()
+            form.setValue("theme", saved.id, { shouldDirty: true, shouldValidate: true })
+          }}
+        />
+
+        <AlertDialog
+          open={Boolean(pendingImport)}
+          onOpenChange={(next) => !next && setPendingImport(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Replace existing theme?</AlertDialogTitle>
+              <AlertDialogDescription>
+                A theme with this file name already exists in your themes folder. Replacing it
+                updates the file for this and every future session.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => pendingImport && void performImport(pendingImport, true)}
+              >
+                Replace theme
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog
           open={Boolean(deletingTheme)}

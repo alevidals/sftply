@@ -27,11 +27,15 @@ token explicit.
    rejects the file with a warning.
 4. The frontend applies the file's colors exactly as inline CSS variables.
    Built-in themes remove those inline variables and use their CSS block.
-5. Settings → Appearance lists custom themes next to built-ins and offers Import,
-   Export, Edit, Reload and open-folder actions. Edit opens the file in the
-   system editor. The selected custom theme is cached in local storage so the
-   bootstrap script can paint it before React starts.
-6. There is no file watcher and no in-app theme editor in this iteration.
+5. Settings → Appearance lists custom themes next to built-ins and offers New,
+   Edit, Import, Export, Reload and open-folder actions. New and Edit use an
+   in-app editor with live preview and can also open the generated file in the
+   system editor. Import asks before replacing an existing file. The selected
+   custom theme is cached in local storage so the bootstrap script can paint it
+   before React starts.
+6. The themes folder is polled while the app runs so external edits appear
+   without a restart. Reload forces an immediate refresh. Custom themes are not
+   contrast-audited; the user chooses the colors explicitly.
 
 ## Consequences
 

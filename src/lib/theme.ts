@@ -40,7 +40,7 @@ export function resolveTheme(
 let appliedCustomTokens: string[] = []
 
 /** Apply the theme class, palette id and color-scheme to `<html>`. */
-export function applyDocumentTheme(theme: ResolvedTheme): void {
+export function applyDocumentTheme(theme: ResolvedTheme, options?: { cache?: boolean }): void {
   const root = document.documentElement
   root.classList.toggle("dark", theme.dark)
   root.dataset.theme = theme.colors ? "custom" : theme.id
@@ -56,7 +56,7 @@ export function applyDocumentTheme(theme: ResolvedTheme): void {
       root.style.setProperty(`--${key}`, value)
       appliedCustomTokens.push(key)
     }
-    rememberCustomTheme(theme)
+    if (options?.cache !== false) rememberCustomTheme(theme)
   } else {
     forgetCustomTheme()
   }

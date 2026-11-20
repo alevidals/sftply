@@ -47,26 +47,113 @@ pub fn list(dir: &Path) -> ThemeList {
     ThemeList { themes, warnings }
 }
 
+/// Parse a theme file without copying it.
+pub fn inspect(source: &Path) -> Result<CustomTheme, String> {
+    read_theme(source)
+}
+
+/// Destination for a custom theme id. The id includes the `custom:` prefix.
+pub fn destination(dir: &Path, id: &str) -> PathBuf {
+    dir.join(format!("{}.toml", id.strip_prefix("custom:").unwrap_or(id)))
+}
+
 /// Copy a valid theme file into the themes directory. The file name determines
-/// the theme id; an existing id is replaced.
+/// the theme id; an existing file with the same id is replaced.
 pub fn import(dir: &Path, source: &Path) -> Result<CustomTheme, String> {
-    let file_name = source
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| "The theme file name is not valid.".to_string())?;
+    let theme = inspect(source)?;
     let contents = std::fs::read_to_string(source)
         .map_err(|error| format!("The theme file could not be read: {error}"))?;
-    if contents.len() as u64 > THEME_FILE_MAX_BYTES {
-        return Err("The theme file is too large.".into());
-    }
-
-    let theme = parse_theme(file_name, &contents)?;
-    let stem = theme.id.strip_prefix("custom:").unwrap_or("theme");
     std::fs::create_dir_all(dir)
         .map_err(|error| format!("Could not create the themes folder: {error}"))?;
-    std::fs::write(dir.join(format!("{stem}.toml")), contents)
+    std::fs::write(destination(dir, &theme.id), contents)
         .map_err(|error| format!("The theme file could not be saved: {error}"))?;
     Ok(theme)
+}
+
+/// Create or update a custom theme from the editor. A new theme gets a unique
+/// id derived from its name; editing an existing theme keeps its file.
+pub fn save(
+    dir: &Path,
+    id: Option<&str>,
+    name: &str,
+    dark: bool,
+    colors: &std::collections::BTreeMap<String, String>,
+) -> Result<CustomTheme, String> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 100 || name.chars().any(char::is_control) {
+        return Err("The theme name is invalid.".into());
+    }
+    if colors.len() != crate::domain::theme::THEME_TOKEN_KEYS.len() {
+        return Err("Every theme color must be defined.".into());
+    }
+    for key in colors.keys() {
+        if !crate::domain::theme::THEME_TOKEN_KEYS.contains(&key.as_str()) {
+            return Err(format!("Unknown theme color: {key}."));
+        }
+    }
+    let mut normalized = std::collections::BTreeMap::new();
+    for key in crate::domain::theme::THEME_TOKEN_KEYS {
+        let value = colors
+            .get(*key)
+            .ok_or_else(|| format!("Missing theme color: {key}."))?;
+        let value = crate::domain::theme::normalize_color(value)
+            .ok_or_else(|| format!("Invalid color for {key}."))?;
+        normalized.insert((*key).to_string(), value);
+    }
+
+    let id = match id {
+        Some(id) if id.starts_with("custom:") => id.to_string(),
+        _ => unique_id(dir, name),
+    };
+    let stem = id.strip_prefix("custom:").unwrap_or("theme");
+    let contents = to_toml(name, dark, &normalized);
+    let theme = crate::domain::theme::parse_theme(&format!("{stem}.toml"), &contents)?;
+    std::fs::create_dir_all(dir)
+        .map_err(|error| format!("Could not create the themes folder: {error}"))?;
+    std::fs::write(destination(dir, &theme.id), contents)
+        .map_err(|error| format!("The theme file could not be saved: {error}"))?;
+    Ok(theme)
+}
+
+fn unique_id(dir: &Path, name: &str) -> String {
+    let base = name
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else if character == '-' || character == '_' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let base = if base.is_empty() {
+        "theme".to_string()
+    } else {
+        base
+    };
+    let mut id = format!("custom:{base}");
+    let mut index = 2;
+    while destination(dir, &id).exists() {
+        id = format!("custom:{base}-{index}");
+        index += 1;
+    }
+    id
+}
+
+fn to_toml(name: &str, dark: bool, colors: &std::collections::BTreeMap<String, String>) -> String {
+    let quote = |value: &str| format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""));
+    let mut lines = vec![
+        format!("name = {}", quote(name)),
+        format!("variant = {}", quote(if dark { "dark" } else { "light" })),
+    ];
+    for (key, value) in colors {
+        lines.push(format!("{key} = {}", quote(value)));
+    }
+    format!("{}\n", lines.join("\n"))
 }
 
 /// Remove the file backing a custom theme. Built-in ids are rejected.
@@ -192,5 +279,42 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         assert!(delete(dir.path(), "dark").is_err());
         assert!(delete(dir.path(), "custom:missing").is_err());
+    }
+}
+
+#[cfg(test)]
+mod save_tests {
+    use super::*;
+    use crate::domain::theme::THEME_TOKEN_KEYS;
+
+    fn colors() -> std::collections::BTreeMap<String, String> {
+        THEME_TOKEN_KEYS
+            .iter()
+            .map(|key| ((*key).to_string(), "#123456".to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn saves_and_updates_a_theme() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let saved = save(dir.path(), None, "Mine", true, &colors()).expect("save");
+        assert_eq!(saved.id, "custom:mine");
+        assert_eq!(list(dir.path()).themes.len(), 1);
+
+        let updated =
+            save(dir.path(), Some(&saved.id), "Mine 2", false, &colors()).expect("update");
+        assert_eq!(updated.id, "custom:mine");
+        assert_eq!(updated.name, "Mine 2");
+        assert!(!updated.dark);
+        assert_eq!(list(dir.path()).themes.len(), 1);
+    }
+
+    #[test]
+    fn gives_repeated_new_names_unique_ids() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let first = save(dir.path(), None, "Mine", true, &colors()).expect("first");
+        let second = save(dir.path(), None, "Mine", true, &colors()).expect("second");
+        assert_eq!(first.id, "custom:mine");
+        assert_eq!(second.id, "custom:mine-2");
     }
 }

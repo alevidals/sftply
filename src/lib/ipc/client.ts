@@ -80,8 +80,17 @@ export const ipc = {
     return invoke(commands.themesList())
   },
 
-  themeImport(path: string): Promise<CustomTheme> {
-    return invoke(commands.themeImport(path)).then((result) => unwrap(result))
+  themeImport(path: string, overwrite: boolean): Promise<CustomTheme> {
+    return invoke(commands.themeImport(path, overwrite)).then((result) => unwrap(result))
+  },
+
+  themeSave(
+    id: string | null,
+    name: string,
+    dark: boolean,
+    colors: Record<string, string>,
+  ): Promise<CustomTheme> {
+    return invoke(commands.themeSave(id, name, dark, colors)).then((result) => unwrap(result))
   },
 
   themeOpenFile(id: string): Promise<void> {

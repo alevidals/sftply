@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::app_state::AppState;
 use crate::config::themes;
 use crate::domain::theme::{CustomTheme, ThemeList};
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 
 #[tauri::command]
 #[specta::specta]
@@ -14,8 +16,32 @@ pub fn themes_list(state: State<'_, AppState>) -> ThemeList {
 
 #[tauri::command]
 #[specta::specta]
-pub fn theme_import(state: State<'_, AppState>, path: String) -> Result<CustomTheme, AppError> {
-    themes::import(&state.paths.themes_dir, std::path::Path::new(&path))
+pub fn theme_import(
+    state: State<'_, AppState>,
+    path: String,
+    overwrite: bool,
+) -> Result<CustomTheme, AppError> {
+    let source = std::path::Path::new(&path);
+    let theme = themes::inspect(source).map_err(AppError::invalid_input)?;
+    if !overwrite && themes::destination(&state.paths.themes_dir, &theme.id).exists() {
+        return Err(AppError::new(
+            ErrorCode::Conflict,
+            "A theme with this file name already exists.",
+        ));
+    }
+    themes::import(&state.paths.themes_dir, source).map_err(AppError::invalid_input)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn theme_save(
+    state: State<'_, AppState>,
+    id: Option<String>,
+    name: String,
+    dark: bool,
+    colors: BTreeMap<String, String>,
+) -> Result<CustomTheme, AppError> {
+    themes::save(&state.paths.themes_dir, id.as_deref(), &name, dark, &colors)
         .map_err(AppError::invalid_input)
 }
 

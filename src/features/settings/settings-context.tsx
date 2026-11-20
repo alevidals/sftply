@@ -50,7 +50,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const themesQuery = useQuery({
     queryKey: THEMES_QUERY_KEY,
     queryFn: ipc.themesList,
-    staleTime: 5_000,
+    staleTime: 1_000,
+    refetchInterval: 3_000,
+    refetchIntervalInBackground: true,
     retry: 1,
   })
   const customThemes = themesQuery.data?.themes ?? []
